@@ -1,0 +1,4 @@
+Feature engineering
+-------------------
+Would like to derive variables e.g. density, momentum from known data
+See load-grid-info.py to get pressures at altitude levels
