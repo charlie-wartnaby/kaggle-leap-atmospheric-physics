@@ -7,6 +7,6 @@ grid_info = xr.open_dataset(grid_path)
 levels = grid_info['lev']
 
 # Get the 60 levels as pressures in hPa
-print(levels.units, levels.values)
-
-pass
+print(f"# Altitude levels in {levels.units} from {grid_path}")
+string_levels = levels.values.astype(str)
+print(f"level_pressure_{levels.units.lower()} = [" + ", ".join(string_levels) + "]")
