@@ -1,5 +1,6 @@
 class ColumnInfo():
     def __init__(self, is_input, name, description, dimension, units='', first_useful_idx=0):
+        self.is_input         = is_input
         self.name             = name
         self.description      = description
         self.dimension        = dimension
