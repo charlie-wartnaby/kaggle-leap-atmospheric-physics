@@ -1,5 +1,6 @@
 # LEAP competition with feature engineering
 
+import copy
 import os
 import polars as pl
 
@@ -88,6 +89,32 @@ unexpanded_col_list = [
 ]
 
 # Add columns for new features
-unexpanded_col_list.append(ColumnInfo(True, 'air_density', 'air density', 60, 'kg/m3'))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_u', 'zonal momentum per unit volume',      60, '(kg.m/s)/m3')),
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_v', 'meridional momentum per unit volume', 60, '(kg.m/s)/m3')),
+unexpanded_col_list.append(ColumnInfo(True, 'pressure',    'air pressure',                        60, 'N/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'air_density', 'air density',                         60, 'kg/m3'      ))
+unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',  'zonal momentum per unit volume',      60, '(kg.m/s)/m3')),
+unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',  'meridional momentum per unit volume', 60, '(kg.m/s)/m3')),
+
+unexpanded_col_names = [col.name for col in unexpanded_col_list]
+unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
+
+unexpanded_input_col_names = [col.name for col in unexpanded_col_list if col.is_input]
+unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not col.is_input]
+
+def expand_and_add_cols(col_list, cols_by_name, col_names):
+    for col_name in col_names:
+        col_info = cols_by_name[col_name]
+        if col_info.dimension <= 1:
+            col_list.append(col_info)
+        else:
+            for i in range(col_info.dimension):
+                col_info = copy.copy(cols_by_name[col_name])
+                col_info.name = col_info.name + f'_{i}'
+                col_list.append(col_info)
+
+expanded_col_list = []
+expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_input_col_names)
+expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_output_col_names)
+
+print(f'expanded_col_list len={len(expanded_col_list)}')
+expanded_names = [col.name for col in expanded_col_list]
+print('Expanded col list names', expanded_names)
