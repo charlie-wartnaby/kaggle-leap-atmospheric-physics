@@ -1,6 +1,6 @@
 import xarray as xr
 
-grid_path = 'ClimSim-main\grid_info\ClimSim_low-res_grid-info.nc'
+grid_path = r'ClimSim-main\grid_info\ClimSim_low-res_grid-info.nc'
 
 grid_info = xr.open_dataset(grid_path)
 

@@ -120,9 +120,7 @@ expanded_col_list = []
 expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_input_col_names)
 expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_output_col_names)
 
-print(f'expanded_col_list len={len(expanded_col_list)}')
 expanded_names = [col.name for col in expanded_col_list]
-print('Expanded col list names', expanded_names)
 
 # Not sure if adding single columns at a time will be too slow on big dataset, can do:
 #new_pressure_cols = [pl.lit(level_pressure_hpa[i]).alias(f'pressure_{i}') for i in range(num_levels)]
@@ -131,16 +129,21 @@ print('Expanded col list names', expanded_names)
 R_air = 287.0 # Mass-based gas constant approx for air in J/kg.K
 for i in range(num_levels):
     # Column names for this level
-    cn_pressure    = f'pressure_{i}'   # Pressure in hPa
-    cn_temperature = f'state_t_{i}'    # Temperature in K
-    cn_density     = f'density_{i}'    # Density in kg/m3
+    cn_pressure       = f'pressure_{i}'   # Pressure in hPa
+    cn_temperature    = f'state_t_{i}'    # Temperature in K
+    cn_density        = f'density_{i}'    # Density in kg/m3
+    cn_mtm_zonal      = f'momentum_u_{i}' # Zonal (E-W) momentum per unit volume in kg/m3.m/s
+    cn_mtm_meridional = f'momentum_v_{i}' # Meridional (N-S) momentum per unit volume in kg/m3.m/s
+    cn_vel_zonal      = f'state_u_{i}'    # Zonal velocity in m/s
+    cn_vel_meridional = f'state_v_{i}'    # Meridional velocity in m/s
     # Using fixed pressure levels, hopefully near enough, not sure in dataset whether
     # we're supposed to scale with surface pressure or something:
     train_df = train_df.with_columns(pl.lit(level_pressure_hpa[i]).alias(cn_pressure))
     # pV = mRT
     # m/V = p/RT = density, with *100 for hPa -> Pa conversion
     train_df = train_df.with_columns((pl.col(cn_pressure) * 100.0 / (R_air * pl.col(cn_temperature))).alias(cn_density))
+    # Momentum per unit vol just density * velocity
+    train_df = train_df.with_columns((pl.col(cn_density) * pl.col(cn_vel_zonal)).alias(cn_mtm_zonal))
+    train_df = train_df.with_columns((pl.col(cn_density) * pl.col(cn_vel_meridional)).alias(cn_mtm_meridional))
 
 train_df.write_csv('debug_train.csv')
-col_names = list(train_df.columns)
-pass
