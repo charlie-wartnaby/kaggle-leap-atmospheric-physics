@@ -1,17 +1,21 @@
 # LEAP competition with feature engineering
 
-import copy
-import os
-import polars as pl
-
-
+# This block will be differen in Kaggle notebook:
 run_local = True
+
+
+
 debug = True
 
 if debug:
-    max_train_rows = 2000
+    max_train_rows = 2
 else:
     max_train_rows = 0 # all
+
+
+import copy
+import os
+import polars as pl
 
 
 if run_local:
@@ -32,6 +36,7 @@ train_df = pl.read_csv(train_path, **pl_read_opts)
 
 # Altitude levels in hPa from ClimSim-main\grid_info\ClimSim_low-res_grid-info.nc
 level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.2529232969453412, 0.4492506351686618, 0.7863461614709879, 1.3473557602677517, 2.244777286900205, 3.6164314830257718, 5.615836425337344, 8.403253219853443, 12.144489352066294, 17.016828024303006, 23.21079811610005, 30.914346261995327, 40.277580662953575, 51.37463234765765, 64.18922841394662, 78.63965761131159, 94.63009200213703, 112.09127353988006, 130.97780378937776, 151.22131809551237, 172.67390465199267, 195.08770981962772, 218.15593476138105, 241.60037901222947, 265.2585152868483, 289.12232222921756, 313.31208711045167, 338.0069992368819, 363.37349177951705, 389.5233382784413, 416.5079218282233, 444.3314120123719, 472.9572063769364, 502.2919169181905, 532.1522731583445, 562.2393924639011, 592.1492760575118, 621.4328411158061, 649.689897132655, 676.6564846051039, 702.2421877859194, 726.4985894989197, 749.5376452869328, 771.4452171682528, 792.2342599534793, 811.8566751313328, 830.2596431972574, 847.4506530638328, 863.5359020075301, 878.7158746040692, 893.2460179738746, 907.3852125876941, 921.3543974831824, 935.3167171670306, 949.3780562075774, 963.5995994020714, 978.013432382012, 992.6355435925217]
+num_levels = len(level_pressure_hpa)
 
 
 # Manage columns as described in competition
@@ -118,3 +123,24 @@ expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_outpu
 print(f'expanded_col_list len={len(expanded_col_list)}')
 expanded_names = [col.name for col in expanded_col_list]
 print('Expanded col list names', expanded_names)
+
+# Not sure if adding single columns at a time will be too slow on big dataset, can do:
+#new_pressure_cols = [pl.lit(level_pressure_hpa[i]).alias(f'pressure_{i}') for i in range(num_levels)]
+#train_df = train_df.with_columns(new_pressure_cols)
+
+R_air = 287.0 # Mass-based gas constant approx for air in J/kg.K
+for i in range(num_levels):
+    # Column names for this level
+    cn_pressure    = f'pressure_{i}'   # Pressure in hPa
+    cn_temperature = f'state_t_{i}'    # Temperature in K
+    cn_density     = f'density_{i}'    # Density in kg/m3
+    # Using fixed pressure levels, hopefully near enough, not sure in dataset whether
+    # we're supposed to scale with surface pressure or something:
+    train_df = train_df.with_columns(pl.lit(level_pressure_hpa[i]).alias(cn_pressure))
+    # pV = mRT
+    # m/V = p/RT = density, with *100 for hPa -> Pa conversion
+    train_df = train_df.with_columns((pl.col(cn_pressure) * 100.0 / (R_air * pl.col(cn_temperature))).alias(cn_density))
+
+train_df.write_csv('debug_train.csv')
+col_names = list(train_df.columns)
+pass
