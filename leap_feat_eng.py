@@ -5,15 +5,15 @@ run_local = True
 
 
 
-debug = True
+debug = False
 do_test = True
 
 if debug:
-    max_train_rows = 2
-    max_test_rows  = 2
+    max_train_rows = 1000
+    max_test_rows  = 1000000000
 else:
     # Very large numbers for 'all'
-    max_train_rows = 1000000000
+    max_train_rows = 100000
     max_test_rows  = 1000000000
 
 import copy
