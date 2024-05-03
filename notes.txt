@@ -15,3 +15,5 @@ https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussi
 
 Nice simple example code showing PyTorch feedforward model and submission:
 https://www.kaggle.com/code/airazusta014/pytorch-nn
+Another nice simple NN using Keras:
+https://www.kaggle.com/code/ymatioun/leap-simple-nn
