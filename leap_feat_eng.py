@@ -10,10 +10,11 @@ do_test = True
 
 if debug:
     max_train_rows = 2
-    max_test_rows = 2
+    max_test_rows  = 2
 else:
-    max_train_rows = 0 # all
-    max_test_rows = 0
+    # Very large numbers for 'all'
+    max_train_rows = 1000000000
+    max_test_rows  = 1000000000
 
 import copy
 import os
@@ -28,7 +29,7 @@ if run_local:
 else:
     base_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim'
     train_path = os.path.join(base_path, 'train.csv')
-    train_path = os.path.join(base_path, 'test.csv')
+    test_path = os.path.join(base_path, 'test.csv')
     submission_path = os.path.join(base_path, 'sample_submission.csv')
 
 # Read in training data
