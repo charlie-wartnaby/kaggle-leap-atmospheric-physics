@@ -17,3 +17,44 @@ Nice simple example code showing PyTorch feedforward model and submission:
 https://www.kaggle.com/code/airazusta014/pytorch-nn
 Another nice simple NN using Keras:
 https://www.kaggle.com/code/ymatioun/leap-simple-nn
+
+
+Ideas to progress
+-----------------
+
+o Understand physics of each target col better
+o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
+o Reciprocal of new features, e.g. heating in K/s will be inversely proportional to density
+ for given heat input
+o Deeper/alternative network structures
+o CNN-type network that scans across altitude levels (mixed with those above and below)
+o Batch-based training on whole dataset or much bigger subset
+o Try other ML techniques apart from NN
+o Would it help to remove old feature columns?
+o Would it help to group columns differently depending on technique?
+
+Beucler et al
+o Transformed relative humidity to specific humidity for much better generalisation
+  https://colab.research.google.com/github/tbeucler/CBRAIN-CAM/blob/master/Climate_Invariant_Guide.ipynb
+o Transformed temperature to a buoyancy metric, also improved but only with RH too
+o Radiative effects: absorbtion of SW (visible), greenhouse trapping of LW (IR)
+o Sensible heat flux: +ve from atm to surface (radiation, conduction, convection??)
+o Latent heat flux: +ve for condensation on surface, -ve for evaporation from surface
+
+
+Results from early expts
+------------------------
+
+Showed that it did a touch better with additional features:
+
+LEAP with feature engineering - Version 7
+Complete · 4m ago · commit 34faf3590 again but with new features turned off for comparison
+0.22994
+
+LEAP with feature engineering - Version 6
+Complete · 42m ago · commit 34faf35, 1000000 training rows failed I think, this is 100000
+0.25368
+
+LEAP with feature engineering - Version 4
+Complete · 11h ago · f2a52c8 First attempts with some feature engineering on limited number of rows
+0.23289

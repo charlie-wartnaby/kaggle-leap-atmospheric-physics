@@ -5,7 +5,7 @@ run_local = True
 
 
 
-debug = False
+debug = True
 do_test = True
 
 if debug:
@@ -17,6 +17,7 @@ else:
     max_test_rows  = 1000000000
 
 import copy
+import numpy as np
 import os
 import polars as pl
 
@@ -100,10 +101,11 @@ unexpanded_col_list = [
 ]
 
 # Add columns for new features
-unexpanded_col_list.append(ColumnInfo(True, 'pressure',    'air pressure',                        60, 'N/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'density',     'air density',                         60, 'kg/m3'      ))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',  'zonal momentum per unit volume',      60, '(kg.m/s)/m3')),
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',  'meridional momentum per unit volume', 60, '(kg.m/s)/m3')),
+unexpanded_col_list.append(ColumnInfo(True, 'pressure',     'air pressure',                        60, 'N/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'density',      'air density',                         60, 'kg/m3'      ))
+unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',   'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',   'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity', 'relative humidity (proportion)'     , 60               ))
 
 unexpanded_col_names = [col.name for col in unexpanded_col_list]
 unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
@@ -130,6 +132,70 @@ expanded_names = [col.name for col in expanded_col_list]
 expanded_names_input = [col.name for col in expanded_col_list if col.is_input]
 expanded_names_output = [col.name for col in expanded_col_list if not col.is_input]
 
+
+# Functions to compute saturation pressure at given temperature taken from
+# https://colab.research.google.com/github/tbeucler/CBRAIN-CAM/blob/master/Climate_Invariant_Guide.ipynb#scrollTo=1Hsy9p4Ghe-G
+# required to compute relative humidity, which generalises much better than
+# specific humidity according to Beucler et al 2021:
+
+def eliq(T):
+    """
+    Function taking temperature (in K) and outputting liquid saturation
+    pressure (in hPa) using a polynomial fit
+    """
+    a_liq = np.array([-0.976195544e-15,-0.952447341e-13,0.640689451e-10,
+                              0.206739458e-7,0.302950461e-5,0.264847430e-3,
+                              0.142986287e-1,0.443987641,6.11239921]);
+    c_liq = -80
+    T0 = 273.16
+    return 100*np.polyval(a_liq,np.maximum(c_liq,T-T0))
+
+def eice(T):
+    """
+    Function taking temperature (in K) and outputting ice saturation
+    pressure (in hPa) using a polynomial fit
+    """
+    a_ice = np.array([0.252751365e-14,0.146898966e-11,0.385852041e-9,
+                      0.602588177e-7,0.615021634e-5,0.420895665e-3,
+                      0.188439774e-1,0.503160820,6.11147274]);
+    c_ice = np.array([273.15,185,-100,0.00763685,0.000151069,7.48215e-07])
+    T0 = 273.16
+    return (T>c_ice[0])*eliq(T)+\
+    (T<=c_ice[0])*(T>c_ice[1])*100*np.polyval(a_ice,T-T0)+\
+    (T<=c_ice[1])*100*(c_ice[3]+np.maximum(c_ice[2],T-T0)*\
+                       (c_ice[4]+np.maximum(c_ice[2],T-T0)*c_ice[5]))
+
+
+def RH_from_climate(specific_humidity, temperature, air_pressure_Pa):
+    
+    # # 0) Extract specific humidity, temperature, and air pressure
+    # specific_humidity = data['vars'][:,:30] # in kg/kg
+    # temperature = data['vars'][:,30:60] # in K
+
+    # P0 = 1e5 # Mean surface air pressure (Pa)
+    # near_surface_air_pressure = data['vars'][:,60]
+    # # Formula to calculate air pressure (in Pa) using the hybrid vertical grid
+    # # coefficients at the middle of each vertical level: hyam and hybm
+    # air_pressure_Pa = np.outer(near_surface_air_pressure**0,P0*hyam) + \
+    # np.outer(near_surface_air_pressure,hybm)
+
+    # 1) Calculating saturation water vapor pressure
+    T0 = 273.16 # Freezing temperature in standard conditions
+    T00 = 253.16 # Temperature below which we use e_ice
+    omega = (temperature - T00) / (T0 - T00)
+    omega = np.maximum( 0, np.minimum( 1, omega ))
+
+    esat =  omega * eliq(temperature) + (1-omega) * eice(temperature)
+
+    # 2) Calculating relative humidity
+    Rd = 287 # Specific gas constant for dry air
+    Rv = 461 # Specific gas constant for water vapor
+
+    # We use the `values` method to convert Xarray DataArray into Numpy ND-Arrays
+    #return Rv/Rd * air_pressure_Pa/esat.values * specific_humidity.values
+    return Rv/Rd * air_pressure_Pa/esat * specific_humidity
+
+
 # Not sure if adding single columns at a time will be too slow on big dataset, can do:
 #new_pressure_cols = [pl.lit(level_pressure_hpa[i]).alias(f'pressure_{i}') for i in range(num_levels)]
 #train_df = train_df.with_columns(new_pressure_cols)
@@ -139,13 +205,15 @@ def add_input_features(df):
     R_air = 287.0 # Mass-based gas constant approx for air in J/kg.K
     for i in range(num_levels):
         # Column names for this level
-        cn_pressure       = f'pressure_{i}'   # Pressure in hPa
-        cn_temperature    = f'state_t_{i}'    # Temperature in K
-        cn_density        = f'density_{i}'    # Density in kg/m3
-        cn_mtm_zonal      = f'momentum_u_{i}' # Zonal (E-W) momentum per unit volume in kg/m3.m/s
-        cn_mtm_meridional = f'momentum_v_{i}' # Meridional (N-S) momentum per unit volume in kg/m3.m/s
-        cn_vel_zonal      = f'state_u_{i}'    # Zonal velocity in m/s
-        cn_vel_meridional = f'state_v_{i}'    # Meridional velocity in m/s
+        cn_pressure       = f'pressure_{i}'     # Pressure in hPa
+        cn_temperature    = f'state_t_{i}'      # Temperature in K
+        cn_density        = f'density_{i}'      # Density in kg/m3
+        cn_mtm_zonal      = f'momentum_u_{i}'   # Zonal (E-W) momentum per unit volume in kg/m3.m/s
+        cn_mtm_meridional = f'momentum_v_{i}'   # Meridional (N-S) momentum per unit volume in kg/m3.m/s
+        cn_vel_zonal      = f'state_u_{i}'      # Zonal velocity in m/s
+        cn_vel_meridional = f'state_v_{i}'      # Meridional velocity in m/s
+        cn_sp_humidity    = f'state_q0001_{i}'  # Specific humidity (kg/kg)
+        cn_rel_humidity   = f'rel_humidity_{i}' # Relative humidity (proportion)
 
         # Using fixed pressure levels, hopefully near enough, not sure in dataset whether
         # we're supposed to scale with surface pressure or something:
@@ -156,6 +224,10 @@ def add_input_features(df):
         # Momentum per unit vol just density * velocity
         df = df.with_columns((pl.col(cn_density) * pl.col(cn_vel_zonal)).alias(cn_mtm_zonal))
         df = df.with_columns((pl.col(cn_density) * pl.col(cn_vel_meridional)).alias(cn_mtm_meridional))
+        # https://www.reddit.com/r/rust/comments/137jcck/polars_computing_a_new_column_from_multiple/
+        df = df.with_columns(pl.struct([cn_sp_humidity, cn_temperature, cn_pressure]).map_elements(
+                       lambda x: RH_from_climate(x[cn_sp_humidity], x[cn_temperature],
+                          x[cn_pressure] * 100.0), return_dtype=pl.datatypes.Float32).alias(cn_rel_humidity))
 
     return df
 
