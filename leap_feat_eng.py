@@ -5,7 +5,7 @@ run_local = True
 
 
 
-debug = True
+debug = False
 do_test = True
 
 if debug:
