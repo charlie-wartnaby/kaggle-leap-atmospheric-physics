@@ -30,6 +30,7 @@ o Deeper/alternative network structures
 o CNN-type network that scans across altitude levels (mixed with those above and below)
 o Batch-based training on whole dataset or much bigger subset
 o Try other ML techniques apart from NN
+o With existing NN understand tweaks that zero out some numbers etc in case not good
 o Would it help to remove old feature columns?
 o Would it help to group columns differently depending on technique?
 
@@ -45,7 +46,11 @@ o Latent heat flux: +ve for condensation on surface, -ve for evaporation from su
 Results from early expts
 ------------------------
 
-Showed that it did a touch better with additional features:
+Showed that it did a touch better with additional new features, and getting rid of some raw ones:
+
+LEAP with feature engineering - Version 10
+Complete · 3m ago · Commit 0d8d069 removed a few raw features
+0.34286
 
 LEAP with feature engineering - Version 9
 Complete · 2m ago · commit fd0d97d93, first with relative humidity

@@ -101,11 +101,12 @@ unexpanded_col_list = [
 ]
 
 # Add columns for new features
-unexpanded_col_list.append(ColumnInfo(True, 'pressure',     'air pressure',                        60, 'N/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'density',      'air density',                         60, 'kg/m3'      ))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',   'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',   'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
-unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity', 'relative humidity (proportion)'     , 60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'pressure',      'air pressure',                        60, 'N/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'density',       'air density',                         60, 'kg/m3'      ))
+unexpanded_col_list.append(ColumnInfo(True, 'recip_density', 'reciprocal air density',              60, 'm3/kg'      ))
+unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',    'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',    'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',  'relative humidity (proportion)'     , 60               ))
 
 unexpanded_col_names = [col.name for col in unexpanded_col_list]
 unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
@@ -205,15 +206,16 @@ def add_input_features(df):
     R_air = 287.0 # Mass-based gas constant approx for air in J/kg.K
     for i in range(num_levels):
         # Column names for this level
-        cn_pressure       = f'pressure_{i}'     # Pressure in hPa
-        cn_temperature    = f'state_t_{i}'      # Temperature in K
-        cn_density        = f'density_{i}'      # Density in kg/m3
-        cn_mtm_zonal      = f'momentum_u_{i}'   # Zonal (E-W) momentum per unit volume in kg/m3.m/s
-        cn_mtm_meridional = f'momentum_v_{i}'   # Meridional (N-S) momentum per unit volume in kg/m3.m/s
-        cn_vel_zonal      = f'state_u_{i}'      # Zonal velocity in m/s
-        cn_vel_meridional = f'state_v_{i}'      # Meridional velocity in m/s
-        cn_sp_humidity    = f'state_q0001_{i}'  # Specific humidity (kg/kg)
-        cn_rel_humidity   = f'rel_humidity_{i}' # Relative humidity (proportion)
+        cn_pressure       = f'pressure_{i}'      # Pressure in hPa
+        cn_temperature    = f'state_t_{i}'       # Temperature in K
+        cn_density        = f'density_{i}'       # Density in kg/m3
+        cn_recip_density  = f'recip_density_{i}' # Density in kg/m3
+        cn_mtm_zonal      = f'momentum_u_{i}'    # Zonal (E-W) momentum per unit volume in kg/m3.m/s
+        cn_mtm_meridional = f'momentum_v_{i}'    # Meridional (N-S) momentum per unit volume in kg/m3.m/s
+        cn_vel_zonal      = f'state_u_{i}'       # Zonal velocity in m/s
+        cn_vel_meridional = f'state_v_{i}'       # Meridional velocity in m/s
+        cn_sp_humidity    = f'state_q0001_{i}'   # Specific humidity (kg/kg)
+        cn_rel_humidity   = f'rel_humidity_{i}'  # Relative humidity (proportion)
 
         # Using fixed pressure levels, hopefully near enough, not sure in dataset whether
         # we're supposed to scale with surface pressure or something:
@@ -221,6 +223,7 @@ def add_input_features(df):
         # pV = mRT
         # m/V = p/RT = density, with *100 for hPa -> Pa conversion
         df = df.with_columns((pl.col(cn_pressure) * 100.0 / (R_air * pl.col(cn_temperature))).alias(cn_density))
+        df = df.with_columns((1.0 / pl.col(cn_density)).alias(cn_recip_density))
         # Momentum per unit vol just density * velocity
         df = df.with_columns((pl.col(cn_density) * pl.col(cn_vel_zonal)).alias(cn_mtm_zonal))
         df = df.with_columns((pl.col(cn_density) * pl.col(cn_vel_meridional)).alias(cn_mtm_meridional))
