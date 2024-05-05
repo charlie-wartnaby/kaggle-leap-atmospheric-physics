@@ -60,11 +60,11 @@ class ColumnInfo():
 unexpanded_col_list = [
     #         input?   Name                Description                                    Dimension   Units   Useful-from-idx
     ColumnInfo(True,  'state_t',          'air temperature',                                     60, 'K'      ),
-    ColumnInfo(True,  'state_q0001',      'specific humidity',                                   60, 'kg/kg'  ),
+    #ColumnInfo(True,  'state_q0001',      'specific humidity',                                   60, 'kg/kg'  ),
     ColumnInfo(True,  'state_q0002',      'cloud liquid mixing ratio',                           60, 'kg/kg'  ),
     ColumnInfo(True,  'state_q0003',      'cloud ice mixing ratio',                              60, 'kg/kg'  ),
-    ColumnInfo(True,  'state_u',          'zonal wind speed',                                    60, 'm/s'    ),
-    ColumnInfo(True,  'state_v',          'meridional wind speed',                               60, 'm/s'    ),
+    #ColumnInfo(True,  'state_u',          'zonal wind speed',                                    60, 'm/s'    ),
+    #ColumnInfo(True,  'state_v',          'meridional wind speed',                               60, 'm/s'    ),
     ColumnInfo(True,  'state_ps',         'surface pressure',                                     1, 'Pa'     ),
     ColumnInfo(True,  'pbuf_SOLIN',       'solar insolation',                                     1, 'W/m2'   ),
     ColumnInfo(True,  'pbuf_LHFLX',       'surface latent heat flux',                             1, 'W/m2'   ),

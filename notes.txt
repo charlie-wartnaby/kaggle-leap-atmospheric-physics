@@ -47,6 +47,10 @@ Results from early expts
 
 Showed that it did a touch better with additional features:
 
+LEAP with feature engineering - Version 9
+Complete · 2m ago · commit fd0d97d93, first with relative humidity
+0.26862
+
 LEAP with feature engineering - Version 7
 Complete · 4m ago · commit 34faf3590 again but with new features turned off for comparison
 0.22994
