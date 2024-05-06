@@ -9,11 +9,14 @@ do_test = True
 
 if debug:
     max_train_rows = 1000
-    max_test_rows  = 1000000000
+    max_test_rows  = 1000
+    patience = 2
 else:
     # Very large numbers for 'all'
     max_train_rows = 100000
     max_test_rows  = 1000000000
+    patience = 3 # was 5 but saving GPU quota
+
 
 import copy
 import numpy as np
@@ -23,9 +26,9 @@ import polars as pl
 
 if run_local:
     base_path = '.'
-    train_path = os.path.join(base_path, 'train-top.csv')
+    train_path = os.path.join(base_path, 'train-top-5000.csv')
     test_path = os.path.join(base_path, 'test-top.csv')
-    submission_path = os.path.join(base_path, 'sample_submission-top.csv')
+    submission_path = os.path.join(base_path, 'sample_submission-top-10000.csv')
 else:
     base_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim'
     train_path = os.path.join(base_path, 'train.csv')
@@ -259,7 +262,7 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 t0 = time()
 np.random.seed(42)
 random.seed(42)
-min_std = 1e-8
+min_std = 1e-30 # was 1e-8
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 DEBUGGING = not do_test
@@ -304,8 +307,16 @@ class FFNN(nn.Module):
         layers = []
         previous_size = input_size
         for hidden_size in hidden_sizes:
+            # nn.Linear: classic weights & biases neuron
             layers.append(nn.Linear(previous_size, hidden_size))
+            # LayerNorm: outputs rescaled to mean zero, unit variance across vector
+            # of all features at this iteration (as opposed to batch normalisation when
+            # features normalised separately in parallel according to their values
+            # across a series of samples in the batch)
+            # https://www.pinecone.io/learn/batch-layer-normalization/
             layers.append(nn.LayerNorm(hidden_size))  # Normalization layer
+            # LeakyReLU: non-zero shallow scaling for -ve input values cf classic
+            # ReLU which is zero for -ve, default 0.01 gradient on -ve side
             layers.append(nn.LeakyReLU(inplace=True))        # Activation
             layers.append(nn.Dropout(p=0.1))            # Dropout for regularization
             previous_size = hidden_size
@@ -355,9 +366,9 @@ batch_size = 4000
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-input_size = x.shape[1]
+input_size = x.shape[1] # number of input features/columns
 output_size = y.shape[1]
-hidden_size = input_size + output_size
+hidden_size = input_size + output_size # any particular reason for this and 'diabalo' shape here?
 model = FFNN(input_size, [3*hidden_size, 2*hidden_size, hidden_size, 2*hidden_size, 3*hidden_size], output_size).to(device)
 criterion = nn.MSELoss()  # Using MSE for regression
 optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
@@ -371,7 +382,6 @@ epochs = 100000
 best_val_loss = float('inf')  # Set initial best as infinity
 best_model_state = None       # To store the best model's state
 patience_count = 0
-patience = 5
 for epoch in range(epochs):
     model.train()
     total_loss = 0
@@ -380,16 +390,16 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         outputs = model(inputs)
         loss = criterion(outputs, labels)
-        loss.backward()
+        loss.backward() # Calculates gradients by backpropagation (chain rule)
         optimizer.step()
 
         total_loss += loss.item()
         steps += 1
 
-        # Print every 10 steps
+        # Print every n steps
         if (batch_idx + 1) % 100 == 0:
             print(f'Epoch {epoch + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / steps:.4f}')
-            total_loss = 0  # Reset the loss for the next 10 steps
+            total_loss = 0  # Reset the loss for the next n steps
             steps = 0  # Reset step count
     
 
@@ -456,9 +466,16 @@ if not DEBUGGING:
 if not DEBUGGING:
     # submit
     # override constant columns
-    #for i in range(sy.shape[0]):
-    #    if sy[i] < min_std * 1.1:
-    #        predt[:,i] = 0
+    # CW: don't understand this yet but get enormous negative score if don't do it
+    # Seems to mainly affect the columns where first 12 are supposed to be zeroed
+    # These are very small values with very large weighting factors
+    # Ah maybe incorrect min_std 1e-8 much larger than those values so getting scaled up?
+    zeroed_col_names = []
+    for i in range(sy.shape[0]):
+        if sy[i] < min_std * 1.1:
+            zeroed_col_names.append(expanded_names_output[i])            
+            # predt[:,i] = 0
+    print('Cols selected to zero out (but not):', zeroed_col_names)
 
     # undo y scaling
     predt = predt * sy.reshape(1,-1) + my.reshape(1,-1)
