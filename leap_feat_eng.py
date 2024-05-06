@@ -3,14 +3,14 @@
 # This block will be different in Kaggle notebook:
 run_local = True
 debug = True
-do_test = False
+do_test = True
 
 #
 
 if debug:
-    max_train_rows = 1000
+    max_train_rows = 2000
     max_test_rows  = 1000
-    patience = 2
+    patience = 3
 else:
     # Very large numbers for 'all'
     max_train_rows = 30000 # was using 100000 but saving GPU quota
@@ -323,7 +323,8 @@ class FFNN(nn.Module):
             layers.append(nn.LayerNorm(hidden_size))  # Normalization layer
             # LeakyReLU: non-zero shallow scaling for -ve input values cf classic
             # ReLU which is zero for -ve, default 0.01 gradient on -ve side
-            layers.append(nn.LeakyReLU(inplace=True))        # Activation
+            #layers.append(nn.LeakyReLU(inplace=True))   # Activation
+            layers.append(nn.SiLU(inplace=True))        # Activation
             layers.append(nn.Dropout(p=0.1))            # Dropout for regularization
             previous_size = hidden_size
         
@@ -483,9 +484,10 @@ if not DEBUGGING:
         # After that scaling, the numbers should be roughly [-1, 1] normalised, but can get some crazy
         # results at low-idx levels with 1e15 scale factors. Zero those out
         max_value_in_col = submission_df[col_name].abs().max()
-        if max_value_in_col > 10.0:
+        if max_value_in_col > 100.0:
             # Assume it's bad
             submission_df = submission_df.with_columns(pl.lit(0.0).alias(col_name))
+            print(f'Zeroed out {col_name} with max abs value = {max_value_in_col}')
     if debug:
         submission_df.write_csv("submission-debug.csv")
     else:
