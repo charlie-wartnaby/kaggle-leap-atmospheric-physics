@@ -1,12 +1,11 @@
 # LEAP competition with feature engineering
 
-# This block will be differen in Kaggle notebook:
+# This block will be different in Kaggle notebook:
 run_local = True
-
-
-
-debug = False
+debug = True
 do_test = True
+
+#
 
 if debug:
     max_train_rows = 1000
@@ -457,9 +456,9 @@ if not DEBUGGING:
 if not DEBUGGING:
     # submit
     # override constant columns
-    for i in range(sy.shape[0]):
-        if sy[i] < min_std * 1.1:
-            predt[:,i] = 0
+    #for i in range(sy.shape[0]):
+    #    if sy[i] < min_std * 1.1:
+    #        predt[:,i] = 0
 
     # undo y scaling
     predt = predt * sy.reshape(1,-1) + my.reshape(1,-1)
