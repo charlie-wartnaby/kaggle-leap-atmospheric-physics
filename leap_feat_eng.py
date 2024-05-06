@@ -3,7 +3,7 @@
 # This block will be different in Kaggle notebook:
 run_local = True
 debug = True
-do_test = True
+do_test = False
 
 #
 
@@ -472,13 +472,20 @@ if not DEBUGGING:
 if not DEBUGGING:
     # submit
     # override constant columns
-    # CW: ditched this now
-    
+    # CW: ditched this now in favour of new logic below to remove crazy columns
+
     # undo y scaling
     predt = predt * sy.reshape(1,-1) + my.reshape(1,-1)
 
     for np_col_idx, col_name in enumerate(expanded_names_output):
+        # Multiply by provided scaling factors
         submission_df = submission_df.with_columns((pl.col(col_name) * predt[:, np_col_idx]).alias(col_name))
+        # After that scaling, the numbers should be roughly [-1, 1] normalised, but can get some crazy
+        # results at low-idx levels with 1e15 scale factors. Zero those out
+        max_value_in_col = submission_df[col_name].abs().max()
+        if max_value_in_col > 10.0:
+            # Assume it's bad
+            submission_df = submission_df.with_columns(pl.lit(0.0).alias(col_name))
     if debug:
         submission_df.write_csv("submission-debug.csv")
     else:
