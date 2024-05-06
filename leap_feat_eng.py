@@ -13,7 +13,7 @@ if debug:
     patience = 2
 else:
     # Very large numbers for 'all'
-    max_train_rows = 100000
+    max_train_rows = 30000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
     patience = 3 # was 5 but saving GPU quota
 
@@ -27,7 +27,7 @@ import polars as pl
 if run_local:
     base_path = '.'
     train_path = os.path.join(base_path, 'train-top-5000.csv')
-    test_path = os.path.join(base_path, 'test-top.csv')
+    test_path = os.path.join(base_path, 'test-top-1000.csv')
     submission_path = os.path.join(base_path, 'sample_submission-top-10000.csv')
 else:
     base_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim'
@@ -262,7 +262,10 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 t0 = time()
 np.random.seed(42)
 random.seed(42)
-min_std = 1e-30 # was 1e-8
+# In first 5000 rows of training data some cols have zero variance, otherwise:
+# x data min stdev 3.703878e-21
+# y data min stdev 8.388529e-20
+min_std = 1e-22 # was 1e-8; if make 1e-28 ish or smaller loss blows up, don't know why
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 DEBUGGING = not do_test
@@ -285,16 +288,24 @@ if not DEBUGGING:
 
 #
 
+def report_smallest_nonzero_stdev(in_array, label):
+    stdevs_debug = x.std(axis=0)
+    nonzero_idx = np.nonzero(stdevs_debug)
+    min_stdev = np.min(stdevs_debug[nonzero_idx])
+    print(f'{label} data min stdev = {min_stdev}')
+
 # norm X
 mx = x.mean(axis=0)
 sx = np.maximum(x.std(axis=0), min_std)
+report_smallest_nonzero_stdev(x, 'x')
 x = (x - mx.reshape(1,-1)) / sx.reshape(1,-1)
 if not DEBUGGING:
     xt = (xt - mx.reshape(1,-1)) / sx.reshape(1,-1)
 
 # norm Y
 my = y.mean(axis=0)
-sy = np.maximum(np.sqrt((y*y).mean(axis=0)), min_std)
+report_smallest_nonzero_stdev(x, 'y')
+sy = np.maximum(y.std(axis=0), min_std) # Original used RMS, OK if centred on zero but otherwise why?
 y = (y - my.reshape(1,-1)) / sy.reshape(1,-1)
 
 #
