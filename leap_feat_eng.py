@@ -288,24 +288,19 @@ if not DEBUGGING:
 
 #
 
-def report_smallest_nonzero_stdev(in_array, label):
-    stdevs_debug = x.std(axis=0)
-    nonzero_idx = np.nonzero(stdevs_debug)
-    min_stdev = np.min(stdevs_debug[nonzero_idx])
-    print(f'{label} data min stdev = {min_stdev}')
-
 # norm X
 mx = x.mean(axis=0)
-sx = np.maximum(x.std(axis=0), min_std)
-report_smallest_nonzero_stdev(x, 'x')
+sx = x.std(axis=0)
+sx[sx < min_std] = 1.0 # some invariant columns
 x = (x - mx.reshape(1,-1)) / sx.reshape(1,-1)
 if not DEBUGGING:
     xt = (xt - mx.reshape(1,-1)) / sx.reshape(1,-1)
 
 # norm Y
 my = y.mean(axis=0)
-report_smallest_nonzero_stdev(x, 'y')
-sy = np.maximum(y.std(axis=0), min_std) # Original used RMS, OK if centred on zero but otherwise why?
+
+sy = y.std(axis=0) # Original used RMS, OK if centred on zero but otherwise why?
+sy[sy < min_std] = 1.0 # some invariant columns
 y = (y - my.reshape(1,-1)) / sy.reshape(1,-1)
 
 #
@@ -477,17 +472,8 @@ if not DEBUGGING:
 if not DEBUGGING:
     # submit
     # override constant columns
-    # CW: don't understand this yet but get enormous negative score if don't do it
-    # Seems to mainly affect the columns where first 12 are supposed to be zeroed
-    # These are very small values with very large weighting factors
-    # Ah maybe incorrect min_std 1e-8 much larger than those values so getting scaled up?
-    zeroed_col_names = []
-    for i in range(sy.shape[0]):
-        if sy[i] < min_std * 1.1:
-            zeroed_col_names.append(expanded_names_output[i])            
-            # predt[:,i] = 0
-    print('Cols selected to zero out (but not):', zeroed_col_names)
-
+    # CW: ditched this now
+    
     # undo y scaling
     predt = predt * sy.reshape(1,-1) + my.reshape(1,-1)
 
