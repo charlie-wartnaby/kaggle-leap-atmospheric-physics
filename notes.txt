@@ -51,6 +51,10 @@ Results from early expts
 
 Showed that it did a touch better with additional new features, and getting rid of some raw ones:
 
+LEAP with feature engineering - Version 16
+Complete · 3m ago · Commit 7cef81edd SiLU activation, allowing larger 'good' values in columns
+-2.34299
+
 LEAP with feature engineering - Version 15
 Complete · 3m ago · Commit 3765366 zeroing crazy large-number cols but not zeroing out all 'low variance' ones
 -0.39082

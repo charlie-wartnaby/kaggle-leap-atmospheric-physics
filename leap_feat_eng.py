@@ -298,8 +298,7 @@ if not DEBUGGING:
 
 # norm Y
 my = y.mean(axis=0)
-
-sy = y.std(axis=0) # Original used RMS, OK if centred on zero but otherwise why?
+sy = np.sqrt((y*y).mean(axis=0)) # Gone back to RMS as expt
 sy[sy < min_std] = 1.0 # some invariant columns
 y = (y - my.reshape(1,-1)) / sy.reshape(1,-1)
 
