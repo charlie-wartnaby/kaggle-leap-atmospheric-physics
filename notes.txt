@@ -36,6 +36,24 @@ o With existing NN understand tweaks that zero out some numbers etc in case not 
 o Not yet zeroing rows that shouldn't be considered
 o Would it help to remove more old feature columns?
 o Would it help to group columns differently depending on technique?
+o Explanation of odd y normalisation: https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
+o Beware underflow in F32: https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/500816
+
+
+Scoring and why predictions zeroed for low-variance cols in example
+-------------------------------------------------------------------
+
+Uses sklearn.metrics.r2_score
+Competition links to https://www.kaggle.com/code/jerrylin96/r2-score-default
+Discussion https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/495255
+R2 is average across R2 for individual columns, but with weighting
+R2 for one col = 1 - ( (sq resids sum of prediction) / ((true - avg true) sq sum))
+So get R2=0 if just guess mean for column
+If true values have very low variance, (true - avg true) -> 0 and R2 -> inf
+R2=0 a lot better than wild value if a little bit off for low-variance columns, hence
+guessing mean like sample code
+But should apply submission weightings before deciding low-variance col?
+Could apply submission weightings from outset when training?
 
 Beucler et al
 o Transformed relative humidity to specific humidity for much better generalisation
@@ -50,6 +68,10 @@ Results from early expts
 ------------------------
 
 Showed that it did a touch better with additional new features, and getting rid of some raw ones:
+
+LEAP with feature engineering - Version 17
+Complete · 9h ago · commit a34b29920 Going back to RMS y-normalisation in case change there somehow responsible for bad recent scores
+-1.32174
 
 LEAP with feature engineering - Version 16
 Complete · 3m ago · Commit 7cef81edd SiLU activation, allowing larger 'good' values in columns

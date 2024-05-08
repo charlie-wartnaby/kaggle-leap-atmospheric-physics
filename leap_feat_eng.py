@@ -262,10 +262,7 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 t0 = time()
 np.random.seed(42)
 random.seed(42)
-# In first 5000 rows of training data some cols have zero variance, otherwise:
-# x data min stdev 3.703878e-21
-# y data min stdev 8.388529e-20
-min_std = 1e-22 # was 1e-8; if make 1e-28 ish or smaller loss blows up, don't know why
+min_std = 1e-8
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 DEBUGGING = not do_test
@@ -275,14 +272,14 @@ DEBUGGING = not do_test
 # load train data
 n_rows = max_train_rows
 df = train_df
-x = df[expanded_names_input].to_numpy().astype(np.float32)
-y = df[expanded_names_output].to_numpy().astype(np.float32)
+x = df[expanded_names_input].to_numpy().astype(np.float64)
+y = df[expanded_names_output].to_numpy().astype(np.float64)
 
 #
 
 # read test
 if not DEBUGGING:
-    xt = test_df[expanded_names_input].to_numpy().astype(np.float32)
+    xt = test_df[expanded_names_input].to_numpy().astype(np.float64)
     del test_df
     gc.collect()
 
@@ -290,18 +287,21 @@ if not DEBUGGING:
 
 # norm X
 mx = x.mean(axis=0)
-sx = x.std(axis=0)
-sx[sx < min_std] = 1.0 # some invariant columns
+sx = np.maximum(x.std(axis=0), min_std)
 x = (x - mx.reshape(1,-1)) / sx.reshape(1,-1)
 if not DEBUGGING:
     xt = (xt - mx.reshape(1,-1)) / sx.reshape(1,-1)
 
 # norm Y
 my = y.mean(axis=0)
-sy = np.sqrt((y*y).mean(axis=0)) # Gone back to RMS as expt
-sy[sy < min_std] = 1.0 # some invariant columns
+sy = np.maximum(y.std(axis=0), min_std) # Original used RMS, OK if centred on zero but otherwise why?
 y = (y - my.reshape(1,-1)) / sy.reshape(1,-1)
 
+# CW now rescaled should be safe to go to F32
+x = x.astype(np.float32)
+y = y.astype(np.float32)
+if not DEBUGGING:
+    xt = xt.astype(np.float32)
 #
 
 class FFNN(nn.Module):
@@ -472,7 +472,12 @@ if not DEBUGGING:
 if not DEBUGGING:
     # submit
     # override constant columns
-    # CW: ditched this now in favour of new logic below to remove crazy columns
+    for i in range(sy.shape[0]):
+        # CW TODO: shouldn't we be considering this after submission weight scaling?
+        # That will make variance of columns with tiny raw numbers more reasonable
+        # so R2 won't blow up for them so much
+        if sy[i] < min_std * 1.1:
+            predt[:,i] = 0 # Although zero here after rescaling will be y.mean
 
     # undo y scaling
     predt = predt * sy.reshape(1,-1) + my.reshape(1,-1)
@@ -480,13 +485,6 @@ if not DEBUGGING:
     for np_col_idx, col_name in enumerate(expanded_names_output):
         # Multiply by provided scaling factors
         submission_df = submission_df.with_columns((pl.col(col_name) * predt[:, np_col_idx]).alias(col_name))
-        # After that scaling, the numbers should be roughly [-1, 1] normalised, but can get some crazy
-        # results at low-idx levels with 1e15 scale factors. Zero those out
-        max_value_in_col = submission_df[col_name].abs().max()
-        if max_value_in_col > 100.0:
-            # Assume it's bad
-            submission_df = submission_df.with_columns(pl.lit(0.0).alias(col_name))
-            print(f'Zeroed out {col_name} with max abs value = {max_value_in_col}')
     if debug:
         submission_df.write_csv("submission-debug.csv")
     else:
