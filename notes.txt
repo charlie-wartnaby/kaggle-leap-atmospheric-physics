@@ -27,17 +27,13 @@ o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
 o Reciprocal of new features, e.g. heating in K/s will be inversely proportional to density
  for given heat input
-o Discussion comment: "changed the activation function to SiLU (Swish) and got..."
 o Deeper/alternative network structures
 o CNN-type network that scans across altitude levels (mixed with those above and below)
 o Batch-based training on whole dataset or much bigger subset
 o Try other ML techniques apart from NN
-o With existing NN understand tweaks that zero out some numbers etc in case not good
-o Not yet zeroing rows that shouldn't be considered
 o Would it help to remove more old feature columns?
 o Would it help to group columns differently depending on technique?
 o Explanation of odd y normalisation: https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
-o Beware underflow in F32: https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/500816
 
 
 Scoring and why predictions zeroed for low-variance cols in example
@@ -52,8 +48,6 @@ So get R2=0 if just guess mean for column
 If true values have very low variance, (true - avg true) -> 0 and R2 -> inf
 R2=0 a lot better than wild value if a little bit off for low-variance columns, hence
 guessing mean like sample code
-But should apply submission weightings before deciding low-variance col?
-Could apply submission weightings from outset when training?
 
 Beucler et al
 o Transformed relative humidity to specific humidity for much better generalisation

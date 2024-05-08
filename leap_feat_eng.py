@@ -8,8 +8,8 @@ do_test = True
 #
 
 if debug:
-    max_train_rows = 2000
-    max_test_rows  = 1000
+    max_train_rows = 200
+    max_test_rows  = 100
     patience = 3
 else:
     # Very large numbers for 'all'
@@ -37,11 +37,16 @@ else:
 
 # Read in training data
 train_df = pl.read_csv(train_path, n_rows=max_train_rows)
+print("train_df:", train_df.describe())
 
-# And test/submission 'sample' (weightings)
+# First row is all we need from submissions, to get col weightings. 
+# sample_id column labels are identical to test.csv (checked first rows at least)
+sample_submission_df = pl.read_csv(submission_path, n_rows=1)
+
+# And test data
 if do_test:
     test_df = pl.read_csv(test_path, n_rows=max_test_rows)
-    submission_df = pl.read_csv(submission_path, n_rows=max_test_rows)
+    print("test_df:", test_df.describe())
 
 # Altitude levels in hPa from ClimSim-main\grid_info\ClimSim_low-res_grid-info.nc
 level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.2529232969453412, 0.4492506351686618, 0.7863461614709879, 1.3473557602677517, 2.244777286900205, 3.6164314830257718, 5.615836425337344, 8.403253219853443, 12.144489352066294, 17.016828024303006, 23.21079811610005, 30.914346261995327, 40.277580662953575, 51.37463234765765, 64.18922841394662, 78.63965761131159, 94.63009200213703, 112.09127353988006, 130.97780378937776, 151.22131809551237, 172.67390465199267, 195.08770981962772, 218.15593476138105, 241.60037901222947, 265.2585152868483, 289.12232222921756, 313.31208711045167, 338.0069992368819, 363.37349177951705, 389.5233382784413, 416.5079218282233, 444.3314120123719, 472.9572063769364, 502.2919169181905, 532.1522731583445, 562.2393924639011, 592.1492760575118, 621.4328411158061, 649.689897132655, 676.6564846051039, 702.2421877859194, 726.4985894989197, 749.5376452869328, 771.4452171682528, 792.2342599534793, 811.8566751313328, 830.2596431972574, 847.4506530638328, 863.5359020075301, 878.7158746040692, 893.2460179738746, 907.3852125876941, 921.3543974831824, 935.3167171670306, 949.3780562075774, 963.5995994020714, 978.013432382012, 992.6355435925217]
@@ -271,17 +276,21 @@ DEBUGGING = not do_test
 
 # load train data
 n_rows = max_train_rows
-df = train_df
-x = df[expanded_names_input].to_numpy().astype(np.float64)
-y = df[expanded_names_output].to_numpy().astype(np.float64)
+x = train_df[expanded_names_input].to_numpy().astype(np.float64)
+y = train_df[expanded_names_output].to_numpy().astype(np.float64)
+del train_df
 
 #
 
 # read test
 if not DEBUGGING:
     xt = test_df[expanded_names_input].to_numpy().astype(np.float64)
-    del test_df
-    gc.collect()
+
+# Single row of weights for outputs
+submission_weights = sample_submission_df[expanded_names_output].to_numpy().astype(np.float64)
+del sample_submission_df
+
+gc.collect()
 
 #
 
@@ -293,6 +302,9 @@ if not DEBUGGING:
     xt = (xt - mx.reshape(1,-1)) / sx.reshape(1,-1)
 
 # norm Y
+# Scaling outputs by weights that wil be used anyway for submission, so we get
+# rid of very tiny values that will give very small variances
+y = y * submission_weights
 my = y.mean(axis=0)
 sy = np.maximum(y.std(axis=0), min_std) # Original used RMS, OK if centred on zero but otherwise why?
 y = (y - my.reshape(1,-1)) / sy.reshape(1,-1)
@@ -473,18 +485,24 @@ if not DEBUGGING:
     # submit
     # override constant columns
     for i in range(sy.shape[0]):
-        # CW TODO: shouldn't we be considering this after submission weight scaling?
-        # That will make variance of columns with tiny raw numbers more reasonable
-        # so R2 won't blow up for them so much
+        # CW: still using original threshold although now premultiplying outputs by
+        # submission weightings, though does zero out those with zero weights
+        # (and some others)
         if sy[i] < min_std * 1.1:
             predt[:,i] = 0 # Although zero here after rescaling will be y.mean
+            print("Using mean for:", expanded_names_output[i])
 
     # undo y scaling
     predt = predt * sy.reshape(1,-1) + my.reshape(1,-1)
 
-    for np_col_idx, col_name in enumerate(expanded_names_output):
-        # Multiply by provided scaling factors
-        submission_df = submission_df.with_columns((pl.col(col_name) * predt[:, np_col_idx]).alias(col_name))
+    # We already premultiplied training values by submission weights
+    # so predictions should already be scaled the same way
+
+    submission_df = pl.DataFrame(test_df['sample_id'])
+    submission_df = submission_df.with_columns(pl.from_numpy(predt, expanded_names_output))
+
+    print("submission_df:", submission_df.describe())
+
     if debug:
         submission_df.write_csv("submission-debug.csv")
     else:
