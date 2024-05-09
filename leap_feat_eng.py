@@ -8,8 +8,8 @@ do_test = True
 #
 
 if debug:
-    max_train_rows = 200
-    max_test_rows  = 100
+    max_train_rows = 5000
+    max_test_rows  = 1000
     patience = 3
 else:
     # Very large numbers for 'all'
@@ -306,7 +306,10 @@ if not DEBUGGING:
 # rid of very tiny values that will give very small variances
 y = y * submission_weights
 my = y.mean(axis=0)
-sy = np.maximum(y.std(axis=0), min_std) # Original used RMS, OK if centred on zero but otherwise why?
+# Donor notebook used RMS instead of stdev here, discussion thread suggesting that
+# gives loss value like competition criterion but I see no training advantage:
+# https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
+sy = np.maximum(y.std(axis=0), min_std)
 y = (y - my.reshape(1,-1)) / sy.reshape(1,-1)
 
 # CW now rescaled should be safe to go to F32
