@@ -8,8 +8,8 @@ do_test = True
 #
 
 if debug:
-    max_train_rows = 5000
-    max_test_rows  = 1000
+    max_train_rows = 2000
+    max_test_rows  = 100
     patience = 3
 else:
     # Very large numbers for 'all'
@@ -73,17 +73,17 @@ unexpanded_col_list = [
     #ColumnInfo(True,  'state_u',          'zonal wind speed',                                    60, 'm/s'    ),
     #ColumnInfo(True,  'state_v',          'meridional wind speed',                               60, 'm/s'    ),
     ColumnInfo(True,  'state_ps',         'surface pressure',                                     1, 'Pa'     ),
-    ColumnInfo(True,  'pbuf_SOLIN',       'solar insolation',                                     1, 'W/m2'   ),
+    #ColumnInfo(True,  'pbuf_SOLIN',       'solar insolation',                                     1, 'W/m2'   ),
     ColumnInfo(True,  'pbuf_LHFLX',       'surface latent heat flux',                             1, 'W/m2'   ),
     ColumnInfo(True,  'pbuf_SHFLX',       'surface sensible heat flux',                           1, 'W/m2'   ),
     ColumnInfo(True,  'pbuf_TAUX',        'zonal surface stress',                                 1, 'N/m2'   ),
     ColumnInfo(True,  'pbuf_TAUY',        'meridional surface stress',                            1, 'N/m2'   ),
-    ColumnInfo(True,  'pbuf_COSZRS',      'cosine of solar zenith angle',                         1, 'N/m2'   ),
-    ColumnInfo(True,  'cam_in_ALDIF',     'albedo for diffuse longwave radiation',                1           ),
-    ColumnInfo(True,  'cam_in_ALDIR',     'albedo for direct longwave radiation',                 1           ),
-    ColumnInfo(True,  'cam_in_ASDIF',     'albedo for diffuse shortwave radiation',               1           ),
-    ColumnInfo(True,  'cam_in_ASDIR',     'albedo for direct shortwave radiation',                1           ),
-    ColumnInfo(True,  'cam_in_LWUP',      'upward longwave flux',                                 1, 'W/m2'   ),
+    #ColumnInfo(True,  'pbuf_COSZRS',      'cosine of solar zenith angle',                         1           ),
+    #ColumnInfo(True,  'cam_in_ALDIF',     'albedo for diffuse longwave radiation',                1           ),
+    #ColumnInfo(True,  'cam_in_ALDIR',     'albedo for direct longwave radiation',                 1           ),
+    #ColumnInfo(True,  'cam_in_ASDIF',     'albedo for diffuse shortwave radiation',               1           ),
+    #ColumnInfo(True,  'cam_in_ASDIR',     'albedo for direct shortwave radiation',                1           ),
+    #ColumnInfo(True,  'cam_in_LWUP',      'upward longwave flux',                                 1, 'W/m2'   ),
     ColumnInfo(True,  'cam_in_ICEFRAC',   'sea-ice areal fraction',                               1           ),
     ColumnInfo(True,  'cam_in_LANDFRAC',  'land areal fraction',                                  1           ),
     ColumnInfo(True,  'cam_in_OCNFRAC',   'ocean areal fraction',                                 1           ),
@@ -108,12 +108,17 @@ unexpanded_col_list = [
 ]
 
 # Add columns for new features
-unexpanded_col_list.append(ColumnInfo(True, 'pressure',      'air pressure',                        60, 'N/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'density',       'air density',                         60, 'kg/m3'      ))
-unexpanded_col_list.append(ColumnInfo(True, 'recip_density', 'reciprocal air density',              60, 'm3/kg'      ))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',    'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',    'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
-unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',  'relative humidity (proportion)'     , 60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'pressure',          'air pressure',                        60, 'N/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'density',           'air density',                         60, 'kg/m3'      ))
+unexpanded_col_list.append(ColumnInfo(True, 'recip_density',     'reciprocal air density',              60, 'm3/kg'      ))
+unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',        'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',        'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',      'relative humidity (proportion)'     , 60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'vert_insolation',   'zenith-adjusted insolation',           1, 'W/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'direct_sw_absorb',  'direct shortwave absorbance',          1, 'W/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'diffuse_sw_absorb', 'diffuse shortwave absorbance',         1, 'W/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'direct_lw_absorb',  'direct longwave absorbance',           1, 'W/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'diffuse_lw_absorb', 'diffuse longwave absorbance',          1, 'W/m2'       ))
 
 unexpanded_col_names = [col.name for col in unexpanded_col_list]
 unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
@@ -238,6 +243,17 @@ def add_input_features(df):
         df = df.with_columns(pl.struct([cn_sp_humidity, cn_temperature, cn_pressure]).map_elements(
                        lambda x: RH_from_climate(x[cn_sp_humidity], x[cn_temperature],
                           x[cn_pressure] * 100.0), return_dtype=pl.datatypes.Float32).alias(cn_rel_humidity))
+
+    # Single-value new features
+
+    # Solar insolation adjusted for zenith angle (angle to vertical)
+    df = df.with_columns((pl.col('pbuf_SOLIN') * pl.col('pbuf_COSZRS')).alias('vert_insolation'))
+    # Absorbance of solar shortwave radiation
+    df = df.with_columns((pl.col('vert_insolation') * (1.0 - pl.col('cam_in_ASDIR'))).alias('direct_sw_absorb'))
+    df = df.with_columns((pl.col('vert_insolation') * (1.0 - pl.col('cam_in_ASDIF'))).alias('diffuse_sw_absorb'))
+    # Absorbance of IR radiation from ground
+    df = df.with_columns((pl.col('cam_in_LWUP') * (1.0 - pl.col('cam_in_ALDIR'))).alias('direct_lw_absorb'))
+    df = df.with_columns((pl.col('cam_in_LWUP') * (1.0 - pl.col('cam_in_ALDIF'))).alias('diffuse_lw_absorb'))
 
     return df
 
