@@ -13,9 +13,9 @@ if debug:
     patience = 3
 else:
     # Very large numbers for 'all'
-    max_train_rows = 30000 # was using 100000 but saving GPU quota
+    max_train_rows = 150000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
-    patience = 3 # was 5 but saving GPU quota
+    patience = 4 # was 5 but saving GPU quota
 
 
 import copy
