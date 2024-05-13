@@ -18,6 +18,30 @@ https://www.kaggle.com/code/airazusta014/pytorch-nn
 Another nice simple NN using Keras:
 https://www.kaggle.com/code/ymatioun/leap-simple-nn
 
+Reduced-size dataset in parquet format, but says features in float16 format yet many
+feature values are well below minimum value for float16 so information will be lost:
+https://www.kaggle.com/datasets/titericz/leap-dataset-giba
+
+Dataset size, processing all with modest memory
+-----------------------------------------------
+https://www.kaggle.com/code/charliewartnaby/big-dataframe-processing
+Using pl.scan_csv(), lazy_df.select(pl.len()).collect().item() :
+Reading /kaggle/input/leap-atmospheric-physics-ai-climsim/test.csv
+Length:  625000 Seconds:  25.933050632476807
+Reading /kaggle/input/leap-atmospheric-physics-ai-climsim/sample_submission.csv
+Length:  625000 Seconds:  13.82296085357666
+Reading /kaggle/input/leap-atmospheric-physics-ai-climsim/train.csv
+Length:  10091520 Seconds:  798.5059781074524
+
+Train.csv has 924 numeric columns so ~9e9 numbers, ~35 GB as float32
+
+Do I need to do something custom (caching knowledge of byte offsets of line endings)
+or can Polars.LazyFrame do this anyway?
+Need to interate feature engineering in to Dataset __getitem__ when accessing
+efficiently from disk?
+Maybe just do some timing experiments trying to read rows from large file after
+Polars has had chance to map the file
+polars.LazyFrame.gather_every() maybe useful for train/validation split?
 
 Ideas to progress
 -----------------
