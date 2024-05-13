@@ -3,12 +3,12 @@
 # This block will be different in Kaggle notebook:
 run_local = True
 debug = True
-do_test = True
+do_test = False
 
 #
 
 if debug:
-    max_train_rows = 2000
+    max_train_rows = 5000
     max_test_rows  = 100
     patience = 3
 else:
@@ -17,6 +17,7 @@ else:
     max_test_rows  = 1000000000
     patience = 4 # was 5 but saving GPU quota
 
+train_proportion = 0.8
 
 import copy
 import numpy as np
@@ -395,7 +396,7 @@ class NumpyDataset(Dataset):
 
 dataset = NumpyDataset(x, y)
 
-train_size = int(0.9 * len(dataset))
+train_size = int(train_proportion * len(dataset))
 val_size = len(dataset) - train_size
 train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
@@ -406,7 +407,7 @@ val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 input_size = x.shape[1] # number of input features/columns
 output_size = y.shape[1]
 hidden_size = input_size + output_size # any particular reason for this and 'diabalo' shape here?
-model = FFNN(input_size, [3*hidden_size, 2*hidden_size, hidden_size, 2*hidden_size, 3*hidden_size], output_size).to(device)
+model = FFNN(input_size, 5*[hidden_size], output_size).to(device)
 criterion = nn.MSELoss()  # Using MSE for regression
 optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=False)
