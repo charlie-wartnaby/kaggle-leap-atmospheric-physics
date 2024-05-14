@@ -53,6 +53,11 @@ Materalising from offset: 593750 proportion: 0.95 ... took 10.94671368598938
 -- so certainly much quicker once it had been forced to access near the end of the
 file; but stilll slow. Could be OK if taking a decent batch of rows each time
 so overhead per row not so bad, but not if getting one at a time.
+If do pl.len().collect() first, that took 28 sec and then fetch to 0.9* file another
+6.5s, so that was a bit quicker (oddly). (Did stop/start session to avoid
+RAM caching.)
+Found materialising rows near end of test.csv using Polars having got length of
+file took so long I abandoned it (>1 hr on Kaggle)
 
 Ideas to progress
 -----------------

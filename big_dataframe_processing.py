@@ -1,26 +1,61 @@
-import polars as pl
+run_local = True
+
+
+#
+
+import os
+import pickle
+import sys
 import time
 
-for name_root in ['test']: #, 'sample_submission', 'train']:
-    in_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim/' + name_root + '.csv'
-    print('Reading', in_path)
-    
-    # https://stackoverflow.com/questions/75523498/python-polars-how-to-get-the-row-count-of-a-dataframe
-    print("Lazy scan of file")
+if run_local:
+    base_input_path = '.'
+    base_output_path = '.'
+    train_name_root = 'train-top-5000'
+    test_name_root = 'test-top-1000'
+    submission_name_root = 'sample_submission-top-10000'
+
+else:
+    base_input_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim'
+    base_output_path = '.'
+    train_name_root = 'train'
+    test_name_root = 'test'
+    submission_name_root = 'sample_submission'
+
+def make_csv_index_file(csv_path, cache_path):
+    print(f'Reading file to get line offsets: {csv_path}')
     start_time = time.time()
-    lazy_df = pl.scan_csv(in_path)
-    print(f"... took {time.time() - start_time}")
-    # length = lazy_df.select(pl.len()).collect().item()
-    
-    # Checking how long it takes to 'materialise' bits of dataframe 
-    total_len = 625000 # from earlier experiment
-    
-    # Is it quicker to get earlier data once it has been forced to analyse near the end,
-    # is a memory map preserved of where to find the rows?
-    for start_offset_propn in [0.1, 0.9, 0.2, 0.5, 0.95]:
-        start_offset = int(start_offset_propn * total_len)
-        print("Materalising from offset:", start_offset, "proportion:", start_offset_propn)
-        start_time = time.time()
-        materialised_slice = lazy_df.slice(start_offset, 1000).collect()
-        print(f"... took {time.time() - start_time}")
-        print(materialised_slice.describe())
+    eol_byte_offsets = []
+    with open(csv_path, 'rb') as fd: # in text mode file.tell() gives strange numbers apparently
+        for line in fd:
+            offset_now = fd.tell()
+            eol_byte_offsets.append(offset_now)
+    print(f'Scan took {time.time() - start_time} s')
+    print(f'List len={len(eol_byte_offsets)}, memory size={sys.getsizeof(eol_byte_offsets)}')
+    # Size of list in memory only a touch bigger than 8 bytes/element so looks OK to use directly
+
+    start_time = time.time()
+    with open(cache_path, 'wb') as fd:
+        pickle.dump(eol_byte_offsets, fd)
+    print(f'Cached offsets written to {cache_path} in {time.time() - start_time} s')
+
+    return eol_byte_offsets
+
+for name_root in [test_name_root, submission_name_root, train_name_root]:
+    in_path = os.path.join(base_input_path,  name_root + '.csv')
+    cache_path = os.path.join(base_output_path, name_root + '.pkl')
+
+    offsets = make_csv_index_file(in_path, cache_path)
+
+    read_from_proportion = 0.9
+    useful_rows = len(offsets) - 1
+    read_from_row_idx = int(read_from_proportion * useful_rows)
+    print(f'Reading from row {read_from_row_idx} in {in_path}')
+    start_time = time.time()
+    with open(in_path, 'rb') as fd:
+        start_byte_offset = offsets[read_from_row_idx]
+        end_byte_offset = offsets[read_from_row_idx + 1]
+        fd.seek(start_byte_offset)
+        raw_data = fd.read(end_byte_offset - start_byte_offset)
+        row_str = raw_data.decode("utf-8")
+        print(f'Row read took {time.time() - start_time} s, start of row: {row_str[:50]}')
