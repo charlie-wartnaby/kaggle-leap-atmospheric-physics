@@ -56,8 +56,10 @@ so overhead per row not so bad, but not if getting one at a time.
 If do pl.len().collect() first, that took 28 sec and then fetch to 0.9* file another
 6.5s, so that was a bit quicker (oddly). (Did stop/start session to avoid
 RAM caching.)
-Found materialising rows near end of test.csv using Polars having got length of
+Found materialising block of rows near end of test.csv using Polars having got length of
 file took so long I abandoned it (>1 hr on Kaggle)
+Indexing full training file myself by line took 41 mins but could then access a
+random row in 2.5 ms using file.seek. So will do my own thing.
 
 Ideas to progress
 -----------------
