@@ -30,6 +30,8 @@ def make_csv_index_file(csv_path, cache_path):
         for line in fd:
             offset_now = fd.tell()
             eol_byte_offsets.append(offset_now)
+    if len(eol_byte_offsets) > 0:
+        eol_byte_offsets.pop() # Don't want off-end-of-file offset for 'next' row
     print(f'Scan took {time.time() - start_time} s')
     print(f'List len={len(eol_byte_offsets)}, memory size={sys.getsizeof(eol_byte_offsets)}')
     # Size of list in memory only a touch bigger than 8 bytes/element so looks OK to use directly

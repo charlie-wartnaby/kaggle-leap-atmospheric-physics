@@ -59,6 +59,9 @@ RAM caching.)
 Found materialising rows near end of test.csv using Polars having got length of
 file took so long I abandoned it (>1 hr on Kaggle)
 
+Created dataset with my row byte offsets:
+https://www.kaggle.com/datasets/charliewartnaby/leap-atmospheric-physics-file-row-offsets
+
 Ideas to progress
 -----------------
 

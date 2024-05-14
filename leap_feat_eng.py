@@ -8,7 +8,7 @@ do_test = False
 #
 
 if debug:
-    max_train_rows = 5000
+    max_train_rows = 2000
     max_test_rows  = 100
     patience = 3
 else:
@@ -17,26 +17,81 @@ else:
     max_test_rows  = 1000000000
     patience = 4 # was 5 but saving GPU quota
 
-train_proportion = 0.8
 
 import copy
 import numpy as np
 import os
+import pickle
 import polars as pl
 
 
 if run_local:
     base_path = '.'
-    train_path = os.path.join(base_path, 'train-top-5000.csv')
-    test_path = os.path.join(base_path, 'test-top-1000.csv')
-    submission_path = os.path.join(base_path, 'sample_submission-top-10000.csv')
+    offsets_path = '.'
+    train_root = 'train-top-5000'
+    test_root = 'test-top-1000'
+    submission_root = 'sample_submission-top-10000'
 else:
     base_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim'
+    offsets_path = '/kaggle/input/leap-atmospheric-physics-file-row-offsets'
     train_path = os.path.join(base_path, 'train.csv')
     test_path = os.path.join(base_path, 'test.csv')
     submission_path = os.path.join(base_path, 'sample_submission.csv')
 
+train_path = os.path.join(base_path, train_root + '.csv')
+train_offsets_path = os.path.join(offsets_path, train_root + '.pkl')
+test_path = os.path.join(base_path, test_root + '.csv')
+test_offsets_path = os.path.join(offsets_path, test_root + '.pkl')
+submission_path = os.path.join(base_path, submission_root + '.csv')
+submission_offsets_path = os.path.join(offsets_path, submission_root + '.pkl')
+
+class SubFrame:
+    """Manage data extraction from large .csv file with random access
+    using precomputed byte offsets of each text row"""
+    def __init__(self, csv_path, offsets_path):
+        with open(offsets_path, 'rb') as offsets_fd:
+            self.offset = pickle.load(offsets_fd)
+        self.csv_fd = open(csv_path, 'rb')
+        self.raw_headings = self.csv_fd.read(self.offset[0])
+        pass        
+
+    def __len__(self):
+        """Length of CSV file in terms of data rows"""
+        return len(self.offset)
+    
+    def get_slice(self, start_row_idx, end_row_idx):
+        """Create Polars dataframe from headings + slice subset of rows"""
+        start_byte_offset = self.offset[start_row_idx]
+        # Treat -ve index like -ve slice index relative to end,
+        # and 0 index like omitted index (start or end)
+        if end_row_idx < 0:
+            end_row_idx = len(self) + end_row_idx
+        elif end_row_idx == 0:
+            end_row_idx = len(self)
+        if start_row_idx < 0:
+            start_row_idx = len(self) + start_row_idx
+        self.csv_fd.seek(start_byte_offset)
+        if end_row_idx >= len(self):
+            # There is no offset for the next row
+            raw_data = self.csv_fd.read()
+        else:    
+            end_byte_offset = self.offset[end_row_idx]
+            raw_data = self.csv_fd.read(end_byte_offset - start_byte_offset)
+        complete_slice_csv = self.raw_headings + raw_data
+        slice_df = pl.read_csv(complete_slice_csv)
+        return slice_df
+
 # Read in training data
+train_sf = SubFrame(train_path, train_offsets_path)
+train_df_slice = train_sf.get_slice(-5, 0) # last few rows
+train_df_slice.write_csv('debug-training-slice_-5_0.csv')
+train_df_slice = train_sf.get_slice(0, 5) # first few rows
+train_df_slice.write_csv('debug-training-slice_0_5.csv')
+mid_idx = int(len(train_sf) / 2)
+train_df_slice = train_sf.get_slice(mid_idx, mid_idx + 5) # some middle rows
+train_df_slice.write_csv(f'debug-training-slice_{mid_idx}_{mid_idx+5}.csv')
+
+
 train_df = pl.read_csv(train_path, n_rows=max_train_rows)
 print("train_df:", train_df.describe())
 
@@ -396,7 +451,7 @@ class NumpyDataset(Dataset):
 
 dataset = NumpyDataset(x, y)
 
-train_size = int(train_proportion * len(dataset))
+train_size = int(0.9 * len(dataset))
 val_size = len(dataset) - train_size
 train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
@@ -407,7 +462,7 @@ val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 input_size = x.shape[1] # number of input features/columns
 output_size = y.shape[1]
 hidden_size = input_size + output_size # any particular reason for this and 'diabalo' shape here?
-model = FFNN(input_size, 5*[hidden_size], output_size).to(device)
+model = FFNN(input_size, [3*hidden_size, 2*hidden_size, hidden_size, 2*hidden_size, 3*hidden_size], output_size).to(device)
 criterion = nn.MSELoss()  # Using MSE for regression
 optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=False)
