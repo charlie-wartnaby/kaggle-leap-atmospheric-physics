@@ -43,6 +43,17 @@ Maybe just do some timing experiments trying to read rows from large file after
 Polars has had chance to map the file
 polars.LazyFrame.gather_every() maybe useful for train/validation split?
 
+Using polars.LazyFrame.slice() on 625000 row test.csv file with 3 rows:
+Materalising from offset: 62500 proportion: 0.1 ... took 9.378756523132324
+Materalising from offset: 562500 proportion: 0.9 ... took 73.70131516456604
+Materalising from offset: 125000 proportion: 0.2 ... took 1.3532490730285645
+Materalising from offset: 312500 proportion: 0.5 ... took 3.406555652618408
+Materalising from offset: 593750 proportion: 0.95 ... took 10.94671368598938
+(similar numbers if materialising 1000 rows instead of 3)
+-- so certainly much quicker once it had been forced to access near the end of the
+file; but stilll slow. Could be OK if taking a decent batch of rows each time
+so overhead per row not so bad, but not if getting one at a time.
+
 Ideas to progress
 -----------------
 
