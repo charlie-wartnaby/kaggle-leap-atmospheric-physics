@@ -61,6 +61,9 @@ file took so long I abandoned it (>1 hr on Kaggle)
 Indexing full training file myself by line took 41 mins but could then access a
 random row in 2.5 ms using file.seek. So will do my own thing.
 
+Created dataset with my row byte offsets:
+https://www.kaggle.com/datasets/charliewartnaby/leap-atmospheric-physics-file-row-offsets
+
 Ideas to progress
 -----------------
 
