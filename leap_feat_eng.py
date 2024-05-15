@@ -10,11 +10,13 @@ do_test = False
 if debug:
     max_train_rows = 2000
     max_test_rows  = 100
+    holo_cache_rows = 100
     patience = 3
 else:
     # Very large numbers for 'all'
     max_train_rows = 150000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
+    holo_cache_rows = 10000
     patience = 4 # was 5 but saving GPU quota
 
 
@@ -45,7 +47,7 @@ test_offsets_path = os.path.join(offsets_path, test_root + '.pkl')
 submission_path = os.path.join(base_path, submission_root + '.csv')
 submission_offsets_path = os.path.join(offsets_path, submission_root + '.pkl')
 
-class SubFrame:
+class HoloFrame:
     """Manage data extraction from large .csv file with random access
     using precomputed byte offsets of each text row"""
     def __init__(self, csv_path, offsets_path):
@@ -82,18 +84,7 @@ class SubFrame:
         return slice_df
 
 # Read in training data
-train_sf = SubFrame(train_path, train_offsets_path)
-train_df_slice = train_sf.get_slice(-5, 0) # last few rows
-train_df_slice.write_csv('debug-training-slice_-5_0.csv')
-train_df_slice = train_sf.get_slice(0, 5) # first few rows
-train_df_slice.write_csv('debug-training-slice_0_5.csv')
-mid_idx = int(len(train_sf) / 2)
-train_df_slice = train_sf.get_slice(mid_idx, mid_idx + 5) # some middle rows
-train_df_slice.write_csv(f'debug-training-slice_{mid_idx}_{mid_idx+5}.csv')
-
-
-train_df = pl.read_csv(train_path, n_rows=max_train_rows)
-print("train_df:", train_df.describe())
+train_sf = HoloFrame(train_path, train_offsets_path)
 
 # First row is all we need from submissions, to get col weightings. 
 # sample_id column labels are identical to test.csv (checked first rows at least)
@@ -313,12 +304,45 @@ def add_input_features(df):
 
     return df
 
-train_df = add_input_features(train_df)
+mx_sx_sample = []
+my_sy_sample = []
+
+def preprocess_data(pl_df, has_outputs):
+    pl_df = add_input_features(pl_df)
+    x = pl_df[expanded_names_input].to_numpy().astype(np.float64)
+    if has_outputs:
+        y = pl_df[expanded_names_output].to_numpy().astype(np.float64)
+    del pl_df
+
+    # norm X
+    mx = x.mean(axis=0)
+    sx = np.maximum(x.std(axis=0), min_std)
+    mx_sx_sample.append((mx, sx))
+    x = (x - mx.reshape(1,-1)) / sx.reshape(1,-1)
+    # CW now rescaled should be safe to go to F32
+    x = x.astype(np.float32)
+
+    if has_outputs:
+        # norm Y
+        # Scaling outputs by weights that wil be used anyway for submission, so we get
+        # rid of very tiny values that will give very small variances
+        y = y * submission_weights
+        my = y.mean(axis=0)
+        # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
+        # gives loss value like competition criterion but I see no training advantage:
+        # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
+        sy = np.maximum(y.std(axis=0), min_std)
+        my_sy_sample.append((my, sy))
+        y = (y - my.reshape(1,-1)) / sy.reshape(1,-1)
+        y = y.astype(np.float32)
+    else:
+        y = None
+
+    return x, y
+
+
 if do_test:
     test_df = add_input_features(test_df)
-
-train_df.write_csv('debug_train.csv')
-if do_test: test_df.write_csv('debug_test.csv')
 
 
 # Now trying same as public notebook but with the new features:
@@ -346,13 +370,6 @@ DEBUGGING = not do_test
 
 #
 
-# load train data
-n_rows = max_train_rows
-x = train_df[expanded_names_input].to_numpy().astype(np.float64)
-y = train_df[expanded_names_output].to_numpy().astype(np.float64)
-del train_df
-
-#
 
 # read test
 if not DEBUGGING:
@@ -366,27 +383,9 @@ gc.collect()
 
 #
 
-# norm X
-mx = x.mean(axis=0)
-sx = np.maximum(x.std(axis=0), min_std)
-x = (x - mx.reshape(1,-1)) / sx.reshape(1,-1)
 if not DEBUGGING:
     xt = (xt - mx.reshape(1,-1)) / sx.reshape(1,-1)
 
-# norm Y
-# Scaling outputs by weights that wil be used anyway for submission, so we get
-# rid of very tiny values that will give very small variances
-y = y * submission_weights
-my = y.mean(axis=0)
-# Donor notebook used RMS instead of stdev here, discussion thread suggesting that
-# gives loss value like competition criterion but I see no training advantage:
-# https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
-sy = np.maximum(y.std(axis=0), min_std)
-y = (y - my.reshape(1,-1)) / sy.reshape(1,-1)
-
-# CW now rescaled should be safe to go to F32
-x = x.astype(np.float32)
-y = y.astype(np.float32)
 if not DEBUGGING:
     xt = xt.astype(np.float32)
 #
@@ -425,31 +424,43 @@ class FFNN(nn.Module):
     
 #
 
-class NumpyDataset(Dataset):
-    def __init__(self, x, y):
+class HoloDataset(Dataset):
+    def __init__(self, holo_df, cache_rows):
         """
-        Initialize with NumPy arrays.
+        Initialize with HoloFrame instance.
         """
-        assert x.shape[0] == y.shape[0], "Features and labels must have the same number of samples"
-        self.x = x
-        self.y = y
+        self.holo_df = holo_df
+        self.cache_rows = cache_rows
+        self.cache_base_idx = -1
+        self.cache_np_x = None
+        self.cache_np_y = None
 
     def __len__(self):
         """
         Total number of samples.
         """
-        return self.x.shape[0]
+        return len(self.holo_df)
 
     def __getitem__(self, index):
         """
         Generate one sample of data.
         """
+        if not (self.cache_base_idx >= 0 and 
+                index >= self.cache_base_idx and index < self.cache_base_idx + self.cache_rows):
+            # We don't already have this convered and processed, so process
+            # a batch of rows to cache
+            self.cache_base_idx = index
+            pl_slice_df = self.holo_df.get_slice(index, index + self.cache_rows)
+            self.cache_np_x, self.cache_np_y = preprocess_data(pl_slice_df, True)
+
         # Convert the data to tensors when requested
-        return torch.from_numpy(self.x[index]).float().to(device), torch.from_numpy(self.y[index]).float().to(device)
+        cache_idx = index - self.cache_base_idx
+        return torch.from_numpy(self.cache_np_x[cache_idx]).float().to(device), \
+               torch.from_numpy(self.cache_np_y[cache_idx]).float().to(device)
     
 #
 
-dataset = NumpyDataset(x, y)
+dataset = HoloDataset(train_sf, holo_cache_rows)
 
 train_size = int(0.9 * len(dataset))
 val_size = len(dataset) - train_size
@@ -459,8 +470,8 @@ batch_size = 4000
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-input_size = x.shape[1] # number of input features/columns
-output_size = y.shape[1]
+input_size = len(expanded_names_input) # number of input features/columns
+output_size = len(expanded_names_output)
 hidden_size = input_size + output_size # any particular reason for this and 'diabalo' shape here?
 model = FFNN(input_size, [3*hidden_size, 2*hidden_size, hidden_size, 2*hidden_size, 3*hidden_size], output_size).to(device)
 criterion = nn.MSELoss()  # Using MSE for regression
