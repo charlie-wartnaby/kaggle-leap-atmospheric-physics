@@ -464,10 +464,15 @@ dataset = HoloDataset(train_sf, holo_cache_rows)
 
 train_size = int(0.9 * len(dataset))
 val_size = len(dataset) - train_size
-train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
-
+# TODO can't cope with randomisation yet because of caching
+#train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+train_dataset = torch.utils.data.Subset(dataset, range(train_size))
+val_dataset = torch.utils.data.Subset(dataset, range(train_size, len(dataset)))
 batch_size = 4000
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+# TODO shuffle completely randomises individual rows. Need to do own thing so we
+# get successive hits in cached dataframe. Turned off shuffle for time being.
+# In fact 
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
 input_size = len(expanded_names_input) # number of input features/columns
