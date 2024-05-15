@@ -304,8 +304,10 @@ def add_input_features(df):
 
     return df
 
-mx_sx_sample = []
-my_sy_sample = []
+mx_sample = []
+sx_sample = []
+my_sample = []
+sy_sample = []
 
 def preprocess_data(pl_df, has_outputs):
     pl_df = add_input_features(pl_df)
@@ -315,9 +317,17 @@ def preprocess_data(pl_df, has_outputs):
     del pl_df
 
     # norm X
-    mx = x.mean(axis=0)
-    sx = np.maximum(x.std(axis=0), min_std)
-    mx_sx_sample.append((mx, sx))
+    if has_outputs:
+        mx = x.mean(axis=0)
+        sx = np.maximum(x.std(axis=0), min_std)
+        mx_sample.append(mx)
+        sx_sample.append(sx)
+    else:
+        mx_samples = np.array(mx_sample, dtype=np.float32)
+        mx = np.mean(mx_samples)
+        sx_samples = np.array(sx_sample, dtype=np.float32)
+        sx = np.mean(sx_samples)
+
     x = (x - mx.reshape(1,-1)) / sx.reshape(1,-1)
     # CW now rescaled should be safe to go to F32
     x = x.astype(np.float32)
@@ -327,22 +337,26 @@ def preprocess_data(pl_df, has_outputs):
         # Scaling outputs by weights that wil be used anyway for submission, so we get
         # rid of very tiny values that will give very small variances
         y = y * submission_weights
-        my = y.mean(axis=0)
+        if has_outputs:
+            my = y.mean(axis=0)
+            sy = np.maximum(y.std(axis=0), min_std)
+            my_sample.append(my)
+            sy_sample.append(sy)
+        else:
+            my_samples = np.array(my_sample, dtype=np.float32)
+            my = np.mean(my_samples)
+            sy_samples = np.array(sy_sample, dtype=np.float32)
+            sy = np.mean(sy_samples)
+
         # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
         # gives loss value like competition criterion but I see no training advantage:
         # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
-        sy = np.maximum(y.std(axis=0), min_std)
-        my_sy_sample.append((my, sy))
         y = (y - my.reshape(1,-1)) / sy.reshape(1,-1)
         y = y.astype(np.float32)
     else:
         y = None
 
     return x, y
-
-
-if do_test:
-    test_df = add_input_features(test_df)
 
 
 # Now trying same as public notebook but with the new features:
@@ -370,10 +384,6 @@ DEBUGGING = not do_test
 
 #
 
-
-# read test
-if not DEBUGGING:
-    xt = test_df[expanded_names_input].to_numpy().astype(np.float64)
 
 # Single row of weights for outputs
 submission_weights = sample_submission_df[expanded_names_output].to_numpy().astype(np.float64)
@@ -544,6 +554,8 @@ for epoch in range(epochs):
 
 # Test
 if not DEBUGGING:
+    xt, _ = preprocess_data(test_df, False)
+
     model.load_state_dict(best_model_state)
     model.eval()
     predt = np.zeros([xt.shape[0], output_size], dtype=np.float32)  # output_size is the dimension of your model's output
