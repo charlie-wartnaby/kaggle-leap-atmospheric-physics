@@ -3,14 +3,14 @@
 # This block will be different in Kaggle notebook:
 run_local = True
 debug = True
-do_test = False
+do_test = True
 
 #
 
 if debug:
-    max_train_rows = 2000
-    max_test_rows  = 100
-    holo_cache_rows = 100
+    max_train_rows = 1000
+    max_test_rows  = 1000
+    holo_cache_rows = 1000
     patience = 3
 else:
     # Very large numbers for 'all'
@@ -304,10 +304,20 @@ def add_input_features(df):
 
     return df
 
-mx_sample = []
-sx_sample = []
-my_sample = []
+mx_sample = [] # Each element vector of means of input columns, from one holo batch
+sx_sample = [] # ... and scaling factor
+my_sample = [] # Similarly for output columns
 sy_sample = []
+
+def mean_vector_across_samples(sample_list):
+    """Given series of sample row vectors across data columns, form
+    new row vector which is mean of those samples"""
+
+    # join series of row vectors across inputs to one matrix of row samples vs column inputs
+    all_samples = np.stack(sample_list)
+    # Get mean down each column to get new row vector across input columns
+    mean_vector = all_samples.mean(axis=0)
+    return mean_vector
 
 def preprocess_data(pl_df, has_outputs):
     pl_df = add_input_features(pl_df)
@@ -323,35 +333,29 @@ def preprocess_data(pl_df, has_outputs):
         mx_sample.append(mx)
         sx_sample.append(sx)
     else:
-        mx_samples = np.array(mx_sample, dtype=np.float32)
-        mx = np.mean(mx_samples)
-        sx_samples = np.array(sx_sample, dtype=np.float32)
-        sx = np.mean(sx_samples)
+        mx = mean_vector_across_samples(mx_sample)
+        sx = mean_vector_across_samples(sx_sample)
 
-    x = (x - mx.reshape(1,-1)) / sx.reshape(1,-1)
-    # CW now rescaled should be safe to go to F32
+    # Original had mx.reshape(1,-1) to go from 1D row vector to 2D array with
+    # one row but seems unnecessary
+    x = (x - mx) / sx
     x = x.astype(np.float32)
 
     if has_outputs:
         # norm Y
         # Scaling outputs by weights that wil be used anyway for submission, so we get
-        # rid of very tiny values that will give very small variances
+        # rid of very tiny values that will give very small variances, and will make
+        # them suitable hopefully for conversion to float32
         y = y * submission_weights
-        if has_outputs:
-            my = y.mean(axis=0)
-            sy = np.maximum(y.std(axis=0), min_std)
-            my_sample.append(my)
-            sy_sample.append(sy)
-        else:
-            my_samples = np.array(my_sample, dtype=np.float32)
-            my = np.mean(my_samples)
-            sy_samples = np.array(sy_sample, dtype=np.float32)
-            sy = np.mean(sy_samples)
 
+        my = y.mean(axis=0)
         # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
         # gives loss value like competition criterion but I see no training advantage:
         # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
-        y = (y - my.reshape(1,-1)) / sy.reshape(1,-1)
+        sy = np.maximum(y.std(axis=0), min_std)
+        my_sample.append(my)
+        sy_sample.append(sy)
+        y = y - my / sy
         y = y.astype(np.float32)
     else:
         y = None
@@ -393,12 +397,6 @@ gc.collect()
 
 #
 
-if not DEBUGGING:
-    xt = (xt - mx.reshape(1,-1)) / sx.reshape(1,-1)
-
-if not DEBUGGING:
-    xt = xt.astype(np.float32)
-#
 
 class FFNN(nn.Module):
     def __init__(self, input_size, hidden_sizes, output_size):
@@ -587,6 +585,9 @@ if not DEBUGGING:
 if not DEBUGGING:
     # submit
     # override constant columns
+    my = mean_vector_across_samples(my_sample)
+    sy = mean_vector_across_samples(sy_sample)
+
     for i in range(sy.shape[0]):
         # CW: still using original threshold although now premultiplying outputs by
         # submission weightings, though does zero out those with zero weights
@@ -596,7 +597,7 @@ if not DEBUGGING:
             print("Using mean for:", expanded_names_output[i])
 
     # undo y scaling
-    predt = predt * sy.reshape(1,-1) + my.reshape(1,-1)
+    predt = predt * sy + my
 
     # We already premultiplied training values by submission weights
     # so predictions should already be scaled the same way
