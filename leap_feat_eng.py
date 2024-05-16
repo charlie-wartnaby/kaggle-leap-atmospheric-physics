@@ -11,14 +11,15 @@ if debug:
     max_train_rows = 1000
     max_test_rows  = 1000
     holo_cache_rows = 1000
-    patience = 3
+    patience = 2
 else:
     # Very large numbers for 'all'
-    max_train_rows = 150000 # was using 100000 but saving GPU quota
+    max_train_rows = 50000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
     holo_cache_rows = 10000
     patience = 4 # was 5 but saving GPU quota
 
+train_proportion = 0.75 # train/val split
 
 import copy
 import numpy as np
@@ -468,14 +469,15 @@ class HoloDataset(Dataset):
 #
 
 dataset = HoloDataset(train_sf, holo_cache_rows)
+num_train_rows = min(len(dataset), max_train_rows)
+train_size = int(train_proportion * num_train_rows)
+val_size = num_train_rows - train_size
 
-train_size = int(0.9 * len(dataset))
-val_size = len(dataset) - train_size
 # TODO can't cope with randomisation yet because of caching
 #train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 train_dataset = torch.utils.data.Subset(dataset, range(train_size))
-val_dataset = torch.utils.data.Subset(dataset, range(train_size, len(dataset)))
-batch_size = 4000
+val_dataset = torch.utils.data.Subset(dataset, range(train_size, num_train_rows))
+batch_size = min(4000, train_size)
 # TODO shuffle completely randomises individual rows. Need to do own thing so we
 # get successive hits in cached dataframe. Turned off shuffle for time being.
 # In fact 
