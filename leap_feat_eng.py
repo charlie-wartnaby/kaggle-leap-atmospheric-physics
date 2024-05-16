@@ -366,14 +366,13 @@ def preprocess_data(pl_df, has_outputs):
 # Now trying same as public notebook but with the new features:
 # https://www.kaggle.com/code/airazusta014/pytorch-nn/notebook
 
-import random, sys, gc, warnings, math
+import random, gc, warnings
 import numpy as np
 #import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-import matplotlib.pyplot as plt
 from time import time
 import warnings
 
