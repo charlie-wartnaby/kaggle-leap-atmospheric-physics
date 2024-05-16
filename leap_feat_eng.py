@@ -14,7 +14,7 @@ if debug:
     patience = 2
 else:
     # Very large numbers for 'all'
-    max_train_rows = 10000000 # was using 100000 but saving GPU quota
+    max_train_rows = 1000000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
     holo_cache_rows = 100000
     patience = 3 # was 5 but saving GPU quota
