@@ -37,9 +37,9 @@ if run_local:
 else:
     base_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim'
     offsets_path = '/kaggle/input/leap-atmospheric-physics-file-row-offsets'
-    train_path = os.path.join(base_path, 'train.csv')
-    test_path = os.path.join(base_path, 'test.csv')
-    submission_path = os.path.join(base_path, 'sample_submission.csv')
+    train_root = 'train'
+    test_root = 'test'
+    submission_root = 'sample_submission'
 
 train_path = os.path.join(base_path, train_root + '.csv')
 train_offsets_path = os.path.join(offsets_path, train_root + '.pkl')
