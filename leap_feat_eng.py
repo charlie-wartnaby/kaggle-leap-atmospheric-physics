@@ -8,25 +8,29 @@ do_test = True
 #
 
 if debug:
-    max_train_rows = 1000
+    max_train_rows = 5000
     max_test_rows  = 1000
-    holo_cache_rows = 1000
+    max_batch_size = 1000
     patience = 2
 else:
     # Very large numbers for 'all'
     max_train_rows = 1000000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
-    holo_cache_rows = 100000
+    max_batch_size = 100
     patience = 3 # was 5 but saving GPU quota
 
-train_proportion = 0.9 # train/val split
+show_timings = debug
+train_proportion = 0.7 # train/val split
+
+holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
 import copy
 import numpy as np
 import os
 import pickle
 import polars as pl
-
+import sklearn.model_selection
+import time
 
 if run_local:
     base_path = '.'
@@ -374,11 +378,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-from time import time
 import warnings
 
 warnings.filterwarnings('ignore', category=FutureWarning)
-t0 = time()
 np.random.seed(42)
 random.seed(42)
 min_std = 1e-8
@@ -458,8 +460,10 @@ class HoloDataset(Dataset):
             # We don't already have this convered and processed, so process
             # a batch of rows to cache
             self.cache_base_idx = index
+            start_time = time.time()
             pl_slice_df = self.holo_df.get_slice(index, index + self.cache_rows)
             self.cache_np_x, self.cache_np_y = preprocess_data(pl_slice_df, True)
+            if show_timings: print(f'HoloDataset slice build at row {self.cache_base_idx} took {time.time() - start_time} s')
 
         # Convert the data to tensors when requested
         cache_idx = index - self.cache_base_idx
@@ -470,19 +474,45 @@ class HoloDataset(Dataset):
 
 dataset = HoloDataset(train_sf, holo_cache_rows)
 num_train_rows = min(len(dataset), max_train_rows)
-train_size = int(train_proportion * num_train_rows)
-val_size = num_train_rows - train_size
 
-# TODO can't cope with randomisation yet because of caching
-#train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
-train_dataset = torch.utils.data.Subset(dataset, range(train_size))
-val_dataset = torch.utils.data.Subset(dataset, range(train_size, num_train_rows))
-batch_size = min(4000, train_size)
-# TODO shuffle completely randomises individual rows. Need to do own thing so we
-# get successive hits in cached dataframe. Turned off shuffle for time being.
-# In fact 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+# Access data in blocks that we can cache efficiently, but on a macro scale access those
+# randomly for training and validation
+
+# If divides exactly this is OK:
+num_blocks = num_train_rows // holo_cache_rows
+blocks_divide_exactly = True
+num_full_blocks = num_blocks
+# Not currently using any spillover, because training batch may then start with smaller
+# awkward number of rows and continue into rows belonging into another block, giving
+# a misalgined pattern
+#if num_train_rows % holo_cache_rows != 0:
+#    # Some rows spill over into last less-than-full block
+#    num_blocks += 1
+#    blocks_divide_exactly = False
+
+block_indices = range(num_blocks)
+train_block_size = int(train_proportion * num_blocks)
+train_block_idx, val_block_idx = sklearn.model_selection.train_test_split(block_indices, train_size=train_block_size)
+
+def form_row_range_from_block_range(block_indices):
+    row_idx = []
+    for block_idx in block_indices:
+        if block_idx == num_blocks - 1 and not blocks_divide_exactly:
+            # Smaller number in last dangling block
+            num_rows_in_block = num_train_rows - num_full_blocks * holo_cache_rows
+        else:
+            num_rows_in_block = holo_cache_rows
+        base_row_idx = block_idx * holo_cache_rows
+        row_idx.extend(list(range(base_row_idx, base_row_idx + num_rows_in_block)))
+    return row_idx
+
+train_row_idx = form_row_range_from_block_range(train_block_idx)
+val_row_idx = form_row_range_from_block_range(val_block_idx)
+
+train_dataset = torch.utils.data.Subset(dataset, train_row_idx)
+val_dataset = torch.utils.data.Subset(dataset, val_row_idx)
+train_loader = DataLoader(train_dataset, batch_size=max_batch_size, shuffle=False)
+val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
 
 input_size = len(expanded_names_input) # number of input features/columns
 output_size = len(expanded_names_output)
@@ -505,6 +535,7 @@ for epoch in range(epochs):
     total_loss = 0
     steps = 0
     for batch_idx, (inputs, labels) in enumerate(train_loader):
+        start_time = time.time()
         optimizer.zero_grad()
         outputs = model(inputs)
         loss = criterion(outputs, labels)
@@ -513,6 +544,8 @@ for epoch in range(epochs):
 
         total_loss += loss.item()
         steps += 1
+
+        if show_timings: print(f'Training batch of {max_batch_size} took {time.time() - start_time} s')
 
         # Print every n steps
         if (batch_idx + 1) % 100 == 0:

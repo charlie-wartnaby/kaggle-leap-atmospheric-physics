@@ -6,79 +6,21 @@ See load-grid-info.py to get pressures at altitude levels
 # Altitude levels in hPa from ClimSim-main\grid_info\ClimSim_low-res_grid-info.nc
 level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.2529232969453412, 0.4492506351686618, 0.7863461614709879, 1.3473557602677517, 2.244777286900205, 3.6164314830257718, 5.615836425337344, 8.403253219853443, 12.144489352066294, 17.016828024303006, 23.21079811610005, 30.914346261995327, 40.277580662953575, 51.37463234765765, 64.18922841394662, 78.63965761131159, 94.63009200213703, 112.09127353988006, 130.97780378937776, 151.22131809551237, 172.67390465199267, 195.08770981962772, 218.15593476138105, 241.60037901222947, 265.2585152868483, 289.12232222921756, 313.31208711045167, 338.0069992368819, 363.37349177951705, 389.5233382784413, 416.5079218282233, 444.3314120123719, 472.9572063769364, 502.2919169181905, 532.1522731583445, 562.2393924639011, 592.1492760575118, 621.4328411158061, 649.689897132655, 676.6564846051039, 702.2421877859194, 726.4985894989197, 749.5376452869328, 771.4452171682528, 792.2342599534793, 811.8566751313328, 830.2596431972574, 847.4506530638328, 863.5359020075301, 878.7158746040692, 893.2460179738746, 907.3852125876941, 921.3543974831824, 935.3167171670306, 949.3780562075774, 963.5995994020714, 978.013432382012, 992.6355435925217]
 
-Tips from others
-----------------
-
-Polars found to be much faster than pandas in saving very large .csv (though not
-clear if forming dataframe included):
-https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/495128
-
-Nice simple example code showing PyTorch feedforward model and submission:
-https://www.kaggle.com/code/airazusta014/pytorch-nn
-Another nice simple NN using Keras:
-https://www.kaggle.com/code/ymatioun/leap-simple-nn
-
-Reduced-size dataset in parquet format, but says features in float16 format yet many
-feature values are well below minimum value for float16 so information will be lost:
-https://www.kaggle.com/datasets/titericz/leap-dataset-giba
-
-Dataset size, processing all with modest memory
------------------------------------------------
-https://www.kaggle.com/code/charliewartnaby/big-dataframe-processing
-Using pl.scan_csv(), lazy_df.select(pl.len()).collect().item() :
-Reading /kaggle/input/leap-atmospheric-physics-ai-climsim/test.csv
-Length:  625000 Seconds:  25.933050632476807
-Reading /kaggle/input/leap-atmospheric-physics-ai-climsim/sample_submission.csv
-Length:  625000 Seconds:  13.82296085357666
-Reading /kaggle/input/leap-atmospheric-physics-ai-climsim/train.csv
-Length:  10091520 Seconds:  798.5059781074524
-
-Train.csv has 924 numeric columns so ~9e9 numbers, ~35 GB as float32
-
-Do I need to do something custom (caching knowledge of byte offsets of line endings)
-or can Polars.LazyFrame do this anyway?
-Need to interate feature engineering in to Dataset __getitem__ when accessing
-efficiently from disk?
-Maybe just do some timing experiments trying to read rows from large file after
-Polars has had chance to map the file
-polars.LazyFrame.gather_every() maybe useful for train/validation split?
-
-Using polars.LazyFrame.slice() on 625000 row test.csv file with 3 rows:
-Materalising from offset: 62500 proportion: 0.1 ... took 9.378756523132324
-Materalising from offset: 562500 proportion: 0.9 ... took 73.70131516456604
-Materalising from offset: 125000 proportion: 0.2 ... took 1.3532490730285645
-Materalising from offset: 312500 proportion: 0.5 ... took 3.406555652618408
-Materalising from offset: 593750 proportion: 0.95 ... took 10.94671368598938
-(similar numbers if materialising 1000 rows instead of 3)
--- so certainly much quicker once it had been forced to access near the end of the
-file; but stilll slow. Could be OK if taking a decent batch of rows each time
-so overhead per row not so bad, but not if getting one at a time.
-If do pl.len().collect() first, that took 28 sec and then fetch to 0.9* file another
-6.5s, so that was a bit quicker (oddly). (Did stop/start session to avoid
-RAM caching.)
-Found materialising block of rows near end of test.csv using Polars having got length of
-file took so long I abandoned it (>1 hr on Kaggle)
-Indexing full training file myself by line took 41 mins but could then access a
-random row in 2.5 ms using file.seek. So will do my own thing.
-
-Created dataset with my row byte offsets:
-https://www.kaggle.com/datasets/charliewartnaby/leap-atmospheric-physics-file-row-offsets
-
 Ideas to progress
 -----------------
 
+o CNN-type network that scans across altitude levels (mixed with those above and below),
+  should be way faster
+o Deal properly with columns that are going to be zero anyway
 o Figure out faster/cheaper validation test to avoid using GPU quota and quicker turnaround
 o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
 o Reciprocal of new features, e.g. heating in K/s will be inversely proportional to density
  for given heat input
 o Deeper/alternative network structures
-o CNN-type network that scans across altitude levels (mixed with those above and below)
-o Batch-based training on whole dataset or much bigger subset
 o Try other ML techniques apart from NN
 o Would it help to remove more old feature columns?
 o Would it help to group columns differently depending on technique?
-o If big run dominated by data loading, could train different model variants simultaneously?
 
 
 Scoring and why predictions zeroed for low-variance cols in example
