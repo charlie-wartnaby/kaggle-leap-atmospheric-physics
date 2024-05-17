@@ -2,7 +2,7 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = True
+debug = False
 do_test = True
 
 #
@@ -11,15 +11,15 @@ if debug:
     max_train_rows = 5000
     max_test_rows  = 1000
     max_batch_size = 1000
-    patience = 2
+    patience = 4
     train_proportion = 0.7
 else:
     # Very large numbers for 'all'
-    max_train_rows = 1000000 # was using 100000 but saving GPU quota
+    max_train_rows = 10000000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
-    max_batch_size = 5000
+    max_batch_size = 50000
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.95
+    train_proportion = 0.75
 
 show_timings = debug
 batch_report_interval = 10
@@ -31,14 +31,16 @@ import numpy as np
 import os
 import pickle
 import polars as pl
+import re
 import sklearn.model_selection
+import sys
 import time
 
 if run_local:
     base_path = '.'
     offsets_path = '.'
-    train_root = 'train-top-5000'
-    test_root = 'test-top-1000'
+    train_root = 'train'
+    test_root = 'test'
     submission_root = 'sample_submission-top-10000'
 else:
     base_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim'
@@ -108,6 +110,7 @@ num_levels = len(level_pressure_hpa)
 
 
 # Manage columns as described in competition
+num_atm_levels = 60
 class ColumnInfo():
     def __init__(self, is_input, name, description, dimension, units='', first_useful_idx=0):
         self.is_input         = is_input
@@ -311,6 +314,39 @@ def add_input_features(df):
 
     return df
 
+
+re_vector_heading = re.compile('([A-Za-z0-9_]+?)_([0-9]+)')
+
+def vectorise_data(pl_df):
+    vector_dict = {}
+    col_idx = 0
+    while col_idx < len(pl_df.columns):
+        col_name = pl_df.columns[col_idx]
+        if not col_name or col_name == 'sample_id':
+            col_idx += 1
+            continue
+        matcher = re_vector_heading.match(col_name)
+        if matcher:
+            # Element in vector column
+            root_str = matcher.group(1)
+            idx_str = matcher.group(2)
+            idx = int(idx_str)
+            if idx != 0:
+                print(f"Error: expected zeroth element first, got {idx}")
+                sys.exit(1)
+            df_level_subset = pl_df[: , col_idx : col_idx + num_atm_levels]
+            row_level_matrix = df_level_subset.to_numpy().astype(np.float64)
+            col_idx += num_atm_levels
+        else:
+            row_vector = pl_df[: , col_name].to_numpy().astype(np.float64)
+            row_vector = row_vector.reshape(len(row_vector), 1)
+            row_level_matrix = np.tile(row_vector, (1,num_atm_levels))
+            col_idx += 1
+        vector_dict[root_str] = row_level_matrix
+
+    return vector_dict
+
+
 mx_sample = [] # Each element vector of means of input columns, from one holo batch
 sx_sample = [] # ... and scaling factor
 my_sample = [] # Similarly for output columns
@@ -327,6 +363,8 @@ def mean_vector_across_samples(sample_list):
     return mean_vector
 
 def preprocess_data(pl_df, has_outputs):
+    if debug:
+        vector_dict = vectorise_data(pl_df)
     pl_df = add_input_features(pl_df)
     x = pl_df[expanded_names_input].to_numpy().astype(np.float64)
     if has_outputs:
