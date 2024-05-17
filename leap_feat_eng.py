@@ -17,12 +17,12 @@ else:
     # Very large numbers for 'all'
     max_train_rows = 10000000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
-    max_batch_size = 50000
+    max_batch_size = 15000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.75
 
 show_timings = debug
-batch_report_interval = 10
+batch_report_interval = 1
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
@@ -93,14 +93,17 @@ class HoloFrame:
         return slice_df
 
 # Read in training data
+print('Loading training HoloFrame...')
 train_sf = HoloFrame(train_path, train_offsets_path)
 
 # First row is all we need from submissions, to get col weightings. 
 # sample_id column labels are identical to test.csv (checked first rows at least)
+print('Loading submission weights...')
 sample_submission_df = pl.read_csv(submission_path, n_rows=1)
 
 # And test data
 if do_test:
+    print('Loading test dataframe...')
     test_df = pl.read_csv(test_path, n_rows=max_test_rows)
     print("test_df:", test_df.describe())
 

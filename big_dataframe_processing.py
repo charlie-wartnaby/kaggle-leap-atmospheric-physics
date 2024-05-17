@@ -11,9 +11,9 @@ import time
 if run_local:
     base_input_path = '.'
     base_output_path = '.'
-    train_name_root = 'train-top-5000'
-    test_name_root = 'test-top-5000'
-    submission_name_root = 'sample_submission-top-5000'
+    train_name_root = 'train'
+    test_name_root = 'test'
+    submission_name_root = 'sample_submission'
 
 else:
     base_input_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim'
