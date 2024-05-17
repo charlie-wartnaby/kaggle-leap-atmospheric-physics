@@ -12,15 +12,17 @@ if debug:
     max_test_rows  = 1000
     max_batch_size = 1000
     patience = 2
+    train_proportion = 0.7
 else:
     # Very large numbers for 'all'
     max_train_rows = 1000000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
-    max_batch_size = 100
+    max_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
+    train_proportion = 0.95
 
 show_timings = debug
-train_proportion = 0.7 # train/val split
+batch_report_interval = 10
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
@@ -548,7 +550,7 @@ for epoch in range(epochs):
         if show_timings: print(f'Training batch of {max_batch_size} took {time.time() - start_time} s')
 
         # Print every n steps
-        if (batch_idx + 1) % 100 == 0:
+        if (batch_idx + 1) % batch_report_interval == 0:
             print(f'Epoch {epoch + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / steps:.4f}')
             total_loss = 0  # Reset the loss for the next n steps
             steps = 0  # Reset step count
