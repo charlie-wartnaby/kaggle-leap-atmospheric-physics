@@ -3,27 +3,27 @@
 # This block will be different in Kaggle notebook:
 run_local = True
 debug = True
-do_test = False
+do_test = True
 use_cnn = True
 
 #
 
 if debug:
-    max_train_rows = 2000
+    max_train_rows = 50000
     max_test_rows  = 1000
-    max_batch_size = 200
+    max_batch_size = 5000
     patience = 4
     train_proportion = 0.7
 else:
     # Very large numbers for 'all'
-    max_train_rows = 10000000 # was using 100000 but saving GPU quota
+    max_train_rows = 1000000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
-    max_batch_size = 15000
+    max_batch_size = 20000
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.75
+    train_proportion = 0.9
 
-show_timings = debug
-batch_report_interval = 1
+show_timings = False # debug
+batch_report_interval = 10
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
@@ -586,6 +586,9 @@ class AtmLayerCNN(nn.Module):
 
         # Output layer - no dropout, no activation function
         layers.append(nn.Flatten())
+
+        # Not sure how to encourage it to use layer-based CNN results in vectorised
+        # outputs. Could maybe at least initialise weights to that end?
         layers.append(nn.Linear(previous_size, num_total_outputs))
         
         # Register all layers
@@ -676,11 +679,11 @@ val_dataset = torch.utils.data.Subset(dataset, val_row_idx)
 train_loader = DataLoader(train_dataset, batch_size=max_batch_size, shuffle=False)
 val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
 
+input_size = len(expanded_names_input) # number of input features/columns
+output_size = len(expanded_names_output)
 if use_cnn:
     model = AtmLayerCNN().to(device)
 else:
-    input_size = len(expanded_names_input) # number of input features/columns
-    output_size = len(expanded_names_output)
     hidden_size = input_size + output_size # any particular reason for this and 'diabalo' shape here?
     model = FFNN(input_size, [3*hidden_size, 2*hidden_size, hidden_size, 2*hidden_size, 3*hidden_size], output_size).to(device)
 criterion = nn.MSELoss()  # Using MSE for regression
