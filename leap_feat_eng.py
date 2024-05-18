@@ -576,18 +576,21 @@ class AtmLayerCNN(nn.Module):
         self.conv_layer_0 = nn.Conv1d(input_size, output_size, 1,
                                 padding='same')
         self.activation_layer_0 =nn.SiLU(inplace=True)
+        self.dropout_layer_0 = nn.Dropout(p=0.1)
 
         input_size = output_size
         output_size = num_input_feature_chans * 3
         self.conv_layer_1 = nn.Conv1d(input_size, output_size, 3,
                                 padding='same')
         self.activation_layer_1 = nn.SiLU(inplace=True)
+        self.dropout_layer_1 = nn.Dropout(p=0.1)
 
         input_size = output_size
         output_size = num_input_feature_chans * 3
         self.conv_layer_2 = nn.Conv1d(input_size, output_size, 7,
                                 padding='same')
         self.activation_layer_2 = nn.SiLU(inplace=True)
+        self.dropout_layer_2 = nn.Dropout(p=0.1)
 
         num_vector_outputs = len(unexpanded_output_vector_col_names)
         num_vector_out_cols = num_vector_outputs * num_atm_levels
@@ -610,10 +613,13 @@ class AtmLayerCNN(nn.Module):
     def forward(self, x):
         x = self.conv_layer_0(x)
         x = self.activation_layer_0(x)
+        x = self.dropout_layer_0(x)
         x = self.conv_layer_1(x)
         x = self.activation_layer_1(x)
+        x = self.dropout_layer_1(x)
         x = self.conv_layer_2(x)
         x = self.activation_layer_2(x)
+        x = self.dropout_layer_2(x)
         x = self.flatten_layer_0(x)
         x = self.linear_layer_0(x)
         return x
