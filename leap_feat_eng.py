@@ -2,26 +2,27 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = True
+debug = False
 do_test = True
 use_cnn = True
 
 #
 
 if debug:
-    max_train_rows = 50000
+    max_train_rows = 5000
     max_test_rows  = 1000
-    max_batch_size = 5000
+    max_batch_size = 1000
     patience = 4
-    train_proportion = 0.7
+    train_proportion = 0.8
 else:
     # Very large numbers for 'all'
-    max_train_rows = 1000000 # was using 100000 but saving GPU quota
+    max_train_rows = 10000000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
-    max_batch_size = 20000
+    max_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.9
+    train_proportion = 0.8
 
+max_epochs = 50
 show_timings = False # debug
 batch_report_interval = 10
 
@@ -720,11 +721,10 @@ scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0
 #
 
 # Training loop
-epochs = 100000
 best_val_loss = float('inf')  # Set initial best as infinity
 best_model_state = None       # To store the best model's state
 patience_count = 0
-for epoch in range(epochs):
+for epoch in range(max_epochs):
     model.train()
     total_loss = 0
     steps = 0

@@ -9,8 +9,10 @@ level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.252923296945341
 Ideas to progress
 -----------------
 
-o CNN-type network that scans across altitude levels (mixed with those above and below),
-  should be way faster
+o Save model to disk so can resume training or reuse
+o Run on whole dataset even for limited number of epochs in case scores better
+o Higher dropout proportion? Looks too smooth on Kaggle big run.
+o Haven't explored optimiser, learning rate etc
 o Deal properly with columns that are going to be zero anyway
 o Figure out faster/cheaper validation test to avoid using GPU quota and quicker turnaround
 o Understand physics of each target col better
@@ -50,6 +52,13 @@ Results from early expts
 ------------------------
 
 Showed that it did a touch better with additional new features, and getting rid of some raw ones:
+
+Current state at commit ebe569df, looks like it may go on for too long as no noise in validation score:
+7363.7s	188	Validation loss decreased, saving new best model and resetting patience counter.
+7417.9s	189	Epoch 28, Step 10, Training Loss: 0.4816
+7471.9s	190	Epoch 28, Step 20, Training Loss: 0.4546
+7525.8s	191	Epoch 28, Step 30, Training Loss: 0.4872
+7579.6s	192	Epoch 28, Step 40, Training Loss: 0.4747
 
 LEAP with feature engineering - Version 19
 Complete · 4m ago · commit afda421d20 Multiplying by submission weights before modelling now
