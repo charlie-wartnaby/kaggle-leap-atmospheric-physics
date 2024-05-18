@@ -4,6 +4,7 @@
 run_local = True
 debug = True
 do_test = False
+use_cnn = True
 
 #
 
@@ -183,7 +184,6 @@ unexpanded_col_list.append(ColumnInfo(True, 'diffuse_lw_absorb', 'diffuse longwa
 
 unexpanded_col_names = [col.name for col in unexpanded_col_list]
 unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
-
 unexpanded_input_col_names = [col.name for col in unexpanded_col_list if col.is_input]
 unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not col.is_input]
 
@@ -203,6 +203,7 @@ expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_input
 expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_output_col_names)
 
 expanded_names = [col.name for col in expanded_col_list]
+expanded_cols_by_name = dict(zip(expanded_names, expanded_col_list))
 expanded_names_input = [col.name for col in expanded_col_list if col.is_input]
 expanded_names_output = [col.name for col in expanded_col_list if not col.is_input]
 
@@ -398,7 +399,12 @@ def vectorise_data(pl_df):
         else:
             row_vector = pl_df[: , col_name].to_numpy().astype(np.float64)
             row_vector = row_vector.reshape(len(row_vector), 1)
-            row_level_matrix = np.tile(row_vector, (1,num_atm_levels))
+            col_info = unexpanded_cols_by_name.get(col_name)
+            if col_info and not col_info.is_input and col_info.dimension <= 1:
+                # Leave output scalars as they are
+                row_level_matrix = row_vector
+            else:
+               row_level_matrix = np.tile(row_vector, (1,num_atm_levels))
             col_idx += 1
         vector_dict[col_name] = row_level_matrix
 
@@ -421,23 +427,35 @@ def mean_vector_across_samples(sample_list):
     return mean_vector
 
 def preprocess_data(pl_df, has_outputs):
-    if debug:
+    if use_cnn:
         vector_dict = vectorise_data(pl_df)
         add_vector_features(vector_dict)
         # Glue input columns together by row, then feature, then atm level
         # (Hope this will work with torch.nn.Conv1d taking N, C, L)
-        for i, col_name in enumerate(unexpanded_col_names):
+        for i, col_name in enumerate(unexpanded_input_col_names):
             if i == 0:
                 x = vector_dict[col_name]
                 (rows,cols) = x.shape
                 x = x.reshape(rows, 1, cols)
             else:
                 x = np.concatenate((x, vector_dict[col_name].reshape(rows, 1, cols)), axis=1)
-                
-    pl_df = add_input_features(pl_df)
-    x = pl_df[expanded_names_input].to_numpy().astype(np.float64)
+    else:
+        pl_df = add_input_features(pl_df)
+        x = pl_df[expanded_names_input].to_numpy().astype(np.float64)
+
     if has_outputs:
-        y = pl_df[expanded_names_output].to_numpy().astype(np.float64)
+        if use_cnn:
+            # Leaving y-data expanded, will need to design model to explode CNN output across
+            # columns, as also need to cope with scalar outputs
+            for i, col_name in enumerate(unexpanded_output_col_names):
+                if i == 0:
+                    y = vector_dict[col_name]
+                else:
+                    y_add = vector_dict[col_name]
+                    y = np.concatenate((y, y_add), axis=1)
+        else:
+            y = pl_df[expanded_names_output].to_numpy().astype(np.float64)
+
     del pl_df
 
     # norm X
@@ -447,6 +465,7 @@ def preprocess_data(pl_df, has_outputs):
         mx_sample.append(mx)
         sx_sample.append(sx)
     else:
+        # Using scaling found in training data; though could use test data if big enough?
         mx = mean_vector_across_samples(mx_sample)
         sx = mean_vector_across_samples(sx_sample)
 
