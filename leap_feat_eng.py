@@ -424,6 +424,16 @@ def preprocess_data(pl_df, has_outputs):
     if debug:
         vector_dict = vectorise_data(pl_df)
         add_vector_features(vector_dict)
+        # Glue input columns together by row, then feature, then atm level
+        # (Hope this will work with torch.nn.Conv1d taking N, C, L)
+        for i, col_name in enumerate(unexpanded_col_names):
+            if i == 0:
+                x = vector_dict[col_name]
+                (rows,cols) = x.shape
+                x = x.reshape(rows, 1, cols)
+            else:
+                x = np.concatenate((x, vector_dict[col_name].reshape(rows, 1, cols)), axis=1)
+                
     pl_df = add_input_features(pl_df)
     x = pl_df[expanded_names_input].to_numpy().astype(np.float64)
     if has_outputs:
