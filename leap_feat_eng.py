@@ -578,10 +578,16 @@ class AtmLayerCNN(nn.Module):
         self.activation_layer_0 =nn.SiLU(inplace=True)
 
         input_size = output_size
-        output_size = num_input_feature_chans * 5
-        self.conv_layer_1 = nn.Conv1d(input_size, output_size, 1,
+        output_size = num_input_feature_chans * 3
+        self.conv_layer_1 = nn.Conv1d(input_size, output_size, 3,
                                 padding='same')
         self.activation_layer_1 = nn.SiLU(inplace=True)
+
+        input_size = output_size
+        output_size = num_input_feature_chans * 3
+        self.conv_layer_2 = nn.Conv1d(input_size, output_size, 7,
+                                padding='same')
+        self.activation_layer_2 = nn.SiLU(inplace=True)
 
         num_vector_outputs = len(unexpanded_output_vector_col_names)
         num_vector_out_cols = num_vector_outputs * num_atm_levels
@@ -596,7 +602,7 @@ class AtmLayerCNN(nn.Module):
 
         # Not sure how to encourage it to use layer-based CNN results in vectorised
         # outputs. Could maybe at least initialise weights to that end?
-        input_size = output_size * num_atm_levels
+        input_size = output_size * num_atm_levels # Now flattened size mult by channels
         output_size = num_total_outputs
         self.linear_layer_0 = nn.Linear(input_size, output_size)
         
@@ -606,6 +612,8 @@ class AtmLayerCNN(nn.Module):
         x = self.activation_layer_0(x)
         x = self.conv_layer_1(x)
         x = self.activation_layer_1(x)
+        x = self.conv_layer_2(x)
+        x = self.activation_layer_2(x)
         x = self.flatten_layer_0(x)
         x = self.linear_layer_0(x)
         return x
