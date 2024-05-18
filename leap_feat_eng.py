@@ -569,34 +569,46 @@ class AtmLayerCNN(nn.Module):
         # Initialize the layers
         num_input_feature_chans = len(unexpanded_input_col_names)
         total_output_size = len(expanded_names_output)
-        layers = []
-
+ 
         # Start simple
-        layer_depth = 10
-        layers.append(nn.Conv1d(num_input_feature_chans, num_input_feature_chans * layer_depth, 1))
-        layers.append(nn.SiLU(inplace=True))        # Activation
-        previous_size = num_input_feature_chans * layer_depth * num_atm_levels
-        
+        input_size = num_input_feature_chans
+        output_size = num_input_feature_chans * 3
+        self.conv_layer_0 = nn.Conv1d(input_size, output_size, 1,
+                                padding='same')
+        self.activation_layer_0 =nn.SiLU(inplace=True)
+
+        input_size = output_size
+        output_size = num_input_feature_chans * 5
+        self.conv_layer_1 = nn.Conv1d(input_size, output_size, 1,
+                                padding='same')
+        self.activation_layer_1 = nn.SiLU(inplace=True)
+
         num_vector_outputs = len(unexpanded_output_vector_col_names)
         num_vector_out_cols = num_vector_outputs * num_atm_levels
         num_scalar_outputs = len(unexpanded_output_scalar_col_names)
         num_total_outputs = len(expanded_names_output)
 
+
         # Data is structured such that all vector columns come first, then scalars
 
         # Output layer - no dropout, no activation function
-        layers.append(nn.Flatten())
+        self.flatten_layer_0 = nn.Flatten()
 
         # Not sure how to encourage it to use layer-based CNN results in vectorised
         # outputs. Could maybe at least initialise weights to that end?
-        layers.append(nn.Linear(previous_size, num_total_outputs))
+        input_size = output_size * num_atm_levels
+        output_size = num_total_outputs
+        self.linear_layer_0 = nn.Linear(input_size, output_size)
         
-        # Register all layers
-        self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
-        return self.layers(x)
-
+        x = self.conv_layer_0(x)
+        x = self.activation_layer_0(x)
+        x = self.conv_layer_1(x)
+        x = self.activation_layer_1(x)
+        x = self.flatten_layer_0(x)
+        x = self.linear_layer_0(x)
+        return x
 #
 
 class HoloDataset(Dataset):
