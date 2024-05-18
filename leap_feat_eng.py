@@ -2,15 +2,15 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = False
-do_test = True
+debug = True
+do_test = False
 
 #
 
 if debug:
-    max_train_rows = 5000
+    max_train_rows = 100
     max_test_rows  = 1000
-    max_batch_size = 1000
+    max_batch_size = 10
     patience = 4
     train_proportion = 0.7
 else:
@@ -110,7 +110,8 @@ if do_test:
 # Altitude levels in hPa from ClimSim-main\grid_info\ClimSim_low-res_grid-info.nc
 level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.2529232969453412, 0.4492506351686618, 0.7863461614709879, 1.3473557602677517, 2.244777286900205, 3.6164314830257718, 5.615836425337344, 8.403253219853443, 12.144489352066294, 17.016828024303006, 23.21079811610005, 30.914346261995327, 40.277580662953575, 51.37463234765765, 64.18922841394662, 78.63965761131159, 94.63009200213703, 112.09127353988006, 130.97780378937776, 151.22131809551237, 172.67390465199267, 195.08770981962772, 218.15593476138105, 241.60037901222947, 265.2585152868483, 289.12232222921756, 313.31208711045167, 338.0069992368819, 363.37349177951705, 389.5233382784413, 416.5079218282233, 444.3314120123719, 472.9572063769364, 502.2919169181905, 532.1522731583445, 562.2393924639011, 592.1492760575118, 621.4328411158061, 649.689897132655, 676.6564846051039, 702.2421877859194, 726.4985894989197, 749.5376452869328, 771.4452171682528, 792.2342599534793, 811.8566751313328, 830.2596431972574, 847.4506530638328, 863.5359020075301, 878.7158746040692, 893.2460179738746, 907.3852125876941, 921.3543974831824, 935.3167171670306, 949.3780562075774, 963.5995994020714, 978.013432382012, 992.6355435925217]
 num_levels = len(level_pressure_hpa)
-
+# Convert to Pa and reshape to be convenient later
+level_pressure_pa_np = 100.0 * np.array(level_pressure_hpa, dtype=np.float32).reshape(1, -1)
 
 # Manage columns as described in competition
 num_atm_levels = 60
@@ -317,6 +318,60 @@ def add_input_features(df):
 
     return df
 
+def add_vector_features(vector_dict):
+    R_air = 287.0 # Mass-based gas constant approx for air in J/kg.K
+    # cn_pressure       = f'pressure_{i}'      # Pressure in hPa
+    # cn_temperature    = f'state_t_{i}'       # Temperature in K
+    # cn_density        = f'density_{i}'       # Density in kg/m3
+    # cn_recip_density  = f'recip_density_{i}' # Density in kg/m3
+    # cn_mtm_zonal      = f'momentum_u_{i}'    # Zonal (E-W) momentum per unit volume in kg/m3.m/s
+    # cn_mtm_meridional = f'momentum_v_{i}'    # Meridional (N-S) momentum per unit volume in kg/m3.m/s
+    # cn_vel_zonal      = f'state_u_{i}'       # Zonal velocity in m/s
+    # cn_vel_meridional = f'state_v_{i}'       # Meridional velocity in m/s
+    # cn_sp_humidity    = f'state_q0001_{i}'   # Specific humidity (kg/kg)
+    # cn_rel_humidity   = f'rel_humidity_{i}'  # Relative humidity (proportion)
+
+    temperature_np = vector_dict['state_t']
+    (rows, cols) = temperature_np.shape # use as template
+    assert cols == num_atm_levels
+
+    # Using fixed pressure levels, hopefully near enough, not sure in dataset whether
+    # we're supposed to scale with surface pressure or something:
+    pressure_np = np.tile(level_pressure_pa_np, (rows,1))
+    vector_dict['pressure'] = pressure_np
+    # pV = mRT
+    # m/V = p/RT = density, with *100 for hPa -> Pa conversion
+    density_np = pressure_np / (R_air * temperature_np)
+    vector_dict['density'] = density_np
+    recip_density_np = 1.0 / density_np
+    vector_dict['recip_density'] = density_np
+    # Momentum per unit vol just density * velocity
+    vel_zonal_np = vector_dict['state_u']
+    momentum_u_np = density_np * vel_zonal_np
+    vector_dict['momentum_u'] = momentum_u_np
+    vel_meridional_np = vector_dict['state_v']
+    momentum_v_np = density_np * vel_meridional_np
+    vector_dict['momentum_v'] = momentum_v_np
+    specific_humidity_np = vector_dict['state_q0001']
+    rel_humidity_np = RH_from_climate(specific_humidity_np, temperature_np, pressure_np)
+    vector_dict['rel_humidity'] = rel_humidity_np
+
+    # Single-value new features
+
+    # Solar insolation adjusted for zenith angle (angle to vertical)
+    vert_insolation_np = vector_dict['pbuf_SOLIN'] * vector_dict['pbuf_COSZRS']
+    vector_dict['vert_insolation'] = vert_insolation_np
+    # Absorbance of solar shortwave radiation
+    direct_sw_absorb_np = vector_dict['vert_insolation'] * (1.0 - vector_dict['cam_in_ASDIR'])
+    vector_dict['direct_sw_absorb'] = direct_sw_absorb_np
+    diffuse_sw_absorb_np = vector_dict['vert_insolation'] * (1.0 - vector_dict['cam_in_ASDIF'])
+    vector_dict['diffuse_sw_absorb'] = diffuse_sw_absorb_np
+    # Absorbance of IR radiation from ground
+    direct_lw_absorb_np = vector_dict['cam_in_LWUP'] * (1.0 - vector_dict['cam_in_ALDIR'])
+    vector_dict['direct_lw_absorb'] = direct_lw_absorb_np
+    diffuse_lw_absorb_np = vector_dict['cam_in_LWUP'] * (1.0 - vector_dict['cam_in_ALDIF'])
+    vector_dict['diffuse_lw_absorb'] = diffuse_lw_absorb_np
+
 
 re_vector_heading = re.compile('([A-Za-z0-9_]+?)_([0-9]+)')
 
@@ -331,7 +386,7 @@ def vectorise_data(pl_df):
         matcher = re_vector_heading.match(col_name)
         if matcher:
             # Element in vector column
-            root_str = matcher.group(1)
+            col_name = matcher.group(1) # now without indexing
             idx_str = matcher.group(2)
             idx = int(idx_str)
             if idx != 0:
@@ -345,7 +400,7 @@ def vectorise_data(pl_df):
             row_vector = row_vector.reshape(len(row_vector), 1)
             row_level_matrix = np.tile(row_vector, (1,num_atm_levels))
             col_idx += 1
-        vector_dict[root_str] = row_level_matrix
+        vector_dict[col_name] = row_level_matrix
 
     return vector_dict
 
@@ -368,6 +423,7 @@ def mean_vector_across_samples(sample_list):
 def preprocess_data(pl_df, has_outputs):
     if debug:
         vector_dict = vectorise_data(pl_df)
+        add_vector_features(vector_dict)
     pl_df = add_input_features(pl_df)
     x = pl_df[expanded_names_input].to_numpy().astype(np.float64)
     if has_outputs:
