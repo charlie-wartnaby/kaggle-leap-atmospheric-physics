@@ -9,9 +9,9 @@ use_cnn = True
 #
 
 if debug:
-    max_train_rows = 100
+    max_train_rows = 2000
     max_test_rows  = 1000
-    max_batch_size = 10
+    max_batch_size = 200
     patience = 4
     train_proportion = 0.7
 else:
@@ -186,6 +186,8 @@ unexpanded_col_names = [col.name for col in unexpanded_col_list]
 unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
 unexpanded_input_col_names = [col.name for col in unexpanded_col_list if col.is_input]
 unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not col.is_input]
+unexpanded_output_vector_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension > 1]
+unexpanded_output_scalar_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension <= 1]
 
 def expand_and_add_cols(col_list, cols_by_name, col_names):
     for col_name in col_names:
@@ -559,7 +561,39 @@ class FFNN(nn.Module):
 
     def forward(self, x):
         return self.layers(x)
-    
+
+class AtmLayerCNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+        # Initialize the layers
+        num_input_feature_chans = len(unexpanded_input_col_names)
+        total_output_size = len(expanded_names_output)
+        layers = []
+
+        # Start simple
+        layer_depth = 10
+        layers.append(nn.Conv1d(num_input_feature_chans, num_input_feature_chans * layer_depth, 1))
+        layers.append(nn.SiLU(inplace=True))        # Activation
+        previous_size = num_input_feature_chans * layer_depth * num_atm_levels
+        
+        num_vector_outputs = len(unexpanded_output_vector_col_names)
+        num_vector_out_cols = num_vector_outputs * num_atm_levels
+        num_scalar_outputs = len(unexpanded_output_scalar_col_names)
+        num_total_outputs = len(expanded_names_output)
+
+        # Data is structured such that all vector columns come first, then scalars
+
+        # Output layer - no dropout, no activation function
+        layers.append(nn.Flatten())
+        layers.append(nn.Linear(previous_size, num_total_outputs))
+        
+        # Register all layers
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.layers(x)
+
 #
 
 class HoloDataset(Dataset):
@@ -642,10 +676,13 @@ val_dataset = torch.utils.data.Subset(dataset, val_row_idx)
 train_loader = DataLoader(train_dataset, batch_size=max_batch_size, shuffle=False)
 val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
 
-input_size = len(expanded_names_input) # number of input features/columns
-output_size = len(expanded_names_output)
-hidden_size = input_size + output_size # any particular reason for this and 'diabalo' shape here?
-model = FFNN(input_size, [3*hidden_size, 2*hidden_size, hidden_size, 2*hidden_size, 3*hidden_size], output_size).to(device)
+if use_cnn:
+    model = AtmLayerCNN().to(device)
+else:
+    input_size = len(expanded_names_input) # number of input features/columns
+    output_size = len(expanded_names_output)
+    hidden_size = input_size + output_size # any particular reason for this and 'diabalo' shape here?
+    model = FFNN(input_size, [3*hidden_size, 2*hidden_size, hidden_size, 2*hidden_size, 3*hidden_size], output_size).to(device)
 criterion = nn.MSELoss()  # Using MSE for regression
 optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=False)
