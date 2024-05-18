@@ -584,10 +584,28 @@ class AtmLayerCNN(nn.Module):
         self.activation_layer_1 = nn.SiLU(inplace=True)
 
         input_size = output_size
-        output_size = num_input_feature_chans * 3
+        self.maxpool_layer_1 = nn.MaxPool1d(4)
+
+        input_size = output_size
+        output_size = num_input_feature_chans * 4
         self.conv_layer_2 = nn.Conv1d(input_size, output_size, 7,
                                 padding='same')
         self.activation_layer_2 = nn.SiLU(inplace=True)
+
+        input_size = output_size
+        self.maxpool_layer_2 = nn.MaxPool1d(3)
+
+        input_size = output_size
+        output_size = num_input_feature_chans * 3
+        self.deconv_layer_3 = nn.ConvTranspose1d(input_size, output_size, 3, stride=3)
+
+        self.activation_layer_3 = nn.SiLU(inplace=True)
+
+        input_size = output_size
+        output_size = num_input_feature_chans * 3
+        self.deconv_layer_4 = nn.ConvTranspose1d(input_size, output_size, 4, stride=4)
+
+        self.activation_layer_4 = nn.SiLU(inplace=True)
 
         num_vector_outputs = len(unexpanded_output_vector_col_names)
         num_vector_out_cols = num_vector_outputs * num_atm_levels
@@ -611,9 +629,17 @@ class AtmLayerCNN(nn.Module):
         x = self.conv_layer_0(x)
         x = self.activation_layer_0(x)
         x = self.conv_layer_1(x)
-        x = self.activation_layer_1(x)
-        x = self.conv_layer_2(x)
-        x = self.activation_layer_2(x)
+        x0 = self.activation_layer_1(x)
+        x_d4 = self.maxpool_layer_1(x0)    # /4
+        x = self.conv_layer_2(x_d4)
+        x1 = self.activation_layer_2(x)
+        x = self.maxpool_layer_2(x1)  # /16
+        x = self.deconv_layer_3(x) # /4
+        x += x_d4
+        x = self.activation_layer_3(x)
+        x = self.deconv_layer_4(x)
+        x += x0
+        x = self.activation_layer_4(x)
         x = self.flatten_layer_0(x)
         x = self.linear_layer_0(x)
         return x
