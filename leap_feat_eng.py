@@ -9,20 +9,20 @@ use_cnn = True
 #
 
 if debug:
-    max_train_rows = 5000
+    max_train_rows = 1000
     max_test_rows  = 1000
-    max_batch_size = 1000
+    max_batch_size = 100
     patience = 4
     train_proportion = 0.8
 else:
-    # Very large numbers for 'all'
-    max_train_rows = 1000000 # was using 100000 but saving GPU quota
+    # Use very large numbers for 'all'
+    max_train_rows = 1000000
     max_test_rows  = 1000000000
     max_batch_size = 50000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
 
-max_epochs = 5
+max_epochs = 3
 show_timings = False # debug
 batch_report_interval = 10
 
@@ -819,9 +819,9 @@ if do_test:
         submission_subset_df = submission_subset_df.with_columns(pl.from_numpy(y_predictions, expanded_names_output))
 
         if submission_df is not None:
-            submission_df = pl.concat([submission_df, subset_df])
+            submission_df = pl.concat([submission_df, submission_subset_df])
         else:
-            submission_df = subset_df
+            submission_df = submission_subset_df
 
     print("submission_df:", submission_df.describe())
 
