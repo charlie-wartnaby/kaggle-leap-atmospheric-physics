@@ -14,6 +14,7 @@ if debug:
     max_batch_size = 1000
     patience = 4
     train_proportion = 0.8
+    try_reload_model = True
 else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000000
@@ -21,6 +22,7 @@ else:
     max_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
+    try_reload_model = False
 
 max_epochs = 20
 show_timings = False # debug
@@ -55,8 +57,9 @@ train_path = os.path.join(base_path, train_root + '.csv')
 train_offsets_path = os.path.join(offsets_path, train_root + '.pkl')
 test_path = os.path.join(base_path, test_root + '.csv')
 test_offsets_path = os.path.join(offsets_path, test_root + '.pkl')
-submission_path = os.path.join(base_path, submission_root + '.csv')
+submission_template_path = os.path.join(base_path, submission_root + '.csv')
 submission_offsets_path = os.path.join(offsets_path, submission_root + '.pkl')
+model_save_path = 'model.pt'
 
 class HoloFrame:
     """Manage data extraction from large .csv file with random access
@@ -101,7 +104,7 @@ train_hf = HoloFrame(train_path, train_offsets_path)
 # First row is all we need from submissions, to get col weightings. 
 # sample_id column labels are identical to test.csv (checked first rows at least)
 print('Loading submission weights...')
-sample_submission_df = pl.read_csv(submission_path, n_rows=1)
+sample_submission_df = pl.read_csv(submission_template_path, n_rows=1)
 
 # Altitude levels in hPa from ClimSim-main\grid_info\ClimSim_low-res_grid-info.nc
 level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.2529232969453412, 0.4492506351686618, 0.7863461614709879, 1.3473557602677517, 2.244777286900205, 3.6164314830257718, 5.615836425337344, 8.403253219853443, 12.144489352066294, 17.016828024303006, 23.21079811610005, 30.914346261995327, 40.277580662953575, 51.37463234765765, 64.18922841394662, 78.63965761131159, 94.63009200213703, 112.09127353988006, 130.97780378937776, 151.22131809551237, 172.67390465199267, 195.08770981962772, 218.15593476138105, 241.60037901222947, 265.2585152868483, 289.12232222921756, 313.31208711045167, 338.0069992368819, 363.37349177951705, 389.5233382784413, 416.5079218282233, 444.3314120123719, 472.9572063769364, 502.2919169181905, 532.1522731583445, 562.2393924639011, 592.1492760575118, 621.4328411158061, 649.689897132655, 676.6564846051039, 702.2421877859194, 726.4985894989197, 749.5376452869328, 771.4452171682528, 792.2342599534793, 811.8566751313328, 830.2596431972574, 847.4506530638328, 863.5359020075301, 878.7158746040692, 893.2460179738746, 907.3852125876941, 921.3543974831824, 935.3167171670306, 949.3780562075774, 963.5995994020714, 978.013432382012, 992.6355435925217]
@@ -704,6 +707,11 @@ if use_cnn:
 else:
     hidden_size = input_size + output_size # any particular reason for this and 'diabalo' shape here?
     model = FFNN(input_size, [3*hidden_size, 2*hidden_size, hidden_size, 2*hidden_size, 3*hidden_size], output_size).to(device)
+
+if try_reload_model and os.path.exists(model_save_path):
+    print('Attempting to reload model from disk...')
+    model.load_state_dict(torch.load(model_save_path))
+
 criterion = nn.MSELoss()  # Using MSE for regression
 optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=False)
@@ -758,7 +766,7 @@ for epoch in range(max_epochs):
         best_model_state = model.state_dict()  # Save the best model state
         patience_count = 0
         print("Validation loss decreased, saving new best model and resetting patience counter.")
-        torch.save(model.state_dict(), 'model.pt')
+        torch.save(model.state_dict(), model_save_path)
     else:
         patience_count += 1
         print(f"No improvement in validation loss for {patience_count} epochs.")
