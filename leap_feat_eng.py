@@ -16,13 +16,13 @@ if debug:
     train_proportion = 0.8
 else:
     # Very large numbers for 'all'
-    max_train_rows = 10000000 # was using 100000 but saving GPU quota
+    max_train_rows = 1000000 # was using 100000 but saving GPU quota
     max_test_rows  = 1000000000
-    max_batch_size = 5000
+    max_batch_size = 50000
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.8
+    train_proportion = 0.9
 
-max_epochs = 1
+max_epochs = 5
 show_timings = False # debug
 batch_report_interval = 10
 
