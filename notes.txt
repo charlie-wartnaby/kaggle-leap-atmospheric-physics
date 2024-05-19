@@ -53,25 +53,15 @@ Results from early expts
 
 Showed that it did a touch better with additional new features, and getting rid of some raw ones:
 
-At commit 42896a9aac, out of memory preprocessing test data on Kaggle. Locally with 10M rows:
-Epoch 1, Validation Loss: 0.4515650928020477
-Epoch 2, Validation Loss: 0.43092106863856317
-Epoch 3, Validation Loss: 0.42092101737856863
-Epoch 4, Validation Loss: 0.4152659673988819
-Epoch 5, Validation Loss: 0.410844571813941
-
-Current state at commit ebe569df, looks like it may go on for too long as no noise in validation score:
-7363.7s	188	Validation loss decreased, saving new best model and resetting patience counter.
-7417.9s	189	Epoch 28, Step 10, Training Loss: 0.4816
-7471.9s	190	Epoch 28, Step 20, Training Loss: 0.4546
-7525.8s	191	Epoch 28, Step 30, Training Loss: 0.4872
-7579.6s	192	Epoch 28, Step 40, Training Loss: 0.4747
+submission.csv
+Complete · 2m ago · Commit 77a26e95b9a local run to validation score ~0.4 on full dataset with CNN
+0.53044
 
 LEAP with feature engineering - Version 35
 Complete · 3m ago · Commit 2c9a279 smallish test run with CNN approach and overhauled test output
 With only: Validation Loss: 0.5902572572231293
-
 0.35463
+
 LEAP with feature engineering - Version 25
 Complete · 3d ago · commit 755728af first test run with holo frame concept
 

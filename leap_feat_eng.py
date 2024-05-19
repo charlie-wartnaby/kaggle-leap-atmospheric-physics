@@ -14,7 +14,8 @@ if debug:
     max_batch_size = 1000
     patience = 4
     train_proportion = 0.8
-    try_reload_model = True
+    try_reload_model = False
+    max_epochs = 1
 else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000000
@@ -22,11 +23,12 @@ else:
     max_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    try_reload_model = False
+    try_reload_model = True
+    max_epochs = 20
 
-max_epochs = 20
 show_timings = False # debug
 batch_report_interval = 10
+dropout_p = 0.2
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
@@ -59,7 +61,10 @@ test_path = os.path.join(base_path, test_root + '.csv')
 test_offsets_path = os.path.join(offsets_path, test_root + '.pkl')
 submission_template_path = os.path.join(base_path, submission_root + '.csv')
 submission_offsets_path = os.path.join(offsets_path, submission_root + '.pkl')
-model_save_path = 'model.pt'
+if debug:
+    model_save_path = 'model-debug.pt'
+else:
+    model_save_path = 'model.pt'
 
 class HoloFrame:
     """Manage data extraction from large .csv file with random access
@@ -570,22 +575,25 @@ class AtmLayerCNN(nn.Module):
         output_size = num_input_feature_chans * 3
         self.conv_layer_0 = nn.Conv1d(input_size, output_size, 1,
                                 padding='same')
+        self.layernorm_0 = nn.LayerNorm([output_size, num_atm_levels])
         self.activation_layer_0 =nn.SiLU(inplace=True)
-        self.dropout_layer_0 = nn.Dropout(p=0.1)
+        self.dropout_layer_0 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
         output_size = num_input_feature_chans * 3
         self.conv_layer_1 = nn.Conv1d(input_size, output_size, 3,
                                 padding='same')
+        self.layernorm_1 = nn.LayerNorm([output_size, num_atm_levels])
         self.activation_layer_1 = nn.SiLU(inplace=True)
-        self.dropout_layer_1 = nn.Dropout(p=0.1)
+        self.dropout_layer_1 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
         output_size = num_input_feature_chans * 3
         self.conv_layer_2 = nn.Conv1d(input_size, output_size, 7,
                                 padding='same')
+        self.layernorm_2 = nn.LayerNorm([output_size, num_atm_levels])
         self.activation_layer_2 = nn.SiLU(inplace=True)
-        self.dropout_layer_2 = nn.Dropout(p=0.1)
+        self.dropout_layer_2 = nn.Dropout(p=dropout_p)
 
         num_vector_outputs = len(unexpanded_output_vector_col_names)
         num_vector_out_cols = num_vector_outputs * num_atm_levels
@@ -607,12 +615,15 @@ class AtmLayerCNN(nn.Module):
 
     def forward(self, x):
         x = self.conv_layer_0(x)
+        x = self.layernorm_0(x)
         x = self.activation_layer_0(x)
         x = self.dropout_layer_0(x)
         x = self.conv_layer_1(x)
+        x = self.layernorm_1(x)
         x = self.activation_layer_1(x)
         x = self.dropout_layer_1(x)
         x = self.conv_layer_2(x)
+        x = self.layernorm_2(x)
         x = self.activation_layer_2(x)
         x = self.dropout_layer_2(x)
         x = self.flatten_layer_0(x)
@@ -750,10 +761,16 @@ for epoch in range(max_epochs):
     # Validation step
     model.eval()
     val_loss = 0
+    steps = 0
     with torch.no_grad():
         for inputs, labels in val_loader:
             outputs = model(inputs)
             val_loss += criterion(outputs, labels).item()
+            steps += 1
+
+            if steps >= batch_report_interval:
+                print(f'Validation step {steps}')
+                steps = 0
 
     avg_val_loss = val_loss / len(val_loader)
     print(f'Epoch {epoch+1}, Validation Loss: {avg_val_loss}')
