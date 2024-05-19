@@ -18,7 +18,7 @@ else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000000
     max_test_rows  = 1000000000
-    max_batch_size = 20000
+    max_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
 

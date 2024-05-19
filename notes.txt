@@ -9,14 +9,12 @@ level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.252923296945341
 Ideas to progress
 -----------------
 
-o Save model to disk so can resume training or reuse
 o Use Kaggle API to submit submission.csv if do good run locally
 o Run on whole dataset even for limited number of epochs in case scores better
 o Higher dropout proportion? Looks too smooth on Kaggle big run.
 o Bring back normalisation layer(s)?
 o Haven't explored optimiser, learning rate etc
 o Deal properly with columns that are going to be zero anyway
-o Figure out faster/cheaper validation test to avoid using GPU quota and quicker turnaround
 o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
 o Reciprocal of new features, e.g. heating in K/s will be inversely proportional to density
