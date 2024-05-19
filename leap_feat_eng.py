@@ -2,27 +2,27 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = True
+debug = False
 do_test = True
 use_cnn = True
 
 #
 
 if debug:
-    max_train_rows = 1000
+    max_train_rows = 5000
     max_test_rows  = 1000
-    max_batch_size = 100
+    max_batch_size = 1000
     patience = 4
     train_proportion = 0.8
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
-    max_batch_size = 50000
+    max_batch_size = 20000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
 
-max_epochs = 3
+max_epochs = 20
 show_timings = False # debug
 batch_report_interval = 10
 
@@ -758,6 +758,7 @@ for epoch in range(max_epochs):
         best_model_state = model.state_dict()  # Save the best model state
         patience_count = 0
         print("Validation loss decreased, saving new best model and resetting patience counter.")
+        torch.save(model.state_dict(), 'model.pt')
     else:
         patience_count += 1
         print(f"No improvement in validation loss for {patience_count} epochs.")
@@ -766,6 +767,10 @@ for epoch in range(max_epochs):
         print("Stopping early due to no improvement in validation loss.")
         break
 
+    if os.path.exists('stop.txt'):
+        print("Stop file detected, deleting it and stopping now")
+        os.remove('stop.txt')
+        break
 
 #
 

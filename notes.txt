@@ -69,6 +69,16 @@ Current state at commit ebe569df, looks like it may go on for too long as no noi
 7525.8s	191	Epoch 28, Step 30, Training Loss: 0.4872
 7579.6s	192	Epoch 28, Step 40, Training Loss: 0.4747
 
+LEAP with feature engineering - Version 35
+Complete · 3m ago · Commit 2c9a279 smallish test run with CNN approach and overhauled test output
+With only: Validation Loss: 0.5902572572231293
+
+0.35463
+LEAP with feature engineering - Version 25
+Complete · 3d ago · commit 755728af first test run with holo frame concept
+
+0.28431
+
 LEAP with feature engineering - Version 19
 Complete · 4m ago · commit afda421d20 Multiplying by submission weights before modelling now
 0.32041
