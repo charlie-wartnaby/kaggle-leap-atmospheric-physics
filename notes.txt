@@ -10,8 +10,10 @@ Ideas to progress
 -----------------
 
 o Save model to disk so can resume training or reuse
+o Use Kaggle API to submit submission.csv if do good run locally
 o Run on whole dataset even for limited number of epochs in case scores better
 o Higher dropout proportion? Looks too smooth on Kaggle big run.
+o Bring back normalisation layer(s)?
 o Haven't explored optimiser, learning rate etc
 o Deal properly with columns that are going to be zero anyway
 o Figure out faster/cheaper validation test to avoid using GPU quota and quicker turnaround
@@ -52,6 +54,13 @@ Results from early expts
 ------------------------
 
 Showed that it did a touch better with additional new features, and getting rid of some raw ones:
+
+At commit 42896a9aac, out of memory preprocessing test data on Kaggle. Locally with 10M rows:
+Epoch 1, Validation Loss: 0.4515650928020477
+Epoch 2, Validation Loss: 0.43092106863856317
+Epoch 3, Validation Loss: 0.42092101737856863
+Epoch 4, Validation Loss: 0.4152659673988819
+Epoch 5, Validation Loss: 0.410844571813941
 
 Current state at commit ebe569df, looks like it may go on for too long as no noise in validation score:
 7363.7s	188	Validation loss decreased, saving new best model and resetting patience counter.
