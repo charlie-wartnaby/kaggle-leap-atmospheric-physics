@@ -23,7 +23,7 @@ else:
     max_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    try_reload_model = True
+    try_reload_model = False
     max_epochs = 20
 
 show_timings = False # debug
@@ -573,7 +573,7 @@ class AtmLayerCNN(nn.Module):
         # Start simple
         input_size = num_input_feature_chans
         output_size = num_input_feature_chans * 3
-        self.conv_layer_0 = nn.Conv1d(input_size, output_size, 1,
+        self.conv_layer_0 = nn.Conv1d(input_size, output_size, 7,
                                 padding='same')
         self.layernorm_0 = nn.LayerNorm([output_size, num_atm_levels])
         self.activation_layer_0 =nn.SiLU(inplace=True)
@@ -581,7 +581,7 @@ class AtmLayerCNN(nn.Module):
 
         input_size = output_size
         output_size = num_input_feature_chans * 3
-        self.conv_layer_1 = nn.Conv1d(input_size, output_size, 3,
+        self.conv_layer_1 = nn.Conv1d(input_size, output_size, 7,
                                 padding='same')
         self.layernorm_1 = nn.LayerNorm([output_size, num_atm_levels])
         self.activation_layer_1 = nn.SiLU(inplace=True)

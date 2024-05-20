@@ -51,7 +51,10 @@ o Latent heat flux: +ve for condensation on surface, -ve for evaporation from su
 Results from early expts
 ------------------------
 
-Showed that it did a touch better with additional new features, and getting rid of some raw ones:
+submission_8531e050.csv
+Complete · 6m ago · Commit 8531e050 with more droput and layer normalisations
+Epoch 19, Validation Loss: 0.38724345529433524 (full dataset)
+0.56218
 
 submission.csv
 Complete · 2m ago · Commit 77a26e95b9a local run to validation score ~0.4 on full dataset with CNN
@@ -64,7 +67,6 @@ With only: Validation Loss: 0.5902572572231293
 
 LEAP with feature engineering - Version 25
 Complete · 3d ago · commit 755728af first test run with holo frame concept
-
 0.28431
 
 LEAP with feature engineering - Version 19
