@@ -9,13 +9,13 @@ use_cnn = True
 #
 
 if debug:
-    max_train_rows = 5000
+    max_train_rows = 200000
     max_test_rows  = 1000
-    max_batch_size = 1000
+    max_batch_size = 5000
     patience = 4
     train_proportion = 0.8
     try_reload_model = False
-    max_epochs = 1
+    max_epochs = 3
 else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000000
@@ -465,8 +465,11 @@ def preprocess_data(pl_df, has_outputs):
 
     # norm X
     if has_outputs:
-        mx = x.mean(axis=0)
-        sx = np.maximum(x.std(axis=0), min_std)
+        mx = x.mean(axis=(0,2))
+        # Now applying same scaling across whole 60-level channel, for x at least:
+        mx = mx.reshape(1, len(unexpanded_input_col_names), 1)
+        sx = np.maximum(x.std(axis=(0,2)), min_std)
+        sx = sx.reshape(1, len(unexpanded_input_col_names), 1)
         mx_sample.append(mx)
         sx_sample.append(sx)
     else:

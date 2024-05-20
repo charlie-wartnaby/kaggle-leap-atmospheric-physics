@@ -9,12 +9,9 @@ level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.252923296945341
 Ideas to progress
 -----------------
 
-o Use Kaggle API to submit submission.csv if do good run locally
-o Run on whole dataset even for limited number of epochs in case scores better
-o Higher dropout proportion? Looks too smooth on Kaggle big run.
-o Bring back normalisation layer(s)?
 o Haven't explored optimiser, learning rate etc
 o Deal properly with columns that are going to be zero anyway
+o Try normalising using stats for whole input vector instead of individual elements
 o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
 o Reciprocal of new features, e.g. heating in K/s will be inversely proportional to density
@@ -50,6 +47,14 @@ o Latent heat flux: +ve for condensation on surface, -ve for evaporation from su
 
 Results from early expts
 ------------------------
+
+submission-763ae6b9.csv
+Complete · 4m ago · Commit 763ae6b9 Trying more channels in early CNN layers
+0.57444
+Epoch 8, Validation Loss: 0.3771515665668072
+Epoch 9, Validation Loss: 0.37443682448108595
+Epoch 10, Validation Loss: 0.37198687337412695
+
 
 submission_8531e050.csv
 Complete · 6m ago · Commit 8531e050 with more droput and layer normalisations
