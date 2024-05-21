@@ -2,7 +2,7 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = True
+debug = False
 do_test = True
 use_cnn = True
 
@@ -24,11 +24,12 @@ else:
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     try_reload_model = False
-    max_epochs = 20
+    max_epochs = 10
 
 show_timings = False # debug
 batch_report_interval = 10
 dropout_p = 0.2
+initial_learning_rate = 0.01 # default 0.001
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
@@ -725,8 +726,8 @@ if try_reload_model and os.path.exists(model_save_path):
     model.load_state_dict(torch.load(model_save_path))
 
 criterion = nn.MSELoss()  # Using MSE for regression
-optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=False)
+optimizer = optim.AdamW(model.parameters(), lr=initial_learning_rate, weight_decay=0.01)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
 
 
 #
@@ -762,16 +763,13 @@ for epoch in range(max_epochs):
     # Validation step
     model.eval()
     val_loss = 0
-    steps = 0
     with torch.no_grad():
-        for inputs, labels in val_loader:
+        for batch_idx, (inputs, labels) in enumerate(val_loader):
             outputs = model(inputs)
             val_loss += criterion(outputs, labels).item()
-            steps += 1
 
-            if steps >= batch_report_interval:
-                print(f'Validation step {steps}')
-                steps = 0
+            if (batch_idx + 1) % batch_report_interval == 0:
+                print(f'Validation batch {batch_idx + 1}')
 
     avg_val_loss = val_loss / len(val_loader)
     print(f'Epoch {epoch+1}, Validation Loss: {avg_val_loss}')
