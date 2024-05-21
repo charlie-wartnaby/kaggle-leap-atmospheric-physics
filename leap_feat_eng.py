@@ -192,7 +192,6 @@ unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not co
 unexpanded_output_vector_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension > 1]
 unexpanded_output_scalar_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension <= 1]
 
-
 def expand_and_add_cols(col_list, cols_by_name, col_names):
     for col_name in col_names:
         col_info = cols_by_name[col_name]
@@ -489,40 +488,16 @@ def preprocess_data(pl_df, has_outputs):
 
     if has_outputs:
         # norm Y
-        # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
-        # gives loss value like competition criterion but I see no training advantage:
-        # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
-
-        # Now attempting to use stats across all elements of each channel for normalisation,
-        # before submission weighting, then apply that to both scale factors and values
-        # so training works on reasonable-sized values
-        my_by_channel = []
-        sy_by_channel = []
-        for chan_idx in range(num_vector_outputs):
-            base_col = chan_idx * num_atm_levels
-            y_col_subset = y[:, base_col : base_col + num_atm_levels]
-            my_col = y_col_subset.mean(axis=(0,1))
-            sy_col = np.maximum(y_col_subset.std(axis=(0,1)), min_std)
-            my_all_chan_cols = np.tile(my_col, num_atm_levels)
-            sy_all_chan_cols = np.tile(sy_col, num_atm_levels)
-            my_by_channel.append(my_all_chan_cols)
-            sy_by_channel.append(sy_all_chan_cols)
-        # And the scalar ones
-        base_col = num_vector_out_cols
-        scalar_subset = y[:, base_col :]
-        my_scalars = scalar_subset.mean(axis=0)
-        sy_scalars = np.maximum(scalar_subset.std(axis=0), min_std)
-        my_by_channel.append(my_scalars)
-        sy_by_channel.append(sy_scalars)
-        my = np.concatenate(my_by_channel).reshape(1,num_total_outputs)
-        sy = np.concatenate(sy_by_channel).reshape(1,num_total_outputs)
-        
         # Scaling outputs by weights that wil be used anyway for submission, so we get
         # rid of very tiny values that will give very small variances, and will make
         # them suitable hopefully for conversion to float32
-        my *= submission_weights
-        y  *= submission_weights
+        y = y * submission_weights
 
+        my = y.mean(axis=0)
+        # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
+        # gives loss value like competition criterion but I see no training advantage:
+        # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
+        sy = np.maximum(y.std(axis=0), min_std)
         my_sample.append(my)
         sy_sample.append(sy)
         y = (y - my) / sy
@@ -548,7 +523,7 @@ import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 np.random.seed(42)
 random.seed(42)
-min_std = 1e-8 * 1e-15 # now before submission weighting
+min_std = 1e-8
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 DEBUGGING = not do_test
@@ -860,7 +835,7 @@ if do_test:
             # CW: still using original threshold although now premultiplying outputs by
             # submission weightings, though does zero out those with zero weights
             # (and some others)
-            if sy[0,i] < min_std * 1.1:
+            if sy[i] < min_std * 1.1:
                 y_predictions[:,i] = 0 # Although zero here after rescaling will be y.mean
 
         # undo y scaling
