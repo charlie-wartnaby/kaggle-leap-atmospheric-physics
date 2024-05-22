@@ -28,7 +28,7 @@ else:
 
 show_timings =  debug
 batch_report_interval = 10
-dropout_p = 0.4
+dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
@@ -68,8 +68,8 @@ if debug:
 else:
     model_save_path = 'model.pt'
 batch_cache_dir = 'batch_cache'
-clear_batch_cache_at_start = debug # True if processing has changed
-clear_batch_cache_at_end = not debug
+clear_batch_cache_at_start = True #debug # True if processing has changed
+clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 
 
 class HoloFrame:
@@ -433,7 +433,6 @@ def vectorise_data(pl_df):
 
 mx_sample = [] # Each element vector of means of input columns, from one holo batch
 sx_sample = [] # ... and scaling factor
-my_sample = [] # Similarly for output columns
 sy_sample = []
 
 def mean_vector_across_samples(sample_list):
@@ -504,14 +503,12 @@ def preprocess_data(pl_df, has_outputs):
         # them suitable hopefully for conversion to float32
         y = y * submission_weights
 
-        my = y.mean(axis=0)
         # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
         # gives loss value like competition criterion but I see no training advantage:
         # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
         sy = np.maximum(y.std(axis=0), min_std)
-        my_sample.append(my)
         sy_sample.append(sy)
-        y = (y - my) / sy
+        y /= sy
         y = y.astype(np.float32)
     else:
         y = None
@@ -827,7 +824,6 @@ if do_test:
 
     submission_df = None
 
-    my = mean_vector_across_samples(my_sample)
     sy = mean_vector_across_samples(sy_sample)
 
     model.load_state_dict(best_model_state)
@@ -859,7 +855,7 @@ if do_test:
                 y_predictions[:,i] = 0 # Although zero here after rescaling will be y.mean
 
         # undo y scaling
-        y_predictions = y_predictions * sy + my
+        y_predictions = y_predictions * sy
 
         # We already premultiplied training values by submission weights
         # so predictions should already be scaled the same way

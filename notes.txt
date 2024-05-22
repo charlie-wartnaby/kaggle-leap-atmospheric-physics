@@ -48,6 +48,8 @@ o Latent heat flux: +ve for condensation on surface, -ve for evaporation from su
 Submission Results
 ------------------
 
+Batch cache: first run took about 50 mins 07:08-08:01 timestamps on cache files
+About half way through epoch 2 at 08:17 -> 32 mins for cached epoch, ~2x speedup
 Tried LR=0.01 but didn't really converge:
 	Epoch 1, Step 610, Training Loss: 0.6596
 With LR=0.004 seemed very smooth, actually slower than 0.001:
@@ -64,7 +66,10 @@ Epoch 10, Validation Loss: 0.38333882804554287 (was 0.367 below before fix)
 Epoch 13, Validation Loss: 0.38022170975656794 + 3 epochs for sanity check submit
 Epoch 15, Validation Loss: 0.3789655051314005
 Epoch 18, Validation Loss: 0.37621909586509855
-
+Did end up with best score so far, but a lot of epochs:
+submission-25b97f1f-23-epochs.csv
+Complete · 2h ago · commit 25b97f1f With y scaling fixed (but didn't help?)
+0.59192
 
 submission-559738c.csv
 Complete · 3m ago · Normalising inputs (but not yet outputs) across whole channels
