@@ -9,9 +9,9 @@ level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.252923296945341
 Ideas to progress
 -----------------
 
-o Haven't explored optimiser, learning rate etc
+o Cache preprocessed data batches as .pkl files for smaller disk access and less CPU
+o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
-o Try normalising using stats for whole input vector instead of individual elements
 o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
 o Reciprocal of new features, e.g. heating in K/s will be inversely proportional to density
@@ -47,6 +47,24 @@ o Latent heat flux: +ve for condensation on surface, -ve for evaporation from su
 
 Submission Results
 ------------------
+
+Tried LR=0.01 but didn't really converge:
+	Epoch 1, Step 610, Training Loss: 0.6596
+With LR=0.004 seemed very smooth, actually slower than 0.001:
+Epoch 2, Step 890, Training Loss: 0.4715
+Trying now with LR=0.0004 on Kaggle for 3 epochs:
+Epoch 3, Validation Loss: 0.4196762824707692 so no improvement
+So default learning rate of 0.001 actually good with current setup.
+
+
+commit 25b97f1f Fix to apparently incorrect y scaling
+Oddly didn't help, maybe worse -- maybe means scaling alone is fine, no need
+to subtract mean at all, which would save time.
+Epoch 10, Validation Loss: 0.38333882804554287 (was 0.367 below before fix)
+Epoch 13, Validation Loss: 0.38022170975656794 + 3 epochs for sanity check submit
+Epoch 15, Validation Loss: 0.3789655051314005
+Epoch 18, Validation Loss: 0.37621909586509855
+
 
 submission-559738c.csv
 Complete · 3m ago · Normalising inputs (but not yet outputs) across whole channels

@@ -9,13 +9,13 @@ use_cnn = True
 #
 
 if debug:
-    max_train_rows = 5000
+    max_train_rows = 25000
     max_test_rows  = 1000
-    max_batch_size = 1000
+    max_batch_size = 5000
     patience = 4
     train_proportion = 0.8
     try_reload_model = False
-    max_epochs = 3
+    max_epochs = 2
 else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000000
@@ -26,7 +26,7 @@ else:
     try_reload_model = False
     max_epochs = 10
 
-show_timings = False # debug
+show_timings =  debug
 batch_report_interval = 10
 dropout_p = 0.2
 initial_learning_rate = 0.01 # default 0.001
@@ -39,6 +39,7 @@ import os
 import pickle
 import polars as pl
 import re
+import shutil
 import sklearn.model_selection
 import sys
 import time
@@ -66,6 +67,10 @@ if debug:
     model_save_path = 'model-debug.pt'
 else:
     model_save_path = 'model.pt'
+batch_cache_dir = 'batch_cache'
+clear_batch_cache_at_start = debug # True if processing has changed
+clear_batch_cache_at_end = not debug
+
 
 class HoloFrame:
     """Manage data extraction from large .csv file with random access
@@ -111,6 +116,11 @@ train_hf = HoloFrame(train_path, train_offsets_path)
 # sample_id column labels are identical to test.csv (checked first rows at least)
 print('Loading submission weights...')
 sample_submission_df = pl.read_csv(submission_template_path, n_rows=1)
+
+if clear_batch_cache_at_start and os.path.exists(batch_cache_dir):
+    print('Deleting any previous batch cache files...')
+    shutil.rmtree(batch_cache_dir)
+os.makedirs(batch_cache_dir, exist_ok=True)
 
 # Altitude levels in hPa from ClimSim-main\grid_info\ClimSim_low-res_grid-info.nc
 level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.2529232969453412, 0.4492506351686618, 0.7863461614709879, 1.3473557602677517, 2.244777286900205, 3.6164314830257718, 5.615836425337344, 8.403253219853443, 12.144489352066294, 17.016828024303006, 23.21079811610005, 30.914346261995327, 40.277580662953575, 51.37463234765765, 64.18922841394662, 78.63965761131159, 94.63009200213703, 112.09127353988006, 130.97780378937776, 151.22131809551237, 172.67390465199267, 195.08770981962772, 218.15593476138105, 241.60037901222947, 265.2585152868483, 289.12232222921756, 313.31208711045167, 338.0069992368819, 363.37349177951705, 389.5233382784413, 416.5079218282233, 444.3314120123719, 472.9572063769364, 502.2919169181905, 532.1522731583445, 562.2393924639011, 592.1492760575118, 621.4328411158061, 649.689897132655, 676.6564846051039, 702.2421877859194, 726.4985894989197, 749.5376452869328, 771.4452171682528, 792.2342599534793, 811.8566751313328, 830.2596431972574, 847.4506530638328, 863.5359020075301, 878.7158746040692, 893.2460179738746, 907.3852125876941, 921.3543974831824, 935.3167171670306, 949.3780562075774, 963.5995994020714, 978.013432382012, 992.6355435925217]
@@ -656,15 +666,27 @@ class HoloDataset(Dataset):
         """
         if not (self.cache_base_idx >= 0 and 
                 index >= self.cache_base_idx and index < self.cache_base_idx + self.cache_rows):
-            # We don't already have this convered and processed, so process
-            # a batch of rows to cache
-            self.cache_base_idx = index
+            # We don't already have this converted and processed in RAM
             start_time = time.time()
-            pl_slice_df = self.holo_df.get_slice(index, index + self.cache_rows)
-            self.cache_np_x, self.cache_np_y = preprocess_data(pl_slice_df, True)
-            if show_timings: print(f'HoloDataset slice build at row {self.cache_base_idx} took {time.time() - start_time} s')
+            self.cache_base_idx = index
+            cache_filename = f'{self.cache_base_idx}.pkl'
+            cache_path = os.path.join(batch_cache_dir, cache_filename)
+            if os.path.exists(cache_path):
+                # Preprocessing already done, retrieve from binary cache file
+                with open(cache_path, 'rb') as fd:
+                    (self.cache_np_x, self.cache_np_y) = pickle.load(fd)
+                if show_timings: print(f'HoloDataset slice cache load at row {self.cache_base_idx} took {time.time() - start_time} s')    
+            else:
+                # Process slice of large dataframe corresponding to batch
+                pl_slice_df = self.holo_df.get_slice(index, index + self.cache_rows)
+                self.cache_np_x, self.cache_np_y = preprocess_data(pl_slice_df, True)
+                if show_timings: print(f'HoloDataset slice build at row {self.cache_base_idx} took {time.time() - start_time} s')
+                start_time = time.time()
+                with open(cache_path, 'wb') as fd:
+                    pickle.dump((self.cache_np_x, self.cache_np_y), fd)
+                if show_timings: print(f'HoloDataset slice cache save at row {self.cache_base_idx} took {time.time() - start_time} s')
 
-        # Convert the data to tensors when requested
+        # Convert the RAM numpy data to tensors when requested
         cache_idx = index - self.cache_base_idx
         return torch.from_numpy(self.cache_np_x[cache_idx]).float().to(device), \
                torch.from_numpy(self.cache_np_y[cache_idx]).float().to(device)
@@ -856,4 +878,7 @@ if do_test:
 
     submission_df.write_csv("submission.csv")
 
-pass
+
+if clear_batch_cache_at_end:
+    print('Deleting batch cache files...')
+    shutil.rmtree(batch_cache_dir)
