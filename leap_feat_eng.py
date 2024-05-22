@@ -28,8 +28,8 @@ else:
 
 show_timings =  debug
 batch_report_interval = 10
-dropout_p = 0.2
-initial_learning_rate = 0.01 # default 0.001
+dropout_p = 0.4
+initial_learning_rate = 0.001 # default 0.001
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
