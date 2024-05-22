@@ -48,8 +48,11 @@ o Latent heat flux: +ve for condensation on surface, -ve for evaporation from su
 Submission Results
 ------------------
 
-Batch cache: first run took about 50 mins 07:08-08:01 timestamps on cache files
-About half way through epoch 2 at 08:17 -> 32 mins for cached epoch, ~2x speedup
+submission-5a5069fa.csv
+Complete · 6m ago · Commit 5a5069fa 10 epochs with high dropout proportion, validation loss not good though
+0.55404
+
+
 Tried LR=0.01 but didn't really converge:
 	Epoch 1, Step 610, Training Loss: 0.6596
 With LR=0.004 seemed very smooth, actually slower than 0.001:

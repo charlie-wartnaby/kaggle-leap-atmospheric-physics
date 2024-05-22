@@ -23,13 +23,15 @@ else:
     max_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    try_reload_model = False
+    try_reload_model = True
     max_epochs = 10
 
 show_timings =  debug
 batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
+clear_batch_cache_at_start = False #debug # True if processing has changed
+clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
@@ -68,8 +70,6 @@ if debug:
 else:
     model_save_path = 'model.pt'
 batch_cache_dir = 'batch_cache'
-clear_batch_cache_at_start = True #debug # True if processing has changed
-clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 
 
 class HoloFrame:
