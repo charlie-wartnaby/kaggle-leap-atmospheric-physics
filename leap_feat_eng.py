@@ -14,7 +14,7 @@ if debug:
     max_batch_size = 5000
     patience = 4
     train_proportion = 0.8
-    try_reload_model = False
+    try_reload_model = True
     max_epochs = 2
 else:
     # Use very large numbers for 'all'
@@ -30,7 +30,7 @@ show_timings =  debug
 batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
-clear_batch_cache_at_start = False #debug # True if processing has changed
+clear_batch_cache_at_start = True #debug # True if processing has changed
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
@@ -430,10 +430,16 @@ def vectorise_data(pl_df):
 
     return vector_dict
 
-
-mx_sample = [] # Each element vector of means of input columns, from one holo batch
-sx_sample = [] # ... and scaling factor
-sy_sample = []
+# Cache normalisation data needed for any rerun later
+scaling_cache_filename = 'scaling_normalisation.pkl'
+scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
+if os.path.exists(scaling_cache_path):
+    with open(scaling_cache_path, 'rb') as fd:
+        (mx_sample, sx_sample, sy_sample) = pickle.load(fd)
+else:
+    mx_sample = [] # Each element vector of means of input columns, from one holo batch
+    sx_sample = [] # ... and scaling factor
+    sy_sample = []
 
 def mean_vector_across_samples(sample_list):
     """Given series of sample row vectors across data columns, form
@@ -815,7 +821,10 @@ for epoch in range(max_epochs):
         os.remove('stop.txt')
         break
 
-#
+# Cache normalisation data needed for any rerun later
+with open(scaling_cache_path, 'wb') as fd:
+    pickle.dump((mx_sample, sx_sample, sy_sample), fd)
+
 
 # Test
 if do_test:
