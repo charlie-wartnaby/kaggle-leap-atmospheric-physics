@@ -1,7 +1,7 @@
 # LEAP competition with feature engineering
 
 # This block will be different in Kaggle notebook:
-run_local = False
+run_local = True
 debug = False
 do_test = True
 use_cnn = True
@@ -23,8 +23,8 @@ else:
     max_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    try_reload_model = True
-    max_epochs = 5 # Enough to get idea of x scaling effect?
+    try_reload_model = False
+    max_epochs = 20
 
 show_timings =  debug
 batch_report_interval = 10

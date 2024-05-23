@@ -48,6 +48,11 @@ o Latent heat flux: +ve for condensation on surface, -ve for evaporation from su
 Submission Results
 ------------------
 
+commit b44f79d7
+Test for 3 epochs only using no subtraction of x-mean on Kaggle:
+Epoch 3, Validation Loss: 0.4196762824707692
+Not bad, worth a bigger run
+
 submission-5a5069fa.csv
 Complete · 6m ago · Commit 5a5069fa 10 epochs with high dropout proportion, validation loss not good though
 0.55404
