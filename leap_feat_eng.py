@@ -486,20 +486,20 @@ def preprocess_data(pl_df, has_outputs):
     # norm X
     if has_outputs:
         # Now applying same scaling across whole 60-level channel, for x at least:
-        #mx = x.mean(axis=(0,2))
-        #mx = mx.reshape(1, len(unexpanded_input_col_names), 1)
+        mx = x.mean(axis=(0,2))
+        mx = mx.reshape(1, len(unexpanded_input_col_names), 1)
         sx = np.maximum(x.std(axis=(0,2)), min_std)
         sx = sx.reshape(1, len(unexpanded_input_col_names), 1)
-        #mx_sample.append(mx)
+        mx_sample.append(mx)
         sx_sample.append(sx)
     else:
         # Using scaling found in training data; though could use test data if big enough?
-        #mx = mean_vector_across_samples(mx_sample)
+        mx = mean_vector_across_samples(mx_sample)
         sx = mean_vector_across_samples(sx_sample)
 
     # Original had mx.reshape(1,-1) to go from 1D row vector to 2D array with
     # one row but seems unnecessary
-    x = x / sx # Experimental hack to only scale not offset like y
+    x = (x - mx) / sx
     x = x.astype(np.float32)
 
     if has_outputs:

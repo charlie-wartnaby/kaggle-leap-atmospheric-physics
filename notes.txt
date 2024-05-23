@@ -48,10 +48,15 @@ o Latent heat flux: +ve for condensation on surface, -ve for evaporation from su
 Submission Results
 ------------------
 
-commit b44f79d7
-Test for 3 epochs only using no subtraction of x-mean on Kaggle:
-Epoch 3, Validation Loss: 0.4196762824707692
-Not bad, worth a bigger run
+submission-1b655d19.csv
+Complete · 2h ago · Commit 1b655d19 with experimental no centring of x values in normalisation either
+0.59778 -- so a bit worse overall, will centre x values again
+
+
+submission.csv
+Complete · 18h ago · commit 9ccabc17 not centering Y values in normalisation
+0.60646
+
 
 submission-5a5069fa.csv
 Complete · 6m ago · Commit 5a5069fa 10 epochs with high dropout proportion, validation loss not good though
