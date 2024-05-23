@@ -9,7 +9,7 @@ level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.252923296945341
 Ideas to progress
 -----------------
 
-o Cache preprocessed data batches as .pkl files for smaller disk access and less CPU
+o Save epoch counter, tend to lose track if have to stop/restart
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
 o Understand physics of each target col better
@@ -54,9 +54,8 @@ Complete · 2h ago · Commit 1b655d19 with experimental no centring of x values 
 
 
 submission.csv
-Complete · 18h ago · commit 9ccabc17 not centering Y values in normalisation
+Complete · 2m ago · commit 9ccabc17 not centering Y values in normalisation
 0.60646
-
 
 submission-5a5069fa.csv
 Complete · 6m ago · Commit 5a5069fa 10 epochs with high dropout proportion, validation loss not good though

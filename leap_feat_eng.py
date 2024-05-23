@@ -593,7 +593,7 @@ class AtmLayerCNN(nn.Module):
  
         # Start simple
         input_size = num_input_feature_chans
-        output_size = num_input_feature_chans * 3
+        output_size = num_input_feature_chans * 6
         self.conv_layer_0 = nn.Conv1d(input_size, output_size, 7,
                                 padding='same')
         self.layernorm_0 = nn.LayerNorm([output_size, num_atm_levels])
@@ -601,7 +601,7 @@ class AtmLayerCNN(nn.Module):
         self.dropout_layer_0 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
-        output_size = num_input_feature_chans * 3
+        output_size = num_input_feature_chans * 6
         self.conv_layer_1 = nn.Conv1d(input_size, output_size, 7,
                                 padding='same')
         self.layernorm_1 = nn.LayerNorm([output_size, num_atm_levels])
@@ -609,7 +609,7 @@ class AtmLayerCNN(nn.Module):
         self.dropout_layer_1 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
-        output_size = num_input_feature_chans * 3
+        output_size = num_input_feature_chans * 6
         self.conv_layer_2 = nn.Conv1d(input_size, output_size, 7,
                                 padding='same')
         self.layernorm_2 = nn.LayerNorm([output_size, num_atm_levels])
