@@ -245,6 +245,16 @@ num_total_outputs = len(expanded_names_output)
 # required to compute relative humidity, which generalises much better than
 # specific humidity according to Beucler et al 2021:
 
+# Constants for the Community Atmosphere Model
+DT = 1800.
+L_V = 2.501e6   # Latent heat of vaporization
+L_I = 3.337e5   # Latent heat of freezing
+L_F = L_I
+L_S = L_V + L_I # Sublimation
+C_P = 1.00464e3 # Specific heat capacity of air at constant pressure
+G = 9.80616
+RHO_L = 1e3
+
 def eliq(T):
     """
     Function taking temperature (in K) and outputting liquid saturation
@@ -301,6 +311,60 @@ def RH_from_climate(specific_humidity, temperature, air_pressure_Pa):
     # We use the `values` method to convert Xarray DataArray into Numpy ND-Arrays
     #return Rv/Rd * air_pressure_Pa/esat.values * specific_humidity.values
     return Rv/Rd * air_pressure_Pa/esat * specific_humidity
+
+# Beucler et al plume buoyance metric from bmse_calc() wrapped in class T2BMSENumpy
+# https://colab.research.google.com/github/tbeucler/CBRAIN-CAM/blob/master/Climate_Invariant_Guide.ipynb#scrollTo=0S6W988UaG6p&line=1&uniqifier=1
+# "Source code for the moist thermodynamics library"
+# qv = specific humidity from comment on class QV2RHNumpy
+# P0, PS clues from "p = P0 * hyam + PS[:, None] * hybm # Total pressure (Pa)"
+# "P0 = 1e5 # Mean surface air pressure (Pa)"
+# "surface pressure `PS` in hPa"
+# "hyam=hyam, hybm=hybm, # Arrays to define mid-levels of the hybrid vertical coordinate"
+# hyam,hybm see http://www.pa.op.dlr.de/~MattiaRighi/ncl/NCL_exercises.pdf
+#              "The hybrid vertical representation"
+# Pressure at level k p(k) = A(k) + B(k)Psurf
+# I.e. coefficients for linear scaling of pressure at height based on surface pressure
+
+def esat(T):
+    T0 = 273.16
+    T00 = 253.16
+    omega = np.maximum(0,np.minimum(1,(T-T00)/(T0-T00)))
+
+    return (T>T0)*eliq(T)+(T<T00)*eice(T)+(T<=T0)*(T>=T00)*(omega*eliq(T)+(1-omega)*eice(T))
+
+def qv(self,T,RH, p): #P0,PS,hyam,hybm):
+    R = 287
+    Rv = 461
+    S = PS.shape
+    # p = 1e5 * np.tile(hyam,(S[0],1))+np.transpose(np.tile(PS,(30,1)))*np.tile(hybm,(S[0],1))
+
+    return R*self.esat(T)*RH/(Rv*p)
+
+def qsat(self,T, p): #,P0,PS,hyam,hybm):
+    return self.qv(T,1,p) # P0,PS,hyam,hybm)
+
+def bmse_calc(T,qv, p): #,P0,PS,hyam,hybm):
+    eps = 0.622 # Ratio of molecular weight(H2O)/molecular weight(dry air)
+    R_D = 287 # Specific gas constant of dry air in J/K/kg
+    Rv = 461
+    # Calculate kappa
+    QSAT0 = qsat(T,p) #P0,PS,hyam,hybm)
+    kappa = 1+(L_V**2)*QSAT0/(Rv*C_P*(T**2))
+    # Calculate geopotential
+    r = qv/(qv**0-qv)
+    Tv = T*(r**0+r/eps)/(r**0+r)
+    #p = P0 * hyam + PS[:, None] * hybm
+    p = p.astype(np.float32)
+    RHO = p/(R_D*Tv)
+    Z = -sin.cumtrapz(x=p,y=1/(G*RHO),axis=1)
+    Z = np.concatenate((0*Z[:,0:1]**0,Z),axis=1)
+    # Assuming near-surface is at 2 meters
+    Z = (Z-Z[:,[29]])+2 
+    # Calculate MSEs of plume and environment
+    Tile_dim = [1,30]
+    h_plume = np.tile(np.expand_dims(C_P*T[:,-1]+L_V*qv[:,-1],axis=1),Tile_dim)
+    h_satenv = C_P*T+L_V*qv+G*Z
+    return (G/kappa)*(h_plume-h_satenv)/(C_P*T)
 
 
 # Not sure if adding single columns at a time will be too slow on big dataset, can do:
