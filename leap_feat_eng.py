@@ -20,7 +20,7 @@ else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000000
     max_test_rows  = 1000000000
-    max_batch_size = 20000  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 20
@@ -75,7 +75,7 @@ if debug:
 else:
     model_save_path = 'model.pt'
 batch_cache_dir = 'batch_cache'
-loss_log_path = 'loss_log.txt'
+loss_log_path = 'loss_log.csv'
 epoch_counter_path = 'epochs.txt'
 
 if not is_rerun and os.path.exists(epoch_counter_path):
@@ -674,7 +674,7 @@ class AtmLayerCNN(nn.Module):
  
         # Start simple
         input_size = num_input_feature_chans
-        output_size = num_input_feature_chans * 3
+        output_size = num_input_feature_chans * 6
         self.conv_layer_0 = nn.Conv1d(input_size, output_size, 7,
                                 padding='same')
         self.layernorm_0 = nn.LayerNorm([output_size, num_atm_levels])
@@ -682,7 +682,7 @@ class AtmLayerCNN(nn.Module):
         self.dropout_layer_0 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
-        output_size = num_input_feature_chans * 3
+        output_size = num_input_feature_chans * 6
         self.conv_layer_1 = nn.Conv1d(input_size, output_size, 7,
                                 padding='same')
         self.layernorm_1 = nn.LayerNorm([output_size, num_atm_levels])
@@ -690,20 +690,12 @@ class AtmLayerCNN(nn.Module):
         self.dropout_layer_1 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
-        output_size = num_input_feature_chans * 3
+        output_size = num_input_feature_chans * 6
         self.conv_layer_2 = nn.Conv1d(input_size, output_size, 7,
                                 padding='same')
         self.layernorm_2 = nn.LayerNorm([output_size, num_atm_levels])
         self.activation_layer_2 = nn.SiLU(inplace=True)
         self.dropout_layer_2 = nn.Dropout(p=dropout_p)
-
-        input_size = output_size
-        output_size = num_input_feature_chans * 3
-        self.conv_layer_3 = nn.Conv1d(input_size, output_size, 7,
-                                padding='same')
-        self.layernorm_3 = nn.LayerNorm([output_size, num_atm_levels])
-        self.activation_layer_3 = nn.SiLU(inplace=True)
-        self.dropout_layer_3 = nn.Dropout(p=dropout_p)
 
         # Data is structured such that all vector columns come first, then scalars
 
@@ -730,10 +722,6 @@ class AtmLayerCNN(nn.Module):
         x = self.layernorm_2(x)
         x = self.activation_layer_2(x)
         x = self.dropout_layer_2(x)
-        x = self.conv_layer_3(x)
-        x = self.layernorm_3(x)
-        x = self.activation_layer_3(x)
-        x = self.dropout_layer_3(x)
         x = self.flatten_layer_0(x)
         x = self.linear_layer_0(x)
         return x

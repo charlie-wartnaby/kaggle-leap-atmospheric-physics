@@ -55,9 +55,17 @@ Though validation loss looking better so far on pcuk151, maybe batches too big?
 Submission Results
 ------------------
 
+submission.csv
+Complete · 5m ago · Commit b8a8d4ec 4th conv layer all depth 3, 30000s
+0.60257
+
 submission-bd3a254.csv
 Complete · 5m ago · Commit bd3a254 more depth in conv layers, 5000-row batches
-0.62144
+0.62144 (notably better than larger batches this time at least)
+
+submission.csv
+Complete · 9h ago · Commit a17aae411 deeper conv layers 30000 batches
+0.60331
 
 submission-1b655d19.csv
 Complete · 2h ago · Commit 1b655d19 with experimental no centring of x values in normalisation either
