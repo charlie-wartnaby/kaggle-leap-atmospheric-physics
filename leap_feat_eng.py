@@ -2,19 +2,20 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = False
+debug = True
 do_test = True
 use_cnn = True
+is_rerun = False
 
 #
 
 if debug:
-    max_train_rows = 25000
+    max_train_rows = 100
     max_test_rows  = 1000
-    max_batch_size = 5000
+    max_batch_size = 10
     patience = 4
     train_proportion = 0.8
-    try_reload_model = True
+    try_reload_model = is_rerun
     max_epochs = 2
 else:
     # Use very large numbers for 'all'
@@ -26,11 +27,11 @@ else:
     try_reload_model = False
     max_epochs = 20
 
-show_timings =  debug
+show_timings = False # debug
 batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
-clear_batch_cache_at_start = True #debug # True if processing has changed
+clear_batch_cache_at_start = not is_rerun #debug # True if processing has changed
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
@@ -46,31 +47,42 @@ import sklearn.model_selection
 import sys
 import time
 
-if run_local:
-    base_path = '.'
-    offsets_path = '.'
-    train_root = 'train'
-    test_root = 'test'
-    submission_root = 'sample_submission-top-10000'
+import socket
+machine = socket.gethostname()
+
+if machine == 'narg':
+    train_root = 'train-top-5000'
+    test_root = 'test-top-1000'
+    submission_root = 'sample_submission-top-1000'
 else:
-    base_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim'
-    offsets_path = '/kaggle/input/leap-atmospheric-physics-file-row-offsets'
     train_root = 'train'
     test_root = 'test'
     submission_root = 'sample_submission'
+
+if run_local:
+    base_path = '.'
+    offsets_path = '.'
+else:
+    base_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim'
+    offsets_path = '/kaggle/input/leap-atmospheric-physics-file-row-offsets'
 
 train_path = os.path.join(base_path, train_root + '.csv')
 train_offsets_path = os.path.join(offsets_path, train_root + '.pkl')
 test_path = os.path.join(base_path, test_root + '.csv')
 test_offsets_path = os.path.join(offsets_path, test_root + '.pkl')
 submission_template_path = os.path.join(base_path, submission_root + '.csv')
-submission_offsets_path = os.path.join(offsets_path, submission_root + '.pkl')
 if debug:
     model_save_path = 'model-debug.pt'
 else:
     model_save_path = 'model.pt'
 batch_cache_dir = 'batch_cache'
+loss_log_path = 'loss_log.txt'
+epoch_counter_path = 'epochs.txt'
 
+if not is_rerun and os.path.exists(epoch_counter_path):
+    os.remove(epoch_counter_path)
+if not is_rerun and os.path.exists(loss_log_path):
+    os.remove(loss_log_path)
 
 class HoloFrame:
     """Manage data extraction from large .csv file with random access
@@ -434,9 +446,11 @@ def vectorise_data(pl_df):
 scaling_cache_filename = 'scaling_normalisation.pkl'
 scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
 if os.path.exists(scaling_cache_path):
+    print("Opening previous scalings...")
     with open(scaling_cache_path, 'rb') as fd:
         (mx_sample, sx_sample, sy_sample) = pickle.load(fd)
 else:
+    print("No previous scalings so starting afresh")
     mx_sample = [] # Each element vector of means of input columns, from one holo batch
     sx_sample = [] # ... and scaling factor
     sy_sample = []
@@ -699,6 +713,10 @@ class HoloDataset(Dataset):
                 start_time = time.time()
                 with open(cache_path, 'wb') as fd:
                     pickle.dump((self.cache_np_x, self.cache_np_y), fd)
+                # Cache normalisation data needed for any rerun later
+                with open(scaling_cache_path, 'wb') as fd:
+                    pickle.dump((mx_sample, sx_sample, sy_sample), fd)
+
                 if show_timings: print(f'HoloDataset slice cache save at row {self.cache_base_idx} took {time.time() - start_time} s')
 
         # Convert the RAM numpy data to tensors when requested
@@ -773,6 +791,7 @@ scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0
 best_val_loss = float('inf')  # Set initial best as infinity
 best_model_state = None       # To store the best model's state
 patience_count = 0
+print("Starting training loop...")
 for epoch in range(max_epochs):
     model.train()
     total_loss = 0
@@ -809,7 +828,25 @@ for epoch in range(max_epochs):
                 print(f'Validation batch {batch_idx + 1}')
 
     avg_val_loss = val_loss / len(val_loader)
-    print(f'Epoch {epoch+1}, Validation Loss: {avg_val_loss}')
+    if os.path.exists(epoch_counter_path):
+        try:
+            with open(epoch_counter_path) as fd:
+                epochs_str = fd.readline()
+                tot_epochs = int(epochs_str)
+        except:
+            print(f"Failed to open/parse {epoch_counter_path}, zeroing counter")
+            tot_epochs = 0
+    else:
+        tot_epochs = 0
+
+    tot_epochs += 1
+    with open(epoch_counter_path, 'w') as fd:
+        fd.write(f'{tot_epochs}\n')
+
+    print(f'Epoch {tot_epochs}, Validation Loss: {avg_val_loss}')
+    with open(loss_log_path, 'a') as fd:
+        fd.write(f'{tot_epochs},{avg_val_loss}\n')
+
     
     scheduler.step(avg_val_loss)  # Adjust learning rate
 
@@ -832,10 +869,6 @@ for epoch in range(max_epochs):
         print("Stop file detected, deleting it and stopping now")
         os.remove('stop.txt')
         break
-
-# Cache normalisation data needed for any rerun later
-with open(scaling_cache_path, 'wb') as fd:
-    pickle.dump((mx_sample, sx_sample, sy_sample), fd)
 
 
 # Test
