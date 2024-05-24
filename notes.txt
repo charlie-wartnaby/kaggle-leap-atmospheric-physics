@@ -44,6 +44,12 @@ o Radiative effects: absorbtion of SW (visible), greenhouse trapping of LW (IR)
 o Sensible heat flux: +ve from atm to surface (radiation, conduction, convection??)
 o Latent heat flux: +ve for condensation on surface, -ve for evaporation from surface
 
+Performance
+-----------
+
+At a17aae4 on greta scaling and model saved at 03:10 first cache 11:55 so ~3hr15 for 20 epochs
+On pcuk151 first cache 21:12, epoch 10 finishing 05:50 so ~8hr40 for 10 epochs
+Though validation loss looking better so far on pcuk151, maybe batches too big?
 
 Submission Results
 ------------------
