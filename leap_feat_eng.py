@@ -2,7 +2,7 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = True
+debug = False
 do_test = True
 use_cnn = True
 is_rerun = False
@@ -10,14 +10,12 @@ is_rerun = False
 #
 
 if debug:
-    max_train_rows = 100
+    max_train_rows = 500
     max_test_rows  = 1000
-    max_batch_size = 10
+    max_batch_size = 100
     patience = 4
     train_proportion = 0.8
-    max_epochs = 2
-    multitrain_params = {"gen_conv_width" : [3, 7, 15],
-                         "gen_conv_depth" : [3, 6, 12]}
+    max_epochs = 3
 else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000000
@@ -25,8 +23,10 @@ else:
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    max_epochs = 20
-    multitrain_params = {}
+    max_epochs = 10
+
+multitrain_params = {"gen_conv_width" : [3, 7, 15],
+                        "gen_conv_depth" : [3, 6, 12]}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -40,7 +40,7 @@ holo_cache_rows = max_batch_size # Explore later if helps to cache for multi bat
 
 multitrain_keys = list(multitrain_params.keys())
 if len(multitrain_keys) < 1:
-    param_permuations = [{}]
+    param_permutations = [{}]
 else:
     permutation_indices = [0] * len(multitrain_keys)
     current_key_idx = 0
@@ -65,6 +65,9 @@ else:
             permutation_indices[current_key_idx] += 1
             current_key_idx = 0
 
+if is_rerun and len(param_permuations) > 1:
+    print("Cannot do multitraining experiment and resume previous run")
+    sys.exit(1)
 
 import copy
 import numpy as np
@@ -102,9 +105,9 @@ test_path = os.path.join(base_path, test_root + '.csv')
 test_offsets_path = os.path.join(offsets_path, test_root + '.pkl')
 submission_template_path = os.path.join(base_path, submission_root + '.csv')
 if debug:
-    model_save_path = 'model-debug.pt'
+    model_root_path = 'model-debug.pt'
 else:
-    model_save_path = 'model.pt'
+    model_root_path = 'model.pt'
 batch_cache_dir = 'batch_cache'
 loss_log_path = 'loss_log.csv'
 epoch_counter_path = 'epochs.txt'
@@ -387,7 +390,7 @@ def bmse_calc(T,qv, p): #,P0,PS,hyam,hybm):
     #p = P0 * hyam + PS[:, None] * hybm
     p = p.astype(np.float32)
     RHO = p/(R_D*Tv)
-    Z = -sin.cumtrapz(x=p,y=1/(G*RHO),axis=1)
+    Z = -sin.cumulative_trapezoid(x=p,y=1/(G*RHO),axis=1)
     Z = np.concatenate((0*Z[:,0:1]**0,Z),axis=1)
     # Assuming near-surface is at 2 meters
     num_levels = T.shape[1]
@@ -696,7 +699,7 @@ class FFNN(nn.Module):
         return self.layers(x)
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self):
+    def __init__(self, gen_conv_width=7, gen_conv_depth=6):
         super().__init__()
         
         # Initialize the layers
@@ -705,24 +708,24 @@ class AtmLayerCNN(nn.Module):
  
         # Start simple
         input_size = num_input_feature_chans
-        output_size = num_input_feature_chans * 6
-        self.conv_layer_0 = nn.Conv1d(input_size, output_size, 7,
+        output_size = num_input_feature_chans * gen_conv_depth
+        self.conv_layer_0 = nn.Conv1d(input_size, output_size, gen_conv_width,
                                 padding='same')
         self.layernorm_0 = nn.LayerNorm([output_size, num_atm_levels])
         self.activation_layer_0 =nn.SiLU(inplace=True)
         self.dropout_layer_0 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
-        output_size = num_input_feature_chans * 6
-        self.conv_layer_1 = nn.Conv1d(input_size, output_size, 7,
+        output_size = num_input_feature_chans * gen_conv_depth
+        self.conv_layer_1 = nn.Conv1d(input_size, output_size, gen_conv_width,
                                 padding='same')
         self.layernorm_1 = nn.LayerNorm([output_size, num_atm_levels])
         self.activation_layer_1 = nn.SiLU(inplace=True)
         self.dropout_layer_1 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
-        output_size = num_input_feature_chans * 6
-        self.conv_layer_2 = nn.Conv1d(input_size, output_size, 7,
+        output_size = num_input_feature_chans * gen_conv_depth
+        self.conv_layer_2 = nn.Conv1d(input_size, output_size, gen_conv_width,
                                 padding='same')
         self.layernorm_2 = nn.LayerNorm([output_size, num_atm_levels])
         self.activation_layer_2 = nn.SiLU(inplace=True)
@@ -856,19 +859,6 @@ val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
 
 input_size = len(expanded_names_input) # number of input features/columns
 output_size = len(expanded_names_output)
-if use_cnn:
-    model = AtmLayerCNN().to(device)
-else:
-    hidden_size = input_size + output_size # any particular reason for this and 'diabalo' shape here?
-    model = FFNN(input_size, [3*hidden_size, 2*hidden_size, hidden_size, 2*hidden_size, 3*hidden_size], output_size).to(device)
-
-if try_reload_model and os.path.exists(model_save_path):
-    print('Attempting to reload model from disk...')
-    model.load_state_dict(torch.load(model_save_path))
-
-criterion = nn.MSELoss()  # Using MSE for regression
-optimizer = optim.AdamW(model.parameters(), lr=initial_learning_rate, weight_decay=0.01)
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
 
 
 #
@@ -885,78 +875,121 @@ else:
     tot_epochs = 0
 
 # Training loop
-best_val_loss = float('inf')  # Set initial best as infinity
-best_model_state = None       # To store the best model's state
-patience_count = 0
+stop_requested = False
+overall_best_model = None
+overall_best_model_state = None
+overall_best_model_name = ""
+overall_best_val_loss = float('inf')
 
-print("Starting training loop...")
-for epoch in range(max_epochs):
-    model.train()
-    total_loss = 0
-    steps = 0
-    for batch_idx, (inputs, labels) in enumerate(train_loader):
-        start_time = time.time()
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward() # Calculates gradients by backpropagation (chain rule)
-        optimizer.step()
+for param_permutation in param_permutations:
+    if stop_requested:
+        break
 
-        total_loss += loss.item()
-        steps += 1
-
-        if show_timings: print(f'Training batch of {max_batch_size} took {time.time() - start_time} s')
-
-        # Print every n steps
-        if (batch_idx + 1) % batch_report_interval == 0:
-            print(f'Epoch {tot_epochs + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / steps:.4f}')
-            total_loss = 0  # Reset the loss for the next n steps
-            steps = 0  # Reset step count
-    
-
-    # Validation step
-    model.eval()
-    val_loss = 0
-    with torch.no_grad():
-        for batch_idx, (inputs, labels) in enumerate(val_loader):
-            outputs = model(inputs)
-            val_loss += criterion(outputs, labels).item()
-
-            if (batch_idx + 1) % batch_report_interval == 0:
-                print(f'Validation batch {batch_idx + 1}')
-
-    avg_val_loss = val_loss / len(val_loader)
-
-    tot_epochs += 1
-    with open(epoch_counter_path, 'w') as fd:
-        fd.write(f'{tot_epochs}\n')
-
-    print(f'Epoch {tot_epochs}, Validation Loss: {avg_val_loss}')
+    print("Starting training loop...")
+    suffix = ""
+    for key in param_permutation.keys():
+        print(f"... {key}={param_permutation[key]}")
+        suffix += f"_{key}_{param_permutation[key]}"
+    model_save_path = model_root_path + suffix + ".pt"
     with open(loss_log_path, 'a') as fd:
-        fd.write(f'{tot_epochs},{avg_val_loss}\n')
+        fd.write(f'{model_save_path}\n')
 
-    
-    scheduler.step(avg_val_loss)  # Adjust learning rate
-
-    # Update best model if current epoch's validation loss is lower
-    if avg_val_loss < best_val_loss:
-        best_val_loss = avg_val_loss
-        best_model_state = model.state_dict()  # Save the best model state
-        patience_count = 0
-        print("Validation loss decreased, saving new best model and resetting patience counter.")
-        torch.save(model.state_dict(), model_save_path)
+    if use_cnn:
+        model = AtmLayerCNN(**param_permutation).to(device)
     else:
-        patience_count += 1
-        print(f"No improvement in validation loss for {patience_count} epochs.")
-        
-    if patience_count >= patience:
-        print("Stopping early due to no improvement in validation loss.")
-        break
+        hidden_size = input_size + output_size # any particular reason for this and 'diabalo' shape here?
+        model = FFNN(input_size, [3*hidden_size, 2*hidden_size, hidden_size, 2*hidden_size, 3*hidden_size], output_size).to(device)
 
-    if os.path.exists('stop.txt'):
-        print("Stop file detected, deleting it and stopping now")
-        os.remove('stop.txt')
-        break
+    if try_reload_model and os.path.exists(model_save_path):
+        print('Attempting to reload model from disk...')
+        model.load_state_dict(torch.load(model_save_path))
+
+    criterion = nn.MSELoss()  # Using MSE for regression
+    optimizer = optim.AdamW(model.parameters(), lr=initial_learning_rate, weight_decay=0.01)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
+
+    best_val_loss = float('inf')  # Set initial best as infinity
+    best_model_state = None       # To store the best model's state
+    patience_count = 0
+
+    if len(param_permutations) > 1:
+        tot_epochs = 0
+
+    for epoch in range(max_epochs):
+        model.train()
+        total_loss = 0
+        steps = 0
+        for batch_idx, (inputs, labels) in enumerate(train_loader):
+            start_time = time.time()
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward() # Calculates gradients by backpropagation (chain rule)
+            optimizer.step()
+
+            total_loss += loss.item()
+            steps += 1
+
+            if show_timings: print(f'Training batch of {max_batch_size} took {time.time() - start_time} s')
+
+            # Print every n steps
+            if (batch_idx + 1) % batch_report_interval == 0:
+                print(f'Epoch {tot_epochs + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / steps:.4f}')
+                total_loss = 0  # Reset the loss for the next n steps
+                steps = 0  # Reset step count
+        
+
+        # Validation step
+        model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for batch_idx, (inputs, labels) in enumerate(val_loader):
+                outputs = model(inputs)
+                val_loss += criterion(outputs, labels).item()
+
+                if (batch_idx + 1) % batch_report_interval == 0:
+                    print(f'Validation batch {batch_idx + 1}')
+
+        avg_val_loss = val_loss / len(val_loader)
+
+        tot_epochs += 1
+        with open(epoch_counter_path, 'w') as fd:
+            fd.write(f'{tot_epochs}\n')
+
+        print(f'Epoch {tot_epochs}, Validation Loss: {avg_val_loss}')
+        with open(loss_log_path, 'a') as fd:
+            fd.write(f'{tot_epochs},{avg_val_loss}\n')
+
+        
+        scheduler.step(avg_val_loss)  # Adjust learning rate
+
+        if avg_val_loss < overall_best_val_loss:
+            overall_best_val_loss = avg_val_loss
+            overall_best_model = model
+            overall_best_model_state = model.state_dict() # TODO is this static anyway?
+            overall_best_model_name = model_save_path
+            print(f"{model_save_path} best so far")
+
+        # Update best model if current epoch's validation loss is lower
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            best_model_state = model.state_dict()  # Save the best model state
+            patience_count = 0
+            print("Validation loss decreased, saving new best model and resetting patience counter.")
+            torch.save(model.state_dict(), model_save_path)
+        else:
+            patience_count += 1
+            print(f"No improvement in validation loss for {patience_count} epochs.")
+            
+        if patience_count >= patience:
+            print("Stopping early due to no improvement in validation loss.")
+            break
+
+        if os.path.exists('stop.txt'):
+            print("Stop file detected, deleting it and stopping now")
+            os.remove('stop.txt')
+            stop_requested = True
+            break
 
 
 # Test
@@ -968,8 +1001,9 @@ if do_test:
 
     sy = mean_vector_across_samples(sy_sample)
 
-    model.load_state_dict(best_model_state)
-    model.eval()
+    print(f'Using model {overall_best_model_name} for test run and submission')
+    overall_best_model.load_state_dict(overall_best_model_state)
+    overall_best_model.eval()
  
     base_row_idx = 0
     num_test_rows = min(max_test_rows, len(test_hf))
@@ -986,7 +1020,7 @@ if do_test:
 
         # No need to track gradients for inference
         with torch.no_grad():
-            outputs = model(inputs)  # Get model predictions
+            outputs = overall_best_model(inputs)  # Get model predictions
             y_predictions = outputs.cpu().numpy()  # Store predictions in predt
 
         for i in range(sy.shape[0]):
