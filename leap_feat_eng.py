@@ -2,7 +2,7 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = False
+debug = True
 do_test = True
 use_cnn = True
 is_rerun = False
@@ -16,6 +16,8 @@ if debug:
     patience = 4
     train_proportion = 0.8
     max_epochs = 2
+    multitrain_params = {"gen_conv_width" : [3, 7, 15],
+                         "gen_conv_depth" : [3, 6, 12]}
 else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000000
@@ -24,6 +26,7 @@ else:
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 20
+    multitrain_params = {}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -34,6 +37,34 @@ clear_batch_cache_at_start = not is_rerun #debug # True if processing has change
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
+
+multitrain_keys = list(multitrain_params.keys())
+if len(multitrain_keys) < 1:
+    param_permuations = [{}]
+else:
+    permutation_indices = [0] * len(multitrain_keys)
+    current_key_idx = 0
+    param_permutations = []
+    while (True):
+        permutation = {}
+        for param_idx in range(len(multitrain_keys)):
+            param = multitrain_keys[param_idx]
+            permutation[param] = multitrain_params[param][permutation_indices[param_idx]]
+        param_permutations.append(permutation)
+        if permutation_indices[current_key_idx] < len(multitrain_params[multitrain_keys[current_key_idx]]) - 1:
+            permutation_indices[current_key_idx] += 1
+            continue
+        while (current_key_idx < len(multitrain_keys) and
+            permutation_indices[current_key_idx] >= (len(multitrain_params[multitrain_keys[current_key_idx]]) - 1)):
+            current_key_idx += 1
+            for i in range(current_key_idx):
+                permutation_indices[i] = 0
+        if current_key_idx >= len(multitrain_keys):
+            break
+        else:
+            permutation_indices[current_key_idx] += 1
+            current_key_idx = 0
+
 
 import copy
 import numpy as np
@@ -356,7 +387,7 @@ def bmse_calc(T,qv, p): #,P0,PS,hyam,hybm):
     #p = P0 * hyam + PS[:, None] * hybm
     p = p.astype(np.float32)
     RHO = p/(R_D*Tv)
-    Z = -sin.cumulative_trapezoid(x=p,y=1/(G*RHO),axis=1)
+    Z = -sin.cumtrapz(x=p,y=1/(G*RHO),axis=1)
     Z = np.concatenate((0*Z[:,0:1]**0,Z),axis=1)
     # Assuming near-surface is at 2 meters
     num_levels = T.shape[1]
