@@ -2,7 +2,7 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = True
+debug = False
 do_test = True
 use_cnn = True
 is_rerun = False
@@ -842,7 +842,7 @@ scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0
 
 #
 
-if os.path.exists(epoch_counter_path):
+if is_rerun and os.path.exists(epoch_counter_path):
     try:
         with open(epoch_counter_path) as fd:
             epochs_str = fd.readline()
