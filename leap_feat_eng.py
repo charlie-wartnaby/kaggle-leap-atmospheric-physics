@@ -356,7 +356,7 @@ def bmse_calc(T,qv, p): #,P0,PS,hyam,hybm):
     #p = P0 * hyam + PS[:, None] * hybm
     p = p.astype(np.float32)
     RHO = p/(R_D*Tv)
-    Z = -sin.cumtrapz(x=p,y=1/(G*RHO),axis=1)
+    Z = -sin.cumulative_trapezoid(x=p,y=1/(G*RHO),axis=1)
     Z = np.concatenate((0*Z[:,0:1]**0,Z),axis=1)
     # Assuming near-surface is at 2 meters
     num_levels = T.shape[1]

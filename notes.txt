@@ -15,7 +15,9 @@ o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
 o Reciprocal of new features, e.g. heating in K/s will be inversely proportional to density
  for given heat input
-o Deeper/alternative network structures
+o Deeper/alternative network structures, automated search of structures?
+o 1x1 conv to mix features before wider convs?
+o Fully connected layer added to conv stack?
 o Try other ML techniques apart from NN
 o Would it help to remove more old feature columns?
 o Would it help to group columns differently depending on technique?
