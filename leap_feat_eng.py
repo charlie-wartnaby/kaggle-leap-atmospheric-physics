@@ -15,7 +15,6 @@ if debug:
     max_batch_size = 10
     patience = 4
     train_proportion = 0.8
-    try_reload_model = is_rerun
     max_epochs = 2
 else:
     # Use very large numbers for 'all'
@@ -24,13 +23,13 @@ else:
     max_batch_size = 20000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    try_reload_model = False
     max_epochs = 20
 
 show_timings = False # debug
 batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
+try_reload_model = is_rerun
 clear_batch_cache_at_start = not is_rerun #debug # True if processing has changed
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 
@@ -202,6 +201,7 @@ unexpanded_col_list.append(ColumnInfo(True, 'recip_density',     'reciprocal air
 unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',        'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
 unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',        'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
 unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',      'relative humidity (proportion)'     , 60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'buoyancy',          'Beucler buoyancy metric',             60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'vert_insolation',   'zenith-adjusted insolation',           1, 'W/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'direct_sw_absorb',  'direct shortwave absorbance',          1, 'W/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'diffuse_sw_absorb', 'diffuse shortwave absorbance',         1, 'W/m2'       ))
@@ -312,6 +312,24 @@ def RH_from_climate(specific_humidity, temperature, air_pressure_Pa):
     #return Rv/Rd * air_pressure_Pa/esat.values * specific_humidity.values
     return Rv/Rd * air_pressure_Pa/esat * specific_humidity
 
+def esat(T):
+    T0 = 273.16
+    T00 = 253.16
+    omega = np.maximum(0,np.minimum(1,(T-T00)/(T0-T00)))
+
+    return (T>T0)*eliq(T)+(T<T00)*eice(T)+(T<=T0)*(T>=T00)*(omega*eliq(T)+(1-omega)*eice(T))
+
+def qv(T,RH, p): #P0,PS,hyam,hybm):
+    R = 287
+    Rv = 461
+    #S = PS.shape
+    # p = 1e5 * np.tile(hyam,(S[0],1))+np.transpose(np.tile(PS,(30,1)))*np.tile(hybm,(S[0],1))
+
+    return R*esat(T)*RH/(Rv*p)
+
+def qsat(T, p): #,P0,PS,hyam,hybm):
+    return qv(T,1,p) # P0,PS,hyam,hybm)
+
 # Beucler et al plume buoyance metric from bmse_calc() wrapped in class T2BMSENumpy
 # https://colab.research.google.com/github/tbeucler/CBRAIN-CAM/blob/master/Climate_Invariant_Guide.ipynb#scrollTo=0S6W988UaG6p&line=1&uniqifier=1
 # "Source code for the moist thermodynamics library"
@@ -324,25 +342,7 @@ def RH_from_climate(specific_humidity, temperature, air_pressure_Pa):
 #              "The hybrid vertical representation"
 # Pressure at level k p(k) = A(k) + B(k)Psurf
 # I.e. coefficients for linear scaling of pressure at height based on surface pressure
-
-def esat(T):
-    T0 = 273.16
-    T00 = 253.16
-    omega = np.maximum(0,np.minimum(1,(T-T00)/(T0-T00)))
-
-    return (T>T0)*eliq(T)+(T<T00)*eice(T)+(T<=T0)*(T>=T00)*(omega*eliq(T)+(1-omega)*eice(T))
-
-def qv(self,T,RH, p): #P0,PS,hyam,hybm):
-    R = 287
-    Rv = 461
-    S = PS.shape
-    # p = 1e5 * np.tile(hyam,(S[0],1))+np.transpose(np.tile(PS,(30,1)))*np.tile(hybm,(S[0],1))
-
-    return R*self.esat(T)*RH/(Rv*p)
-
-def qsat(self,T, p): #,P0,PS,hyam,hybm):
-    return self.qv(T,1,p) # P0,PS,hyam,hybm)
-
+import scipy.integrate as sin
 def bmse_calc(T,qv, p): #,P0,PS,hyam,hybm):
     eps = 0.622 # Ratio of molecular weight(H2O)/molecular weight(dry air)
     R_D = 287 # Specific gas constant of dry air in J/K/kg
@@ -359,9 +359,10 @@ def bmse_calc(T,qv, p): #,P0,PS,hyam,hybm):
     Z = -sin.cumtrapz(x=p,y=1/(G*RHO),axis=1)
     Z = np.concatenate((0*Z[:,0:1]**0,Z),axis=1)
     # Assuming near-surface is at 2 meters
-    Z = (Z-Z[:,[29]])+2 
+    num_levels = T.shape[1]
+    Z = (Z-Z[:,[num_levels - 1]])+2 
     # Calculate MSEs of plume and environment
-    Tile_dim = [1,30]
+    Tile_dim = [1,num_levels]
     h_plume = np.tile(np.expand_dims(C_P*T[:,-1]+L_V*qv[:,-1],axis=1),Tile_dim)
     h_satenv = C_P*T+L_V*qv+G*Z
     return (G/kappa)*(h_plume-h_satenv)/(C_P*T)
@@ -452,6 +453,8 @@ def add_vector_features(vector_dict):
     specific_humidity_np = vector_dict['state_q0001']
     rel_humidity_np = RH_from_climate(specific_humidity_np, temperature_np, pressure_np)
     vector_dict['rel_humidity'] = rel_humidity_np
+    buoyancy_np = bmse_calc(temperature_np, specific_humidity_np, pressure_np)
+    vector_dict['buoyancy'] = buoyancy_np
 
     # Single-value new features
 
@@ -851,10 +854,22 @@ scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0
 
 #
 
+if os.path.exists(epoch_counter_path):
+    try:
+        with open(epoch_counter_path) as fd:
+            epochs_str = fd.readline()
+            tot_epochs = int(epochs_str)
+    except:
+        print(f"Failed to open/parse {epoch_counter_path}, zeroing counter")
+        tot_epochs = 0
+else:
+    tot_epochs = 0
+
 # Training loop
 best_val_loss = float('inf')  # Set initial best as infinity
 best_model_state = None       # To store the best model's state
 patience_count = 0
+
 print("Starting training loop...")
 for epoch in range(max_epochs):
     model.train()
@@ -875,7 +890,7 @@ for epoch in range(max_epochs):
 
         # Print every n steps
         if (batch_idx + 1) % batch_report_interval == 0:
-            print(f'Epoch {epoch + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / steps:.4f}')
+            print(f'Epoch {tot_epochs + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / steps:.4f}')
             total_loss = 0  # Reset the loss for the next n steps
             steps = 0  # Reset step count
     
@@ -892,16 +907,6 @@ for epoch in range(max_epochs):
                 print(f'Validation batch {batch_idx + 1}')
 
     avg_val_loss = val_loss / len(val_loader)
-    if os.path.exists(epoch_counter_path):
-        try:
-            with open(epoch_counter_path) as fd:
-                epochs_str = fd.readline()
-                tot_epochs = int(epochs_str)
-        except:
-            print(f"Failed to open/parse {epoch_counter_path}, zeroing counter")
-            tot_epochs = 0
-    else:
-        tot_epochs = 0
 
     tot_epochs += 1
     with open(epoch_counter_path, 'w') as fd:
