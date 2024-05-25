@@ -2,7 +2,7 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = False
+debug = True
 do_test = True
 use_cnn = True
 is_rerun = False
@@ -10,9 +10,9 @@ is_rerun = False
 #
 
 if debug:
-    max_train_rows = 500
+    max_train_rows = 5000
     max_test_rows  = 1000
-    max_batch_size = 100
+    max_batch_size = 1000
     patience = 4
     train_proportion = 0.8
     max_epochs = 3
@@ -25,8 +25,7 @@ else:
     train_proportion = 0.9
     max_epochs = 10
 
-multitrain_params = {"init_1x1" :         [True, False],
-                     "use_output_depth" : [True]        }
+multitrain_params = {}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -269,10 +268,10 @@ expanded_cols_by_name = dict(zip(expanded_names, expanded_col_list))
 expanded_names_input = [col.name for col in expanded_col_list if col.is_input]
 expanded_names_output = [col.name for col in expanded_col_list if not col.is_input]
 
-num_vector_outputs = len(unexpanded_output_vector_col_names)
-num_vector_out_cols = num_vector_outputs * num_atm_levels
+num_all_outputs_as_vectors = len(unexpanded_output_col_names)
+num_pure_vector_outputs = len(unexpanded_output_vector_col_names)
 num_scalar_outputs = len(unexpanded_output_scalar_col_names)
-num_total_outputs = len(expanded_names_output)
+num_total_expanded_outputs = len(expanded_names_output)
 
 # Functions to compute saturation pressure at given temperature taken from
 # https://colab.research.google.com/github/tbeucler/CBRAIN-CAM/blob/master/Climate_Invariant_Guide.ipynb#scrollTo=1Hsy9p4Ghe-G
@@ -705,12 +704,10 @@ class AtmLayerCNN(nn.Module):
         self.init_1x1 = init_1x1
 
         num_input_feature_chans = len(unexpanded_input_col_names)
-        vector_output_size = len(unexpanded_output_col_names)
-        total_output_size = len(expanded_names_output)
 
         if use_output_depth:
             # Intuitive one channel per output variable (vector or scalar)
-            gen_conv_depth = len(unexpanded_output_col_names)
+            gen_conv_depth = num_input_feature_chans
  
         # Initialize the layers
 
@@ -747,23 +744,23 @@ class AtmLayerCNN(nn.Module):
         self.dropout_layer_1 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
-        output_size = num_input_feature_chans * gen_conv_depth
+        self.last_conv_depth = gen_conv_depth
+        output_size = num_all_outputs_as_vectors * self.last_conv_depth
         self.conv_layer_2 = nn.Conv1d(input_size, output_size, gen_conv_width,
                                 padding='same')
         self.layernorm_2 = nn.LayerNorm([output_size, num_atm_levels])
         self.activation_layer_2 = nn.SiLU(inplace=True)
         self.dropout_layer_2 = nn.Dropout(p=dropout_p)
 
-        # Data is structured such that all vector columns come first, then scalars
-
         # Output layer - no dropout, no activation function
-        self.flatten_layer_0 = nn.Flatten()
-
-        # Not sure how to encourage it to use layer-based CNN results in vectorised
-        # outputs. Could maybe at least initialise weights to that end?
-        input_size = output_size * num_atm_levels # Now flattened size mult by channels
-        output_size = num_total_outputs
-        self.linear_layer_0 = nn.Linear(input_size, output_size)
+        # Data is structured such that all vector columns come first, then scalars
+        input_size = output_size
+        self.conv_vector_harvest = nn.Conv1d(num_pure_vector_outputs * gen_conv_depth,
+                                         num_pure_vector_outputs, 1, padding='same')
+        self.vector_flatten = nn.Flatten()
+        self.pre_scalar_pool = nn.AvgPool1d(num_atm_levels)
+        self.scalar_flatten = nn.Flatten()
+        self.linear_scalar_harvest = nn.Linear(num_scalar_outputs * gen_conv_depth, num_scalar_outputs)
         
 
     def forward(self, x):
@@ -784,9 +781,16 @@ class AtmLayerCNN(nn.Module):
         x = self.layernorm_2(x)
         x = self.activation_layer_2(x)
         x = self.dropout_layer_2(x)
-        x = self.flatten_layer_0(x)
-        x = self.linear_layer_0(x)
-        return x
+        num_conv_outputs_for_vectors = num_pure_vector_outputs * self.last_conv_depth
+        vector_subset = x[:, : num_conv_outputs_for_vectors, :]
+        scalar_subset = x[:, num_conv_outputs_for_vectors :, :]
+        scalars_pooled = self.pre_scalar_pool(scalar_subset)
+        scalars_flattened = self.scalar_flatten(scalars_pooled)
+        scalar_harvest = self.linear_scalar_harvest(scalars_flattened)
+        vector_harvest = self.conv_vector_harvest(vector_subset)
+        vectors_flattened = self.vector_flatten(vector_harvest)
+        expanded_outputs = torch.cat((vectors_flattened, scalar_harvest), dim=1)
+        return expanded_outputs
 #
 
 class HoloDataset(Dataset):
