@@ -2,7 +2,7 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = True
+debug = False
 do_test = True
 use_cnn = True
 is_rerun = False
