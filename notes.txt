@@ -9,6 +9,7 @@ level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.252923296945341
 Ideas to progress
 -----------------
 
+o Got conv1d params all wrong? N should be batch size...
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
 o Understand physics of each target col better

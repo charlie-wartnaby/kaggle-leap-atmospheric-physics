@@ -25,8 +25,8 @@ else:
     train_proportion = 0.9
     max_epochs = 10
 
-multitrain_params = {"gen_conv_width" : [3, 7, 15],
-                        "gen_conv_depth" : [3, 6, 12]}
+multitrain_params = {"init_1x1" :         [False, True],
+                     "use_output_depth" : [True]        }
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -699,15 +699,38 @@ class FFNN(nn.Module):
         return self.layers(x)
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self, gen_conv_width=7, gen_conv_depth=6):
+    def __init__(self, gen_conv_width=7, gen_conv_depth=6, init_1x1=False, use_output_depth=False):
         super().__init__()
         
-        # Initialize the layers
+        self.init_1x1 = init_1x1
+
         num_input_feature_chans = len(unexpanded_input_col_names)
+        vector_output_size = len(unexpanded_output_col_names)
         total_output_size = len(expanded_names_output)
+
+        if use_output_depth:
+            # Intuitive one channel per output variable (vector or scalar)
+            gen_conv_depth = len(unexpanded_output_col_names)
  
-        # Start simple
+        # Initialize the layers
+
         input_size = num_input_feature_chans
+
+        if self.init_1x1:
+            # Having single-width layer just means mixing combinations of input
+            # vars for this layer only as a useful starting point
+            # Could generalise to multiple if works
+            output_size = gen_conv_depth * 1
+            self.conv_layer_1x1 = nn.Conv1d(input_size, output_size, 1,
+                                    padding='same')
+            self.layernorm_1x1 = nn.LayerNorm([output_size, num_atm_levels])
+            self.activation_layer_1x1 =nn.SiLU(inplace=True)
+            self.dropout_layer_1x1 = nn.Dropout(p=dropout_p)
+        else:
+            # No initial unit width layer
+            output_size = input_size
+
+        input_size = output_size
         output_size = num_input_feature_chans * gen_conv_depth
         self.conv_layer_0 = nn.Conv1d(input_size, output_size, gen_conv_width,
                                 padding='same')
@@ -744,6 +767,11 @@ class AtmLayerCNN(nn.Module):
         
 
     def forward(self, x):
+        if self.init_1x1:
+            x = self.conv_layer_1x1(x)
+            x = self.layernorm_1x1(x)
+            x = self.activation_layer_1x1(x)
+            x = self.dropout_layer_1x1(x)
         x = self.conv_layer_0(x)
         x = self.layernorm_0(x)
         x = self.activation_layer_0(x)
