@@ -25,7 +25,7 @@ else:
     train_proportion = 0.9
     max_epochs = 10
 
-multitrain_params = {"init_1x1" :         [False, True],
+multitrain_params = {"init_1x1" :         [True, False],
                      "use_output_depth" : [True]        }
 
 show_timings = False # debug
