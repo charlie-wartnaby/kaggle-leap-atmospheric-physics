@@ -19,7 +19,7 @@ o Deeper/alternative network structures
 o Try other ML techniques apart from NN
 o Would it help to remove more old feature columns?
 o Would it help to group columns differently depending on technique?
-
+o Tried '1x1' conv but didn't help (868dd, val loss ~0.47 after 10 epochs wih 1x1)
 
 Scoring and why predictions zeroed for low-variance cols in example
 -------------------------------------------------------------------
@@ -54,6 +54,14 @@ Though validation loss looking better so far on pcuk151, maybe batches too big?
 
 Submission Results
 ------------------
+
+submission.csv
+Complete · 2h ago · Commit e77e89d8 first automated model param search, only 10 epochs, best of 9 was model.pt_gen_conv_width_7_gen_conv_depth_12.pt
+In general depth in conv layers was dominant, 12 better than 6 better than 3.
+Width across atm layers less important, but probably 7/15 better than 3.
+But also a lot more parameters and computing time.
+0.61821
+
 
 submission.csv
 Complete · 19m ago · Commit 939c2b5 reverting to fewer but deeper conv layers, 5000 batches, with buoyancy feature
