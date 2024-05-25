@@ -23,7 +23,7 @@ else:
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    max_epochs = 10
+    max_epochs = 50
 
 multitrain_params = {}
 
@@ -104,9 +104,9 @@ test_path = os.path.join(base_path, test_root + '.csv')
 test_offsets_path = os.path.join(offsets_path, test_root + '.pkl')
 submission_template_path = os.path.join(base_path, submission_root + '.csv')
 if debug:
-    model_root_path = 'model-debug.pt'
+    model_root_path = 'model-debug'
 else:
-    model_root_path = 'model.pt'
+    model_root_path = 'model'
 batch_cache_dir = 'batch_cache'
 loss_log_path = 'loss_log.csv'
 epoch_counter_path = 'epochs.txt'
@@ -698,7 +698,7 @@ class FFNN(nn.Module):
         return self.layers(x)
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self, gen_conv_width=7, gen_conv_depth=6, init_1x1=False, use_output_depth=False):
+    def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=False, use_output_depth=False):
         super().__init__()
         
         self.init_1x1 = init_1x1
