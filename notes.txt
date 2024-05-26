@@ -56,6 +56,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 4m ago · Commit e352323c with new scalar/vector output structure and bigger conv depth, 23 epochs
+0.64229
+
+submission.csv
 Complete · 2h ago · Commit e77e89d8 first automated model param search, only 10 epochs, best of 9 was model.pt_gen_conv_width_7_gen_conv_depth_12.pt
 In general depth in conv layers was dominant, 12 better than 6 better than 3.
 Width across atm layers less important, but probably 7/15 better than 3.
