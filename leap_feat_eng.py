@@ -25,14 +25,14 @@ else:
     train_proportion = 0.9
     max_epochs = 50
 
-multitrain_params = {'init_1x1' : [True]}
+multitrain_params = {"init_1x1" : [True]}
 
 show_timings = False # debug
 batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
-clear_batch_cache_at_start = False #not is_rerun #debug # True if processing has changed
+clear_batch_cache_at_start = False # forgot before starting # not is_rerun #debug # True if processing has changed
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
@@ -727,21 +727,21 @@ class AtmLayerCNN(nn.Module):
             # No initial unit width layer
             output_size = input_size
 
-        # input_size = output_size
-        # output_size = num_input_feature_chans * gen_conv_depth
-        # self.conv_layer_0 = nn.Conv1d(input_size, output_size, gen_conv_width,
-        #                         padding='same')
-        # self.layernorm_0 = nn.LayerNorm([output_size, num_atm_levels])
-        # self.activation_layer_0 =nn.SiLU(inplace=True)
-        # self.dropout_layer_0 = nn.Dropout(p=dropout_p)
+        input_size = output_size
+        output_size = num_input_feature_chans * gen_conv_depth
+        self.conv_layer_0 = nn.Conv1d(input_size, output_size, gen_conv_width,
+                                padding='same')
+        self.layernorm_0 = nn.LayerNorm([output_size, num_atm_levels])
+        self.activation_layer_0 =nn.SiLU(inplace=True)
+        self.dropout_layer_0 = nn.Dropout(p=dropout_p)
 
-        # input_size = output_size
-        # output_size = num_input_feature_chans * gen_conv_depth
-        # self.conv_layer_1 = nn.Conv1d(input_size, output_size, gen_conv_width,
-        #                         padding='same')
-        # self.layernorm_1 = nn.LayerNorm([output_size, num_atm_levels])
-        # self.activation_layer_1 = nn.SiLU(inplace=True)
-        # self.dropout_layer_1 = nn.Dropout(p=dropout_p)
+        input_size = output_size
+        output_size = num_input_feature_chans * gen_conv_depth
+        self.conv_layer_1 = nn.Conv1d(input_size, output_size, gen_conv_width,
+                                padding='same')
+        self.layernorm_1 = nn.LayerNorm([output_size, num_atm_levels])
+        self.activation_layer_1 = nn.SiLU(inplace=True)
+        self.dropout_layer_1 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
         self.last_conv_depth = gen_conv_depth
@@ -769,14 +769,14 @@ class AtmLayerCNN(nn.Module):
             x = self.layernorm_1x1(x)
             x = self.activation_layer_1x1(x)
             x = self.dropout_layer_1x1(x)
-        # x = self.conv_layer_0(x)
-        # x = self.layernorm_0(x)
-        # x = self.activation_layer_0(x)
-        # x = self.dropout_layer_0(x)
-        # x = self.conv_layer_1(x)
-        # x = self.layernorm_1(x)
-        # x = self.activation_layer_1(x)
-        # x = self.dropout_layer_1(x)
+        x = self.conv_layer_0(x)
+        x = self.layernorm_0(x)
+        x = self.activation_layer_0(x)
+        x = self.dropout_layer_0(x)
+        x = self.conv_layer_1(x)
+        x = self.layernorm_1(x)
+        x = self.activation_layer_1(x)
+        x = self.dropout_layer_1(x)
         x = self.conv_layer_2(x)
         x = self.layernorm_2(x)
         x = self.activation_layer_2(x)
