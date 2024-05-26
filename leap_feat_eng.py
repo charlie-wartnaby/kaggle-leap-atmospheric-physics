@@ -64,7 +64,7 @@ else:
             permutation_indices[current_key_idx] += 1
             current_key_idx = 0
 
-if is_rerun and len(param_permuations) > 1:
+if is_rerun and len(param_permutations) > 1:
     print("Cannot do multitraining experiment and resume previous run")
     sys.exit(1)
 
@@ -110,7 +110,11 @@ else:
 batch_cache_dir = 'batch_cache'
 loss_log_path = 'loss_log.csv'
 epoch_counter_path = 'epochs.txt'
+stopfile_path = 'stop.txt'
 
+if os.path.exists(stopfile_path):
+    print("Stop file detected on entry, deleting it")
+    os.remove(stopfile_path)
 if not is_rerun and os.path.exists(epoch_counter_path):
     os.remove(epoch_counter_path)
 if not is_rerun and os.path.exists(loss_log_path):
@@ -717,7 +721,7 @@ class AtmLayerCNN(nn.Module):
             # Having single-width layer just means mixing combinations of input
             # vars for this layer only as a useful starting point
             # Could generalise to multiple if works
-            output_size = gen_conv_depth * 1
+            output_size = num_input_feature_chans * gen_conv_depth
             self.conv_layer_1x1 = nn.Conv1d(input_size, output_size, 1,
                                     padding='same')
             self.layernorm_1x1 = nn.LayerNorm([output_size, num_atm_levels])
@@ -1017,9 +1021,9 @@ for param_permutation in param_permutations:
             print("Stopping early due to no improvement in validation loss.")
             break
 
-        if os.path.exists('stop.txt'):
+        if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
-            os.remove('stop.txt')
+            os.remove(stopfile_path)
             stop_requested = True
             break
 
