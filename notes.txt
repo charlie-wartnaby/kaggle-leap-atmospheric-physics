@@ -18,9 +18,9 @@ o Reciprocal of new features, e.g. heating in K/s will be inversely proportional
 o Deeper/alternative network structures
 o Try systematic permutation of normalisation and activation functions
 o Try other ML techniques apart from NN
+o Ensemble method combining independent technique(s) and NN
 o Would it help to remove more old feature columns?
 o Would it help to group columns differently depending on technique?
-o Tried '1x1' conv but didn't help (868dd, val loss ~0.47 after 10 epochs wih 1x1)
 
 Scoring and why predictions zeroed for low-variance cols in example
 -------------------------------------------------------------------

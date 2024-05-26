@@ -2,7 +2,7 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = False
+debug = True
 do_test = True
 use_cnn = True
 is_rerun = False
@@ -15,7 +15,7 @@ if debug:
     max_batch_size = 1000
     patience = 4
     train_proportion = 0.8
-    max_epochs = 3
+    max_epochs = 10
 else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000000
@@ -25,7 +25,8 @@ else:
     train_proportion = 0.9
     max_epochs = 50
 
-multitrain_params = {"init_1x1" : [True]}
+multitrain_params = {"norm_type" : ["batch", "layer"],
+                     "activation_type" : ["silu", "prelu"]}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -104,12 +105,16 @@ test_path = os.path.join(base_path, test_root + '.csv')
 test_offsets_path = os.path.join(offsets_path, test_root + '.pkl')
 submission_template_path = os.path.join(base_path, submission_root + '.csv')
 if debug:
-    model_root_path = 'model-debug'
+    model_root_path = 'model_debug'
+    epoch_counter_path = 'epochs_debug.txt'
+    loss_log_path = 'loss_log_debug.csv'
+    batch_cache_dir = 'batch_cache_debug'
 else:
     model_root_path = 'model'
-batch_cache_dir = 'batch_cache'
-loss_log_path = 'loss_log.csv'
-epoch_counter_path = 'epochs.txt'
+    epoch_counter_path = 'epochs.txt'
+    loss_log_path = 'loss_log.csv'
+    batch_cache_dir = 'batch_cache'
+
 stopfile_path = 'stop.txt'
 
 if os.path.exists(stopfile_path):
@@ -702,17 +707,16 @@ class FFNN(nn.Module):
         return self.layers(x)
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=False, use_output_depth=False):
+    def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=False, 
+                 norm_type="layer", activation_type="silu"):
         super().__init__()
         
         self.init_1x1 = init_1x1
+        self.norm_type = norm_type
+        self.activation_type = activation_type
 
         num_input_feature_chans = len(unexpanded_input_col_names)
 
-        if use_output_depth:
-            # Intuitive one channel per output variable (vector or scalar)
-            gen_conv_depth = num_input_feature_chans
- 
         # Initialize the layers
 
         input_size = num_input_feature_chans
@@ -724,8 +728,8 @@ class AtmLayerCNN(nn.Module):
             output_size = num_input_feature_chans * gen_conv_depth
             self.conv_layer_1x1 = nn.Conv1d(input_size, output_size, 1,
                                     padding='same')
-            self.layernorm_1x1 = nn.LayerNorm([output_size, num_atm_levels])
-            self.activation_layer_1x1 =nn.SiLU(inplace=True)
+            self.layernorm_1x1 = self.norm_layer(output_size, num_atm_levels)
+            self.activation_layer_1x1 = self.activation_layer()
             self.dropout_layer_1x1 = nn.Dropout(p=dropout_p)
         else:
             # No initial unit width layer
@@ -735,16 +739,16 @@ class AtmLayerCNN(nn.Module):
         output_size = num_input_feature_chans * gen_conv_depth
         self.conv_layer_0 = nn.Conv1d(input_size, output_size, gen_conv_width,
                                 padding='same')
-        self.layernorm_0 = nn.LayerNorm([output_size, num_atm_levels])
-        self.activation_layer_0 =nn.SiLU(inplace=True)
+        self.layernorm_0 = self.norm_layer(output_size, num_atm_levels)
+        self.activation_layer_0 = self.activation_layer()
         self.dropout_layer_0 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
         output_size = num_input_feature_chans * gen_conv_depth
         self.conv_layer_1 = nn.Conv1d(input_size, output_size, gen_conv_width,
                                 padding='same')
-        self.layernorm_1 = nn.LayerNorm([output_size, num_atm_levels])
-        self.activation_layer_1 = nn.SiLU(inplace=True)
+        self.layernorm_1 = self.norm_layer(output_size, num_atm_levels)
+        self.activation_layer_1 = self.activation_layer()
         self.dropout_layer_1 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
@@ -752,8 +756,8 @@ class AtmLayerCNN(nn.Module):
         output_size = num_all_outputs_as_vectors * self.last_conv_depth
         self.conv_layer_2 = nn.Conv1d(input_size, output_size, gen_conv_width,
                                 padding='same')
-        self.layernorm_2 = nn.LayerNorm([output_size, num_atm_levels])
-        self.activation_layer_2 = nn.SiLU(inplace=True)
+        self.layernorm_2 = self.norm_layer(output_size, num_atm_levels)
+        self.activation_layer_2 = self.activation_layer()
         self.dropout_layer_2 = nn.Dropout(p=dropout_p)
 
         # Output layer - no dropout, no activation function
@@ -765,7 +769,28 @@ class AtmLayerCNN(nn.Module):
         self.pre_scalar_pool = nn.AvgPool1d(num_atm_levels)
         self.scalar_flatten = nn.Flatten()
         self.linear_scalar_harvest = nn.Linear(num_scalar_outputs * gen_conv_depth, num_scalar_outputs)
-        
+
+
+    def norm_layer(self, num_features, num_chans):
+            match self.norm_type:
+                case "layer":
+                    return nn.LayerNorm([num_features, num_chans])
+                case "batch":
+                    return nn.BatchNorm1d(num_features)
+                case _:
+                    print(f"Unexpected norm_type={self.norm_type}")
+                    sys.exit(1)
+
+    def activation_layer(self):
+            match self.activation_type:
+                case "silu":
+                    return nn.SiLU() # Now skipping inplace=True
+                case "prelu":
+                    return nn.PReLU()
+                case _:
+                    print(f"Unexpected activation_type={self.activation_type}")
+                    sys.exit(1)
+
 
     def forward(self, x):
         if self.init_1x1:
