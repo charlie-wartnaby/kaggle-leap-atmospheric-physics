@@ -25,7 +25,7 @@ else:
     train_proportion = 0.9
     max_epochs = 50
 
-multitrain_params = {}
+multitrain_params = {'init_1x1' : [True]}
 
 show_timings = False # debug
 batch_report_interval = 10
