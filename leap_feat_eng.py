@@ -442,7 +442,7 @@ def add_vector_features(vector_dict):
     specific_humidity_np = vector_dict['state_q0001']
     rel_humidity_np = RH_from_climate(specific_humidity_np, temperature_np, pressure_np)
     vector_dict['rel_humidity'] = rel_humidity_np
-    recip_rel_humidity_np = 1.0 / rel_humidity_np
+    recip_rel_humidity_np = 1.0 / np.maximum(rel_humidity_np, 0.01)
     vector_dict['recip_rel_humidity'] = recip_rel_humidity_np
     buoyancy_np = bmse_calc(temperature_np, specific_humidity_np, pressure_np)
     vector_dict['buoyancy'] = buoyancy_np
