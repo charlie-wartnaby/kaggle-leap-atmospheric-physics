@@ -2,11 +2,12 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = True
-do_test = True
+debug = False
+do_test = False
 use_cnn = True
-is_rerun = True
+is_rerun = False
 do_analysis = True
+do_train = True
 
 #
 
@@ -19,23 +20,22 @@ if debug:
     max_epochs = 10
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000000
+    max_train_rows = 1000000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 50
 
-multitrain_params = {}
+multitrain_params = {"init_1x1" : [True]}
 
 show_timings = False # debug
 batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
-try_reload_model = is_rerun or do_analysis
+try_reload_model = is_rerun
 clear_batch_cache_at_start = False # forgot before starting # not is_rerun #debug # True if processing has changed
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
-if do_analysis: max_epochs = 1
 max_analysis_output_rows = 1000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
@@ -959,6 +959,7 @@ def analyse_batch(analysis_df, inputs, outputs_pred, outputs_true):
     error_variance_sqd = np.square(error_residues)
     avg_error_variance_sqd = np.mean(error_variance_sqd, axis=0)
     r2_metric = 1.0 - (avg_error_variance_sqd / true_variance_sqd)
+    print(f"Batch R2={np.mean(r2_metric)}")
     num_rows = outputs_true_np.shape[0]
     r2_cols = np.tile(r2_metric, (num_rows,1))
 
@@ -967,7 +968,11 @@ def analyse_batch(analysis_df, inputs, outputs_pred, outputs_true):
         batch_df = batch_df.with_columns(pl.from_numpy(outputs_true_np[:,i], [output_name + "_true"]))
         batch_df = batch_df.with_columns(pl.from_numpy(outputs_pred_np[:,i], [output_name + "_pred"]))
         batch_df = batch_df.with_columns(pl.from_numpy(r2_cols[:,i], [output_name + "_r2"]))
-
+    for i, vector_name in enumerate(unexpanded_output_vector_col_names):
+        first_col_idx = i * num_atm_levels
+        end_col_idx = first_col_idx + num_atm_levels
+        r2_avg_for_vector = np.mean(r2_cols[:, first_col_idx:end_col_idx], axis=1)
+        batch_df = batch_df.with_columns(pl.from_numpy(r2_avg_for_vector, [vector_name + "_vecavgr2"]))
     
     return pl.concat([analysis_df, batch_df])
     
@@ -994,9 +999,6 @@ overall_best_val_loss = float('inf')
 for param_permutation in param_permutations:
     if stop_requested:
         break
-
-    if do_analysis:
-        analysis_df = pl.DataFrame()
 
     print("Starting training loop...")
     suffix = ""
@@ -1029,7 +1031,7 @@ for param_permutation in param_permutations:
         tot_epochs = 0
 
     for epoch in range(max_epochs):
-        if not do_analysis:
+        if do_train:
             model.train()
             total_loss = 0
             steps = 0
@@ -1053,13 +1055,16 @@ for param_permutation in param_permutations:
                     steps = 0  # Reset step count
         
         # Validation step
+        if do_analysis:
+            analysis_df = pl.DataFrame()
+
         model.eval()
         val_loss = 0
         with torch.no_grad():
             for batch_idx, (inputs, outputs_true) in enumerate(val_loader):
                 outputs_pred = model(inputs)
                 val_loss += criterion(outputs_pred, outputs_true).item()
-                if do_analysis:
+                if do_analysis and analysis_df.height < max_analysis_output_rows:
                     analysis_df = analyse_batch(analysis_df, inputs, outputs_pred, outputs_true)
 
                 if (batch_idx + 1) % batch_report_interval == 0:
