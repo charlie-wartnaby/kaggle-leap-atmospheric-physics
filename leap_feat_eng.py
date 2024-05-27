@@ -3,11 +3,10 @@
 # This block will be different in Kaggle notebook:
 run_local = True
 debug = False
-do_test = False
-use_cnn = True
-is_rerun = True
-do_analysis = True
-do_train = False
+do_test = True
+is_rerun = False
+do_analysis = False
+do_train = True
 
 #
 
@@ -20,21 +19,21 @@ if debug:
     max_epochs = 10
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    max_epochs = 10
+    max_epochs = 50
 
-multitrain_params = {"init_1x1" : [True]}
+multitrain_params = {}
 
 show_timings = False # debug
 batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
-clear_batch_cache_at_start = False # forgot before starting # not is_rerun #debug # True if processing has changed
+clear_batch_cache_at_start = debug
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
@@ -245,7 +244,8 @@ unexpanded_col_list.append(ColumnInfo(True, 'density',           'air density', 
 unexpanded_col_list.append(ColumnInfo(True, 'recip_density',     'reciprocal air density',              60, 'm3/kg'      ))
 unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',        'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
 unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',        'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
-unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',      'relative humidity (proportion)'     , 60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',      'relative humidity (proportion)',      60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity','reciprocal lative humidity',          60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'buoyancy',          'Beucler buoyancy metric',             60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'vert_insolation',   'zenith-adjusted insolation',           1, 'W/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'direct_sw_absorb',  'direct shortwave absorbance',          1, 'W/m2'       ))
@@ -284,6 +284,7 @@ num_all_outputs_as_vectors = len(unexpanded_output_col_names)
 num_pure_vector_outputs = len(unexpanded_output_vector_col_names)
 num_scalar_outputs = len(unexpanded_output_scalar_col_names)
 num_total_expanded_outputs = len(expanded_names_output)
+
 
 # Functions to compute saturation pressure at given temperature taken from
 # https://colab.research.google.com/github/tbeucler/CBRAIN-CAM/blob/master/Climate_Invariant_Guide.ipynb#scrollTo=1Hsy9p4Ghe-G
@@ -413,66 +414,9 @@ def bmse_calc(T,qv, p): #,P0,PS,hyam,hybm):
     return (G/kappa)*(h_plume-h_satenv)/(C_P*T)
 
 
-# Not sure if adding single columns at a time will be too slow on big dataset, can do:
-#new_pressure_cols = [pl.lit(level_pressure_hpa[i]).alias(f'pressure_{i}') for i in range(num_levels)]
-#train_df = train_df.with_columns(new_pressure_cols)
-
-
-def add_input_features(df):
-    R_air = 287.0 # Mass-based gas constant approx for air in J/kg.K
-    for i in range(num_levels):
-        # Column names for this level
-        cn_pressure       = f'pressure_{i}'      # Pressure in hPa
-        cn_temperature    = f'state_t_{i}'       # Temperature in K
-        cn_density        = f'density_{i}'       # Density in kg/m3
-        cn_recip_density  = f'recip_density_{i}' # Density in kg/m3
-        cn_mtm_zonal      = f'momentum_u_{i}'    # Zonal (E-W) momentum per unit volume in kg/m3.m/s
-        cn_mtm_meridional = f'momentum_v_{i}'    # Meridional (N-S) momentum per unit volume in kg/m3.m/s
-        cn_vel_zonal      = f'state_u_{i}'       # Zonal velocity in m/s
-        cn_vel_meridional = f'state_v_{i}'       # Meridional velocity in m/s
-        cn_sp_humidity    = f'state_q0001_{i}'   # Specific humidity (kg/kg)
-        cn_rel_humidity   = f'rel_humidity_{i}'  # Relative humidity (proportion)
-
-        # Using fixed pressure levels, hopefully near enough, not sure in dataset whether
-        # we're supposed to scale with surface pressure or something:
-        df = df.with_columns(pl.lit(level_pressure_hpa[i]).alias(cn_pressure))
-        # pV = mRT
-        # m/V = p/RT = density, with *100 for hPa -> Pa conversion
-        df = df.with_columns((pl.col(cn_pressure) * 100.0 / (R_air * pl.col(cn_temperature))).alias(cn_density))
-        df = df.with_columns((1.0 / pl.col(cn_density)).alias(cn_recip_density))
-        # Momentum per unit vol just density * velocity
-        df = df.with_columns((pl.col(cn_density) * pl.col(cn_vel_zonal)).alias(cn_mtm_zonal))
-        df = df.with_columns((pl.col(cn_density) * pl.col(cn_vel_meridional)).alias(cn_mtm_meridional))
-        # https://www.reddit.com/r/rust/comments/137jcck/polars_computing_a_new_column_from_multiple/
-        df = df.with_columns(pl.struct([cn_sp_humidity, cn_temperature, cn_pressure]).map_elements(
-                       lambda x: RH_from_climate(x[cn_sp_humidity], x[cn_temperature],
-                          x[cn_pressure] * 100.0), return_dtype=pl.datatypes.Float32).alias(cn_rel_humidity))
-
-    # Single-value new features
-
-    # Solar insolation adjusted for zenith angle (angle to vertical)
-    df = df.with_columns((pl.col('pbuf_SOLIN') * pl.col('pbuf_COSZRS')).alias('vert_insolation'))
-    # Absorbance of solar shortwave radiation
-    df = df.with_columns((pl.col('vert_insolation') * (1.0 - pl.col('cam_in_ASDIR'))).alias('direct_sw_absorb'))
-    df = df.with_columns((pl.col('vert_insolation') * (1.0 - pl.col('cam_in_ASDIF'))).alias('diffuse_sw_absorb'))
-    # Absorbance of IR radiation from ground
-    df = df.with_columns((pl.col('cam_in_LWUP') * (1.0 - pl.col('cam_in_ALDIR'))).alias('direct_lw_absorb'))
-    df = df.with_columns((pl.col('cam_in_LWUP') * (1.0 - pl.col('cam_in_ALDIF'))).alias('diffuse_lw_absorb'))
-
-    return df
 
 def add_vector_features(vector_dict):
     R_air = 287.0 # Mass-based gas constant approx for air in J/kg.K
-    # cn_pressure       = f'pressure_{i}'      # Pressure in hPa
-    # cn_temperature    = f'state_t_{i}'       # Temperature in K
-    # cn_density        = f'density_{i}'       # Density in kg/m3
-    # cn_recip_density  = f'recip_density_{i}' # Density in kg/m3
-    # cn_mtm_zonal      = f'momentum_u_{i}'    # Zonal (E-W) momentum per unit volume in kg/m3.m/s
-    # cn_mtm_meridional = f'momentum_v_{i}'    # Meridional (N-S) momentum per unit volume in kg/m3.m/s
-    # cn_vel_zonal      = f'state_u_{i}'       # Zonal velocity in m/s
-    # cn_vel_meridional = f'state_v_{i}'       # Meridional velocity in m/s
-    # cn_sp_humidity    = f'state_q0001_{i}'   # Specific humidity (kg/kg)
-    # cn_rel_humidity   = f'rel_humidity_{i}'  # Relative humidity (proportion)
 
     temperature_np = vector_dict['state_t']
     (rows, cols) = temperature_np.shape # use as template
@@ -487,7 +431,7 @@ def add_vector_features(vector_dict):
     density_np = pressure_np / (R_air * temperature_np)
     vector_dict['density'] = density_np
     recip_density_np = 1.0 / density_np
-    vector_dict['recip_density'] = density_np
+    vector_dict['recip_density'] = recip_density_np
     # Momentum per unit vol just density * velocity
     vel_zonal_np = vector_dict['state_u']
     momentum_u_np = density_np * vel_zonal_np
@@ -498,6 +442,8 @@ def add_vector_features(vector_dict):
     specific_humidity_np = vector_dict['state_q0001']
     rel_humidity_np = RH_from_climate(specific_humidity_np, temperature_np, pressure_np)
     vector_dict['rel_humidity'] = rel_humidity_np
+    recip_rel_humidity_np = 1.0 / rel_humidity_np
+    vector_dict['recip_rel_humidity'] = recip_rel_humidity_np
     buoyancy_np = bmse_calc(temperature_np, specific_humidity_np, pressure_np)
     vector_dict['buoyancy'] = buoyancy_np
 
@@ -578,35 +524,27 @@ def mean_vector_across_samples(sample_list):
     return mean_vector
 
 def preprocess_data(pl_df, has_outputs):
-    if use_cnn:
-        vector_dict = vectorise_data(pl_df)
-        add_vector_features(vector_dict)
-        # Glue input columns together by row, then feature, then atm level
-        # (Hope this will work with torch.nn.Conv1d taking N, C, L)
-        for i, col_name in enumerate(unexpanded_input_col_names):
-            if i == 0:
-                x = vector_dict[col_name]
-                (rows,cols) = x.shape
-                x = x.reshape(rows, 1, cols)
-            else:
-                x = np.concatenate((x, vector_dict[col_name].reshape(rows, 1, cols)), axis=1)
-    else:
-        pl_df = add_input_features(pl_df)
-        x = pl_df[expanded_names_input].to_numpy().astype(np.float64)
+    vector_dict = vectorise_data(pl_df)
+    add_vector_features(vector_dict)
+    # Glue input columns together by row, then feature, then atm level
+    # (Hope this will work with torch.nn.Conv1d taking N, C, L)
+    for i, col_name in enumerate(unexpanded_input_col_names):
+        if i == 0:
+            x = vector_dict[col_name]
+            (rows,cols) = x.shape
+            x = x.reshape(rows, 1, cols)
+        else:
+            x = np.concatenate((x, vector_dict[col_name].reshape(rows, 1, cols)), axis=1)
 
     if has_outputs:
-        if use_cnn:
-            # Leaving y-data expanded, will need to design model to explode CNN output across
-            # columns, as also need to cope with scalar outputs
-            for i, col_name in enumerate(unexpanded_output_col_names):
-                if i == 0:
-                    y = vector_dict[col_name]
-                else:
-                    y_add = vector_dict[col_name]
-                    y = np.concatenate((y, y_add), axis=1)
-        else:
-            y = pl_df[expanded_names_output].to_numpy().astype(np.float64)
-
+        # Leaving y-data expanded, will need to design model to explode CNN output across
+        # columns, as also need to cope with scalar outputs
+        for i, col_name in enumerate(unexpanded_output_col_names):
+            if i == 0:
+                y = vector_dict[col_name]
+            else:
+                y_add = vector_dict[col_name]
+                y = np.concatenate((y, y_add), axis=1)
     del pl_df
 
     # norm X
@@ -675,39 +613,6 @@ DEBUGGING = not do_test
 submission_weights = sample_submission_df[expanded_names_output].to_numpy().astype(np.float64)
 
 #
-
-
-class FFNN(nn.Module):
-    def __init__(self, input_size, hidden_sizes, output_size):
-        super(FFNN, self).__init__()
-        
-        # Initialize the layers
-        layers = []
-        previous_size = input_size
-        for hidden_size in hidden_sizes:
-            # nn.Linear: classic weights & biases neuron
-            layers.append(nn.Linear(previous_size, hidden_size))
-            # LayerNorm: outputs rescaled to mean zero, unit variance across vector
-            # of all features at this iteration (as opposed to batch normalisation when
-            # features normalised separately in parallel according to their values
-            # across a series of samples in the batch)
-            # https://www.pinecone.io/learn/batch-layer-normalization/
-            layers.append(nn.LayerNorm(hidden_size))  # Normalization layer
-            # LeakyReLU: non-zero shallow scaling for -ve input values cf classic
-            # ReLU which is zero for -ve, default 0.01 gradient on -ve side
-            #layers.append(nn.LeakyReLU(inplace=True))   # Activation
-            layers.append(nn.SiLU(inplace=True))        # Activation
-            layers.append(nn.Dropout(p=0.1))            # Dropout for regularization
-            previous_size = hidden_size
-        
-        # Output layer - no dropout, no activation function
-        layers.append(nn.Linear(previous_size, output_size))
-        
-        # Register all layers
-        self.layers = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.layers(x)
 
 class AtmLayerCNN(nn.Module):
     def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
@@ -1023,11 +928,7 @@ for param_permutation in param_permutations:
     with open(loss_log_path, 'a') as fd:
         fd.write(f'{model_save_path}\n')
 
-    if use_cnn:
-        model = AtmLayerCNN(**param_permutation).to(device)
-    else:
-        hidden_size = input_size + output_size # any particular reason for this and 'diabalo' shape here?
-        model = FFNN(input_size, [3*hidden_size, 2*hidden_size, hidden_size, 2*hidden_size, 3*hidden_size], output_size).to(device)
+    model = AtmLayerCNN(**param_permutation).to(device)
 
     if try_reload_model and os.path.exists(model_save_path):
         print('Attempting to reload model from disk...')
