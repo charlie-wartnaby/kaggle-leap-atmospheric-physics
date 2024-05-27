@@ -2,11 +2,11 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = False
+debug = True
 do_test = True
 use_cnn = True
 is_rerun = True
-is_analysis = True
+do_analysis = True
 
 #
 
@@ -19,9 +19,9 @@ if debug:
     max_epochs = 10
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 100
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
-    max_batch_size = 10  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 50
@@ -32,10 +32,10 @@ show_timings = False # debug
 batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
-try_reload_model = is_rerun or is_analysis
+try_reload_model = is_rerun or do_analysis
 clear_batch_cache_at_start = False # forgot before starting # not is_rerun #debug # True if processing has changed
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
-if is_analysis: max_epochs = 1
+if do_analysis: max_epochs = 1
 max_analysis_output_rows = 1000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
@@ -105,6 +105,7 @@ train_offsets_path = os.path.join(offsets_path, train_root + '.pkl')
 test_path = os.path.join(base_path, test_root + '.csv')
 test_offsets_path = os.path.join(offsets_path, test_root + '.pkl')
 submission_template_path = os.path.join(base_path, submission_root + '.csv')
+analysis_df_path = 'analysis.csv'
 if debug:
     model_root_path = 'model_debug'
     epoch_counter_path = 'epochs_debug.txt'
@@ -939,19 +940,6 @@ def unscale_outputs(y, sy):
 
 
 
-def create_analysis_dataframe():
-    """Output file to show which columns contributing to loss"""
-    schema_col_names = expanded_names_input
-    for expanded_output in expanded_names_output:
-        schema_col_names.append(expanded_output + '_act')
-        schema_col_names.append(expanded_output + '_pred')
-        schema_col_names.append(expanded_output + '_r2')
-    for vector_output in unexpanded_output_vector_col_names:
-        schema_col_names.append(vector_output + '_r2avg')
-
-    analysis_df = pl.DataFrame(schema=schema_col_names)
-    return analysis_df
-
 def analyse_batch(analysis_df, inputs, outputs_pred, outputs_true):
     """Analyse batch of true versus predicted outputs"""
 
@@ -971,8 +959,18 @@ def analyse_batch(analysis_df, inputs, outputs_pred, outputs_true):
     error_variance_sqd = np.square(error_residues)
     avg_error_variance_sqd = np.mean(error_variance_sqd, axis=0)
     r2_metric = 1.0 - (avg_error_variance_sqd / true_variance_sqd)
+    num_rows = outputs_true_np.shape[0]
+    r2_cols = np.tile(r2_metric, (num_rows,1))
+
+    batch_df = pl.DataFrame()
+    for i, output_name in enumerate(expanded_names_output):
+        batch_df = batch_df.with_columns(pl.from_numpy(outputs_true_np[:,i], [output_name + "_true"]))
+        batch_df = batch_df.with_columns(pl.from_numpy(outputs_pred_np[:,i], [output_name + "_pred"]))
+        batch_df = batch_df.with_columns(pl.from_numpy(r2_cols[:,i], [output_name + "_r2"]))
+
     
-    pass
+    return pl.concat([analysis_df, batch_df])
+    
 
 
 if is_rerun and os.path.exists(epoch_counter_path):
@@ -997,8 +995,8 @@ for param_permutation in param_permutations:
     if stop_requested:
         break
 
-    if is_analysis:
-        analysis_df = create_analysis_dataframe()
+    if do_analysis:
+        analysis_df = pl.DataFrame()
 
     print("Starting training loop...")
     suffix = ""
@@ -1031,7 +1029,7 @@ for param_permutation in param_permutations:
         tot_epochs = 0
 
     for epoch in range(max_epochs):
-        if not is_analysis:
+        if not do_analysis:
             model.train()
             total_loss = 0
             steps = 0
@@ -1061,8 +1059,8 @@ for param_permutation in param_permutations:
             for batch_idx, (inputs, outputs_true) in enumerate(val_loader):
                 outputs_pred = model(inputs)
                 val_loss += criterion(outputs_pred, outputs_true).item()
-                if is_analysis:
-                    analyse_batch(analysis_df, inputs, outputs_pred, outputs_true)
+                if do_analysis:
+                    analysis_df = analyse_batch(analysis_df, inputs, outputs_pred, outputs_true)
 
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Validation batch {batch_idx + 1}')
@@ -1080,28 +1078,30 @@ for param_permutation in param_permutations:
         
         scheduler.step(avg_val_loss)  # Adjust learning rate
 
-        if not is_analysis:
-            if avg_val_loss < overall_best_val_loss:
-                overall_best_val_loss = avg_val_loss
-                overall_best_model = model
-                overall_best_model_state = model.state_dict() # TODO is this static anyway?
-                overall_best_model_name = model_save_path
-                print(f"{model_save_path} best so far")
+        if do_analysis:
+            analysis_df.head(max_analysis_output_rows).write_csv(analysis_df_path)
 
-            # Update best model if current epoch's validation loss is lower
-            if avg_val_loss < best_val_loss:
-                best_val_loss = avg_val_loss
-                best_model_state = model.state_dict()  # Save the best model state
-                patience_count = 0
-                print("Validation loss decreased, saving new best model and resetting patience counter.")
-                torch.save(model.state_dict(), model_save_path)
-            else:
-                patience_count += 1
-                print(f"No improvement in validation loss for {patience_count} epochs.")
-                
-            if patience_count >= patience:
-                print("Stopping early due to no improvement in validation loss.")
-                break
+        if avg_val_loss < overall_best_val_loss:
+            overall_best_val_loss = avg_val_loss
+            overall_best_model = model
+            overall_best_model_state = model.state_dict() # TODO is this static anyway?
+            overall_best_model_name = model_save_path
+            print(f"{model_save_path} best so far")
+
+        # Update best model if current epoch's validation loss is lower
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            best_model_state = model.state_dict()  # Save the best model state
+            patience_count = 0
+            print("Validation loss decreased, saving new best model and resetting patience counter.")
+            torch.save(model.state_dict(), model_save_path)
+        else:
+            patience_count += 1
+            print(f"No improvement in validation loss for {patience_count} epochs.")
+            
+        if patience_count >= patience:
+            print("Stopping early due to no improvement in validation loss.")
+            break
 
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
