@@ -9,6 +9,8 @@ level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.252923296945341
 Ideas to progress
 -----------------
 
+o Try starting with single layer, then 3, wider, wider, narrower...?
+o Analyse which columns contributing most to error metric
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
 o Understand physics of each target col better
@@ -16,10 +18,10 @@ o Does humidity have significant effect on heat capacity? And cloud/rain/snow co
 o Reciprocal of new features, e.g. heating in K/s will be inversely proportional to density
  for given heat input
 o Deeper/alternative network structures
-o Try systematic permutation of normalisation and activation functions
 o Try other ML techniques apart from NN
 o Ensemble method combining independent technique(s) and NN
-o Would it help to remove more old feature columns?
+o Would it help to remove more old feature columns? Could automate experiment
+  - brief expt removed temperature, bit worse
 o Would it help to group columns differently depending on technique?
 
 Scoring and why predictions zeroed for low-variance cols in example
@@ -53,8 +55,15 @@ At a17aae4 on greta scaling and model saved at 03:10 first cache 11:55 so ~3hr15
 On pcuk151 first cache 21:12, epoch 10 finishing 05:50 so ~8hr40 for 10 epochs, batch size 5000
 Though validation loss looking better so far on pcuk151, maybe batches too big?
 
+Found layer normalisation and SiLU best in experiment 26May2024 though little in it
+
 Submission Results
 ------------------
+
+submission.csv
+Complete · 6m ago · Commit b1472343 with corrected width 1-deep initial conv
+Ran until patience counter of 3 exhausted, 42 epochs validation loss 0.312
+0.65009
 
 submission.csv
 Complete · 4m ago · Commit e352323c with new scalar/vector output structure and bigger conv depth, 23 epochs

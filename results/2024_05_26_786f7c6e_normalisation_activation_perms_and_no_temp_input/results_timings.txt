@@ -1,0 +1,1006 @@
+Ran as Kaggle notebook, hacked num rows to 1M instead of 10M
+
+batch silu
+Epoch 2 576-798s = 222s
+Epoch 10, Validation Loss: 0.4090651023387909
+
+layer silu
+Epoch 2 2751-2968s = 217s
+Epoch 10, Validation Loss: 0.407031489610672
+
+batch prelu
+Epoch 2 4910-5129 = 219s
+Epoch 10, Validation Loss: 0.41260197103023527
+
+layer prelu
+Epoch 2 7096-7314 = 218s
+Epoch 10, Validation Loss: 0.4218912446498871
+
+and with layer/silu and temperature removed as a feature input:
+1,0.5727955913543701
+2,0.5040577107667923
+3,0.4735415643453598
+4,0.45665816843509677
+5,0.4451386833190918
+6,0.436365510225296
+7,0.4289278644323349
+8,0.4221593153476715
+9,0.41696181178092956
+10,0.41159241378307343
+
+
+12.9s	3	Starting training loop...
+12.9s	4	... norm_type=batch
+12.9s	5	... activation_type=silu
+46.4s	6	Epoch 1, Step 10, Training Loss: 0.8519
+75.7s	7	Epoch 1, Step 20, Training Loss: 0.7302
+104.9s	8	Epoch 1, Step 30, Training Loss: 0.7110
+134.4s	9	Epoch 1, Step 40, Training Loss: 0.6839
+163.6s	10	Epoch 1, Step 50, Training Loss: 0.6639
+193.7s	11	Epoch 1, Step 60, Training Loss: 0.6464
+222.9s	12	Epoch 1, Step 70, Training Loss: 0.6274
+252.8s	13	Epoch 1, Step 80, Training Loss: 0.6076
+282.5s	14	Epoch 1, Step 90, Training Loss: 0.5941
+312.2s	15	Epoch 1, Step 100, Training Loss: 0.5823
+341.3s	16	Epoch 1, Step 110, Training Loss: 0.5750
+371.0s	17	Epoch 1, Step 120, Training Loss: 0.5667
+399.7s	18	Epoch 1, Step 130, Training Loss: 0.5526
+429.2s	19	Epoch 1, Step 140, Training Loss: 0.5526
+458.7s	20	Epoch 1, Step 150, Training Loss: 0.5404
+481.6s	21	Validation batch 10
+504.1s	22	Validation batch 20
+526.6s	23	Validation batch 30
+549.1s	24	Validation batch 40
+571.6s	25	Validation batch 50
+571.6s	26	Epoch 1, Validation Loss: 0.5285917592048645
+571.6s	27	model_norm_type_batch_activation_type_silu.pt best so far
+571.6s	28	Validation loss decreased, saving new best model and resetting patience counter.
+585.6s	29	Epoch 2, Step 10, Training Loss: 0.5345
+599.8s	30	Epoch 2, Step 20, Training Loss: 0.5289
+613.7s	31	Epoch 2, Step 30, Training Loss: 0.5288
+627.4s	32	Epoch 2, Step 40, Training Loss: 0.5220
+641.4s	33	Epoch 2, Step 50, Training Loss: 0.5145
+655.2s	34	Epoch 2, Step 60, Training Loss: 0.5163
+669.1s	35	Epoch 2, Step 70, Training Loss: 0.5147
+682.5s	36	Epoch 2, Step 80, Training Loss: 0.5082
+695.4s	37	Epoch 2, Step 90, Training Loss: 0.5057
+708.3s	38	Epoch 2, Step 100, Training Loss: 0.5042
+721.0s	39	Epoch 2, Step 110, Training Loss: 0.5026
+733.7s	40	Epoch 2, Step 120, Training Loss: 0.4990
+746.5s	41	Epoch 2, Step 130, Training Loss: 0.4938
+759.2s	42	Epoch 2, Step 140, Training Loss: 0.5001
+772.0s	43	Epoch 2, Step 150, Training Loss: 0.4934
+777.3s	44	Validation batch 10
+782.5s	45	Validation batch 20
+787.9s	46	Validation batch 30
+793.0s	47	Validation batch 40
+798.2s	48	Validation batch 50
+798.2s	49	Epoch 2, Validation Loss: 0.48027372002601626
+798.2s	50	model_norm_type_batch_activation_type_silu.pt best so far
+798.2s	51	Validation loss decreased, saving new best model and resetting patience counter.
+811.1s	52	Epoch 3, Step 10, Training Loss: 0.4867
+823.9s	53	Epoch 3, Step 20, Training Loss: 0.4844
+836.9s	54	Epoch 3, Step 30, Training Loss: 0.4859
+849.7s	55	Epoch 3, Step 40, Training Loss: 0.4832
+862.4s	56	Epoch 3, Step 50, Training Loss: 0.4781
+875.2s	57	Epoch 3, Step 60, Training Loss: 0.4801
+888.0s	58	Epoch 3, Step 70, Training Loss: 0.4846
+900.7s	59	Epoch 3, Step 80, Training Loss: 0.4789
+913.6s	60	Epoch 3, Step 90, Training Loss: 0.4773
+926.3s	61	Epoch 3, Step 100, Training Loss: 0.4767
+939.3s	62	Epoch 3, Step 110, Training Loss: 0.4749
+952.0s	63	Epoch 3, Step 120, Training Loss: 0.4729
+964.7s	64	Epoch 3, Step 130, Training Loss: 0.4677
+977.6s	65	Epoch 3, Step 140, Training Loss: 0.4752
+990.3s	66	Epoch 3, Step 150, Training Loss: 0.4699
+995.6s	67	Validation batch 10
+1000.8s	68	Validation batch 20
+1005.9s	69	Validation batch 30
+7.0s	70	Loading training HoloFrame...
+8.7s	71	Loading submission weights...
+9.2s	72	No previous scalings so starting afresh
+12.9s	73	Starting training loop...
+12.9s	74	... norm_type=batch
+12.9s	75	... activation_type=silu
+46.4s	76	Epoch 1, Step 10, Training Loss: 0.8519
+75.7s	77	Epoch 1, Step 20, Training Loss: 0.7302
+104.9s	78	Epoch 1, Step 30, Training Loss: 0.7110
+134.4s	79	Epoch 1, Step 40, Training Loss: 0.6839
+163.6s	80	Epoch 1, Step 50, Training Loss: 0.6639
+193.7s	81	Epoch 1, Step 60, Training Loss: 0.6464
+222.9s	82	Epoch 1, Step 70, Training Loss: 0.6274
+252.8s	83	Epoch 1, Step 80, Training Loss: 0.6076
+282.5s	84	Epoch 1, Step 90, Training Loss: 0.5941
+312.2s	85	Epoch 1, Step 100, Training Loss: 0.5823
+341.3s	86	Epoch 1, Step 110, Training Loss: 0.5750
+371.0s	87	Epoch 1, Step 120, Training Loss: 0.5667
+399.7s	88	Epoch 1, Step 130, Training Loss: 0.5526
+429.2s	89	Epoch 1, Step 140, Training Loss: 0.5526
+458.7s	90	Epoch 1, Step 150, Training Loss: 0.5404
+481.6s	91	Validation batch 10
+504.1s	92	Validation batch 20
+526.6s	93	Validation batch 30
+549.1s	94	Validation batch 40
+571.6s	95	Validation batch 50
+571.6s	96	Epoch 1, Validation Loss: 0.5285917592048645
+571.6s	97	model_norm_type_batch_activation_type_silu.pt best so far
+571.6s	98	Validation loss decreased, saving new best model and resetting patience counter.
+585.6s	99	Epoch 2, Step 10, Training Loss: 0.5345
+599.8s	100	Epoch 2, Step 20, Training Loss: 0.5289
+613.7s	101	Epoch 2, Step 30, Training Loss: 0.5288
+627.4s	102	Epoch 2, Step 40, Training Loss: 0.5220
+641.4s	103	Epoch 2, Step 50, Training Loss: 0.5145
+655.2s	104	Epoch 2, Step 60, Training Loss: 0.5163
+669.1s	105	Epoch 2, Step 70, Training Loss: 0.5147
+682.5s	106	Epoch 2, Step 80, Training Loss: 0.5082
+695.4s	107	Epoch 2, Step 90, Training Loss: 0.5057
+708.3s	108	Epoch 2, Step 100, Training Loss: 0.5042
+721.0s	109	Epoch 2, Step 110, Training Loss: 0.5026
+733.7s	110	Epoch 2, Step 120, Training Loss: 0.4990
+746.5s	111	Epoch 2, Step 130, Training Loss: 0.4938
+759.2s	112	Epoch 2, Step 140, Training Loss: 0.5001
+772.0s	113	Epoch 2, Step 150, Training Loss: 0.4934
+777.3s	114	Validation batch 10
+782.5s	115	Validation batch 20
+787.9s	116	Validation batch 30
+793.0s	117	Validation batch 40
+798.2s	118	Validation batch 50
+798.2s	119	Epoch 2, Validation Loss: 0.48027372002601626
+798.2s	120	model_norm_type_batch_activation_type_silu.pt best so far
+798.2s	121	Validation loss decreased, saving new best model and resetting patience counter.
+811.1s	122	Epoch 3, Step 10, Training Loss: 0.4867
+823.9s	123	Epoch 3, Step 20, Training Loss: 0.4844
+836.9s	124	Epoch 3, Step 30, Training Loss: 0.4859
+849.7s	125	Epoch 3, Step 40, Training Loss: 0.4832
+862.4s	126	Epoch 3, Step 50, Training Loss: 0.4781
+875.2s	127	Epoch 3, Step 60, Training Loss: 0.4801
+888.0s	128	Epoch 3, Step 70, Training Loss: 0.4846
+900.7s	129	Epoch 3, Step 80, Training Loss: 0.4789
+913.6s	130	Epoch 3, Step 90, Training Loss: 0.4773
+926.3s	131	Epoch 3, Step 100, Training Loss: 0.4767
+939.3s	132	Epoch 3, Step 110, Training Loss: 0.4749
+952.0s	133	Epoch 3, Step 120, Training Loss: 0.4729
+964.7s	134	Epoch 3, Step 130, Training Loss: 0.4677
+977.6s	135	Epoch 3, Step 140, Training Loss: 0.4752
+990.3s	136	Epoch 3, Step 150, Training Loss: 0.4699
+995.6s	137	Validation batch 10
+1000.8s	138	Validation batch 20
+1005.9s	139	Validation batch 30
+1011.3s	140	Validation batch 40
+1016.5s	141	Validation batch 50
+1016.5s	142	Epoch 3, Validation Loss: 0.4576531422138214
+1016.5s	143	model_norm_type_batch_activation_type_silu.pt best so far
+1016.5s	144	Validation loss decreased, saving new best model and resetting patience counter.
+1029.3s	145	Epoch 4, Step 10, Training Loss: 0.4633
+1042.2s	146	Epoch 4, Step 20, Training Loss: 0.4620
+1054.9s	147	Epoch 4, Step 30, Training Loss: 0.4640
+1067.9s	148	Epoch 4, Step 40, Training Loss: 0.4626
+1080.5s	149	Epoch 4, Step 50, Training Loss: 0.4590
+1093.2s	150	Epoch 4, Step 60, Training Loss: 0.4601
+1106.1s	151	Epoch 4, Step 70, Training Loss: 0.4655
+1118.7s	152	Epoch 4, Step 80, Training Loss: 0.4610
+1131.7s	153	Epoch 4, Step 90, Training Loss: 0.4584
+1144.4s	154	Epoch 4, Step 100, Training Loss: 0.4601
+1157.0s	155	Epoch 4, Step 110, Training Loss: 0.4573
+1169.9s	156	Epoch 4, Step 120, Training Loss: 0.4548
+1182.6s	157	Epoch 4, Step 130, Training Loss: 0.4507
+1195.3s	158	Epoch 4, Step 140, Training Loss: 0.4595
+1208.2s	159	Epoch 4, Step 150, Training Loss: 0.4554
+1213.3s	160	Validation batch 10
+1218.7s	161	Validation batch 20
+1223.8s	162	Validation batch 30
+1229.1s	163	Validation batch 40
+1234.2s	164	Validation batch 50
+1234.2s	165	Epoch 4, Validation Loss: 0.4428884929418564
+1234.2s	166	model_norm_type_batch_activation_type_silu.pt best so far
+1234.2s	167	Validation loss decreased, saving new best model and resetting patience counter.
+1246.9s	168	Epoch 5, Step 10, Training Loss: 0.4488
+1259.8s	169	Epoch 5, Step 20, Training Loss: 0.4474
+1272.5s	170	Epoch 5, Step 30, Training Loss: 0.4502
+1285.1s	171	Epoch 5, Step 40, Training Loss: 0.4493
+1297.9s	172	Epoch 5, Step 50, Training Loss: 0.4456
+1310.5s	173	Epoch 5, Step 60, Training Loss: 0.4474
+1323.2s	174	Epoch 5, Step 70, Training Loss: 0.4542
+1336.0s	175	Epoch 5, Step 80, Training Loss: 0.4483
+1348.6s	176	Epoch 5, Step 90, Training Loss: 0.4467
+1361.5s	177	Epoch 5, Step 100, Training Loss: 0.4487
+1374.2s	178	Epoch 5, Step 110, Training Loss: 0.4462
+1387.0s	179	Epoch 5, Step 120, Training Loss: 0.4429
+1399.6s	180	Epoch 5, Step 130, Training Loss: 0.4394
+1412.3s	181	Epoch 5, Step 140, Training Loss: 0.4499
+1425.1s	182	Epoch 5, Step 150, Training Loss: 0.4460
+1430.2s	183	Validation batch 10
+1435.4s	184	Validation batch 20
+1440.7s	185	Validation batch 30
+1445.8s	186	Validation batch 40
+1450.9s	187	Validation batch 50
+1450.9s	188	Epoch 5, Validation Loss: 0.4332989853620529
+1450.9s	189	model_norm_type_batch_activation_type_silu.pt best so far
+1450.9s	190	Validation loss decreased, saving new best model and resetting patience counter.
+1463.7s	191	Epoch 6, Step 10, Training Loss: 0.4387
+1476.4s	192	Epoch 6, Step 20, Training Loss: 0.4375
+1489.4s	193	Epoch 6, Step 30, Training Loss: 0.4410
+1502.1s	194	Epoch 6, Step 40, Training Loss: 0.4399
+1514.6s	195	Epoch 6, Step 50, Training Loss: 0.4355
+1527.5s	196	Epoch 6, Step 60, Training Loss: 0.4373
+1540.1s	197	Epoch 6, Step 70, Training Loss: 0.4434
+1553.0s	198	Epoch 6, Step 80, Training Loss: 0.4390
+1565.7s	199	Epoch 6, Step 90, Training Loss: 0.4373
+1578.3s	200	Epoch 6, Step 100, Training Loss: 0.4402
+1591.1s	201	Epoch 6, Step 110, Training Loss: 0.4376
+1603.7s	202	Epoch 6, Step 120, Training Loss: 0.4344
+1616.4s	203	Epoch 6, Step 130, Training Loss: 0.4314
+1629.2s	204	Epoch 6, Step 140, Training Loss: 0.4415
+1641.9s	205	Epoch 6, Step 150, Training Loss: 0.4386
+1647.2s	206	Validation batch 10
+1652.3s	207	Validation batch 20
+1657.4s	208	Validation batch 30
+1662.7s	209	Validation batch 40
+1667.8s	210	Validation batch 50
+1667.8s	211	Epoch 6, Validation Loss: 0.4260945409536362
+1667.8s	212	model_norm_type_batch_activation_type_silu.pt best so far
+1667.8s	213	Validation loss decreased, saving new best model and resetting patience counter.
+1680.7s	214	Epoch 7, Step 10, Training Loss: 0.4307
+1693.4s	215	Epoch 7, Step 20, Training Loss: 0.4305
+1706.1s	216	Epoch 7, Step 30, Training Loss: 0.4334
+1718.9s	217	Epoch 7, Step 40, Training Loss: 0.4322
+1731.5s	218	Epoch 7, Step 50, Training Loss: 0.4286
+1744.2s	219	Epoch 7, Step 60, Training Loss: 0.4305
+1757.0s	220	Epoch 7, Step 70, Training Loss: 0.4369
+1769.6s	221	Epoch 7, Step 80, Training Loss: 0.4321
+1782.5s	222	Epoch 7, Step 90, Training Loss: 0.4313
+1795.2s	223	Epoch 7, Step 100, Training Loss: 0.4336
+1807.8s	224	Epoch 7, Step 110, Training Loss: 0.4311
+1820.7s	225	Epoch 7, Step 120, Training Loss: 0.4288
+1833.3s	226	Epoch 7, Step 130, Training Loss: 0.4251
+1846.1s	227	Epoch 7, Step 140, Training Loss: 0.4345
+1858.8s	228	Epoch 7, Step 150, Training Loss: 0.4326
+1863.9s	229	Validation batch 10
+1869.2s	230	Validation batch 20
+1874.3s	231	Validation batch 30
+1879.4s	232	Validation batch 40
+1884.6s	233	Validation batch 50
+1884.6s	234	Epoch 7, Validation Loss: 0.42034604847431184
+1884.6s	235	model_norm_type_batch_activation_type_silu.pt best so far
+1884.6s	236	Validation loss decreased, saving new best model and resetting patience counter.
+1897.3s	237	Epoch 8, Step 10, Training Loss: 0.4247
+1910.2s	238	Epoch 8, Step 20, Training Loss: 0.4237
+1922.9s	239	Epoch 8, Step 30, Training Loss: 0.4262
+1935.8s	240	Epoch 8, Step 40, Training Loss: 0.4268
+1948.4s	241	Epoch 8, Step 50, Training Loss: 0.4237
+1961.0s	242	Epoch 8, Step 60, Training Loss: 0.4246
+1973.8s	243	Epoch 8, Step 70, Training Loss: 0.4303
+1986.5s	244	Epoch 8, Step 80, Training Loss: 0.4258
+1999.1s	245	Epoch 8, Step 90, Training Loss: 0.4257
+2012.1s	246	Epoch 8, Step 100, Training Loss: 0.4281
+2024.7s	247	Epoch 8, Step 110, Training Loss: 0.4257
+2037.4s	248	Epoch 8, Step 120, Training Loss: 0.4219
+2050.2s	249	Epoch 8, Step 130, Training Loss: 0.4193
+2062.8s	250	Epoch 8, Step 140, Training Loss: 0.4302
+2075.7s	251	Epoch 8, Step 150, Training Loss: 0.4279
+2080.8s	252	Validation batch 10
+2086.1s	253	Validation batch 20
+2091.2s	254	Validation batch 30
+2096.3s	255	Validation batch 40
+2101.7s	256	Validation batch 50
+2101.7s	257	Epoch 8, Validation Loss: 0.4162297797203064
+2101.7s	258	model_norm_type_batch_activation_type_silu.pt best so far
+2101.7s	259	Validation loss decreased, saving new best model and resetting patience counter.
+2114.3s	260	Epoch 9, Step 10, Training Loss: 0.4200
+2127.0s	261	Epoch 9, Step 20, Training Loss: 0.4191
+2139.9s	262	Epoch 9, Step 30, Training Loss: 0.4205
+2152.6s	263	Epoch 9, Step 40, Training Loss: 0.4214
+2165.3s	264	Epoch 9, Step 50, Training Loss: 0.4181
+2178.0s	265	Epoch 9, Step 60, Training Loss: 0.4188
+2190.6s	266	Epoch 9, Step 70, Training Loss: 0.4260
+2203.5s	267	Epoch 9, Step 80, Training Loss: 0.4206
+2216.1s	268	Epoch 9, Step 90, Training Loss: 0.4202
+2229.0s	269	Epoch 9, Step 100, Training Loss: 0.4236
+2241.7s	270	Epoch 9, Step 110, Training Loss: 0.4218
+2254.3s	271	Epoch 9, Step 120, Training Loss: 0.4185
+2267.2s	272	Epoch 9, Step 130, Training Loss: 0.4150
+2279.8s	273	Epoch 9, Step 140, Training Loss: 0.4252
+2292.4s	274	Epoch 9, Step 150, Training Loss: 0.4237
+2297.7s	275	Validation batch 10
+2302.8s	276	Validation batch 20
+2308.0s	277	Validation batch 30
+2313.3s	278	Validation batch 40
+2318.3s	279	Validation batch 50
+2318.3s	280	Epoch 9, Validation Loss: 0.4124305325746536
+2318.3s	281	model_norm_type_batch_activation_type_silu.pt best so far
+2318.3s	282	Validation loss decreased, saving new best model and resetting patience counter.
+2331.2s	283	Epoch 10, Step 10, Training Loss: 0.4146
+2343.9s	284	Epoch 10, Step 20, Training Loss: 0.4150
+2356.5s	285	Epoch 10, Step 30, Training Loss: 0.4172
+2369.4s	286	Epoch 10, Step 40, Training Loss: 0.4172
+2382.0s	287	Epoch 10, Step 50, Training Loss: 0.4139
+2394.9s	288	Epoch 10, Step 60, Training Loss: 0.4141
+2407.5s	289	Epoch 10, Step 70, Training Loss: 0.4204
+2420.1s	290	Epoch 10, Step 80, Training Loss: 0.4156
+2433.0s	291	Epoch 10, Step 90, Training Loss: 0.4167
+2445.7s	292	Epoch 10, Step 100, Training Loss: 0.4185
+2458.3s	293	Epoch 10, Step 110, Training Loss: 0.4169
+2471.2s	294	Epoch 10, Step 120, Training Loss: 0.4141
+2483.8s	295	Epoch 10, Step 130, Training Loss: 0.4111
+2496.6s	296	Epoch 10, Step 140, Training Loss: 0.4220
+2509.3s	297	Epoch 10, Step 150, Training Loss: 0.4198
+2514.3s	298	Validation batch 10
+2519.6s	299	Validation batch 20
+2524.7s	300	Validation batch 30
+2530.0s	301	Validation batch 40
+2535.1s	302	Validation batch 50
+2535.1s	303	Epoch 10, Validation Loss: 0.4090651023387909
+2535.1s	304	model_norm_type_batch_activation_type_silu.pt best so far
+2535.1s	305	Validation loss decreased, saving new best model and resetting patience counter.
+2535.1s	306	Starting training loop...
+2535.1s	307	... norm_type=layer
+2535.1s	308	... activation_type=silu
+2547.7s	309	Epoch 1, Step 10, Training Loss: 0.8265
+2560.6s	310	Epoch 1, Step 20, Training Loss: 0.7145
+2573.2s	311	Epoch 1, Step 30, Training Loss: 0.6968
+2585.8s	312	Epoch 1, Step 40, Training Loss: 0.6808
+2598.6s	313	Epoch 1, Step 50, Training Loss: 0.6730
+2611.1s	314	Epoch 1, Step 60, Training Loss: 0.6659
+2623.9s	315	Epoch 1, Step 70, Training Loss: 0.6548
+2636.6s	316	Epoch 1, Step 80, Training Loss: 0.6456
+2649.2s	317	Epoch 1, Step 90, Training Loss: 0.6387
+2662.0s	318	Epoch 1, Step 100, Training Loss: 0.6295
+2674.5s	319	Epoch 1, Step 110, Training Loss: 0.6205
+2687.1s	320	Epoch 1, Step 120, Training Loss: 0.6128
+2699.9s	321	Epoch 1, Step 130, Training Loss: 0.5964
+2712.4s	322	Epoch 1, Step 140, Training Loss: 0.5940
+2725.0s	323	Epoch 1, Step 150, Training Loss: 0.5785
+2730.4s	324	Validation batch 10
+2735.6s	325	Validation batch 20
+2740.7s	326	Validation batch 30
+2746.1s	327	Validation batch 40
+2751.3s	328	Validation batch 50
+2751.3s	329	Epoch 1, Validation Loss: 0.568145968914032
+2751.3s	330	Validation loss decreased, saving new best model and resetting patience counter.
+2763.9s	331	Epoch 2, Step 10, Training Loss: 0.5690
+2776.7s	332	Epoch 2, Step 20, Training Loss: 0.5641
+2789.3s	333	Epoch 2, Step 30, Training Loss: 0.5601
+2802.2s	334	Epoch 2, Step 40, Training Loss: 0.5509
+2814.7s	335	Epoch 2, Step 50, Training Loss: 0.5431
+2827.2s	336	Epoch 2, Step 60, Training Loss: 0.5400
+2840.0s	337	Epoch 2, Step 70, Training Loss: 0.5389
+2852.6s	338	Epoch 2, Step 80, Training Loss: 0.5312
+2865.4s	339	Epoch 2, Step 90, Training Loss: 0.5261
+2878.0s	340	Epoch 2, Step 100, Training Loss: 0.5222
+2890.5s	341	Epoch 2, Step 110, Training Loss: 0.5229
+2903.4s	342	Epoch 2, Step 120, Training Loss: 0.5213
+2915.9s	343	Epoch 2, Step 130, Training Loss: 0.5090
+2928.5s	344	Epoch 2, Step 140, Training Loss: 0.5127
+2941.2s	345	Epoch 2, Step 150, Training Loss: 0.5073
+2946.4s	346	Validation batch 10
+2951.6s	347	Validation batch 20
+2957.0s	348	Validation batch 30
+2962.1s	349	Validation batch 40
+2967.5s	350	Validation batch 50
+2967.5s	351	Epoch 2, Validation Loss: 0.4977594918012619
+2967.5s	352	Validation loss decreased, saving new best model and resetting patience counter.
+2980.1s	353	Epoch 3, Step 10, Training Loss: 0.5042
+2992.7s	354	Epoch 3, Step 20, Training Loss: 0.5039
+3005.6s	355	Epoch 3, Step 30, Training Loss: 0.5022
+3018.1s	356	Epoch 3, Step 40, Training Loss: 0.4998
+3030.7s	357	Epoch 3, Step 50, Training Loss: 0.4932
+3043.4s	358	Epoch 3, Step 60, Training Loss: 0.4947
+3056.0s	359	Epoch 3, Step 70, Training Loss: 0.4955
+3068.6s	360	Epoch 3, Step 80, Training Loss: 0.4873
+3081.3s	361	Epoch 3, Step 90, Training Loss: 0.4863
+3094.0s	362	Epoch 3, Step 100, Training Loss: 0.4853
+3106.5s	363	Epoch 3, Step 110, Training Loss: 0.4876
+3119.3s	364	Epoch 3, Step 120, Training Loss: 0.4859
+3131.8s	365	Epoch 3, Step 130, Training Loss: 0.4771
+3144.4s	366	Epoch 3, Step 140, Training Loss: 0.4863
+3157.1s	367	Epoch 3, Step 150, Training Loss: 0.4820
+3162.2s	368	Validation batch 10
+3167.6s	369	Validation batch 20
+3172.7s	370	Validation batch 30
+3177.9s	371	Validation batch 40
+3183.2s	372	Validation batch 50
+3183.2s	373	Epoch 3, Validation Loss: 0.4690103507041931
+3183.2s	374	Validation loss decreased, saving new best model and resetting patience counter.
+3195.8s	375	Epoch 4, Step 10, Training Loss: 0.4758
+3208.6s	376	Epoch 4, Step 20, Training Loss: 0.4763
+3221.1s	377	Epoch 4, Step 30, Training Loss: 0.4761
+3233.7s	378	Epoch 4, Step 40, Training Loss: 0.4764
+3246.5s	379	Epoch 4, Step 50, Training Loss: 0.4705
+3259.0s	380	Epoch 4, Step 60, Training Loss: 0.4699
+3271.5s	381	Epoch 4, Step 70, Training Loss: 0.4731
+3284.3s	382	Epoch 4, Step 80, Training Loss: 0.4678
+3296.8s	383	Epoch 4, Step 90, Training Loss: 0.4705
+3309.4s	384	Epoch 4, Step 100, Training Loss: 0.4673
+3322.1s	385	Epoch 4, Step 110, Training Loss: 0.4696
+3334.7s	386	Epoch 4, Step 120, Training Loss: 0.4658
+3347.4s	387	Epoch 4, Step 130, Training Loss: 0.4601
+3359.9s	388	Epoch 4, Step 140, Training Loss: 0.4689
+3372.5s	389	Epoch 4, Step 150, Training Loss: 0.4649
+3377.9s	390	Validation batch 10
+3383.0s	391	Validation batch 20
+3388.1s	392	Validation batch 30
+3393.4s	393	Validation batch 40
+3398.5s	394	Validation batch 50
+3398.5s	395	Epoch 4, Validation Loss: 0.4516385465860367
+3398.5s	396	Validation loss decreased, saving new best model and resetting patience counter.
+3411.1s	397	Epoch 5, Step 10, Training Loss: 0.4575
+3423.9s	398	Epoch 5, Step 20, Training Loss: 0.4587
+3436.5s	399	Epoch 5, Step 30, Training Loss: 0.4610
+3449.1s	400	Epoch 5, Step 40, Training Loss: 0.4631
+3461.8s	401	Epoch 5, Step 50, Training Loss: 0.4583
+3474.4s	402	Epoch 5, Step 60, Training Loss: 0.4573
+3487.0s	403	Epoch 5, Step 70, Training Loss: 0.4603
+3499.7s	404	Epoch 5, Step 80, Training Loss: 0.4542
+3512.2s	405	Epoch 5, Step 90, Training Loss: 0.4530
+3525.0s	406	Epoch 5, Step 100, Training Loss: 0.4534
+3537.5s	407	Epoch 5, Step 110, Training Loss: 0.4561
+3550.0s	408	Epoch 5, Step 120, Training Loss: 0.4536
+3562.8s	409	Epoch 5, Step 130, Training Loss: 0.4476
+3575.4s	410	Epoch 5, Step 140, Training Loss: 0.4575
+3588.2s	411	Epoch 5, Step 150, Training Loss: 0.4541
+3593.4s	412	Validation batch 10
+3598.5s	413	Validation batch 20
+3603.9s	414	Validation batch 30
+3609.0s	415	Validation batch 40
+3614.1s	416	Validation batch 50
+3614.1s	417	Epoch 5, Validation Loss: 0.4397795510292053
+3614.1s	418	Validation loss decreased, saving new best model and resetting patience counter.
+3626.9s	419	Epoch 6, Step 10, Training Loss: 0.4457
+3639.5s	420	Epoch 6, Step 20, Training Loss: 0.4464
+3652.1s	421	Epoch 6, Step 30, Training Loss: 0.4499
+3664.9s	422	Epoch 6, Step 40, Training Loss: 0.4528
+3677.3s	423	Epoch 6, Step 50, Training Loss: 0.4482
+3690.0s	424	Epoch 6, Step 60, Training Loss: 0.4476
+3702.6s	425	Epoch 6, Step 70, Training Loss: 0.4503
+3715.2s	426	Epoch 6, Step 80, Training Loss: 0.4435
+3727.9s	427	Epoch 6, Step 90, Training Loss: 0.4410
+3740.5s	428	Epoch 6, Step 100, Training Loss: 0.4437
+3753.1s	429	Epoch 6, Step 110, Training Loss: 0.4473
+3765.8s	430	Epoch 6, Step 120, Training Loss: 0.4450
+3778.4s	431	Epoch 6, Step 130, Training Loss: 0.4391
+3790.9s	432	Epoch 6, Step 140, Training Loss: 0.4469
+3803.7s	433	Epoch 6, Step 150, Training Loss: 0.4456
+3808.9s	434	Validation batch 10
+3814.0s	435	Validation batch 20
+3819.3s	436	Validation batch 30
+3824.4s	437	Validation batch 40
+3829.6s	438	Validation batch 50
+3829.6s	439	Epoch 6, Validation Loss: 0.429390960931778
+3829.6s	440	Validation loss decreased, saving new best model and resetting patience counter.
+3842.4s	441	Epoch 7, Step 10, Training Loss: 0.4372
+3854.9s	442	Epoch 7, Step 20, Training Loss: 0.4366
+3867.7s	443	Epoch 7, Step 30, Training Loss: 0.4410
+3880.3s	444	Epoch 7, Step 40, Training Loss: 0.4438
+3892.8s	445	Epoch 7, Step 50, Training Loss: 0.4391
+3905.6s	446	Epoch 7, Step 60, Training Loss: 0.4394
+3918.2s	447	Epoch 7, Step 70, Training Loss: 0.4411
+3930.9s	448	Epoch 7, Step 80, Training Loss: 0.4349
+3943.5s	449	Epoch 7, Step 90, Training Loss: 0.4352
+3956.1s	450	Epoch 7, Step 100, Training Loss: 0.4363
+3968.8s	451	Epoch 7, Step 110, Training Loss: 0.4390
+3981.3s	452	Epoch 7, Step 120, Training Loss: 0.4356
+3993.9s	453	Epoch 7, Step 130, Training Loss: 0.4309
+4006.7s	454	Epoch 7, Step 140, Training Loss: 0.4397
+4019.2s	455	Epoch 7, Step 150, Training Loss: 0.4384
+4024.7s	456	Validation batch 10
+4029.8s	457	Validation batch 20
+4034.9s	458	Validation batch 30
+4040.3s	459	Validation batch 40
+4045.4s	460	Validation batch 50
+4045.4s	461	Epoch 7, Validation Loss: 0.42159552693367003
+4045.4s	462	Validation loss decreased, saving new best model and resetting patience counter.
+4058.0s	463	Epoch 8, Step 10, Training Loss: 0.4301
+4070.7s	464	Epoch 8, Step 20, Training Loss: 0.4293
+4083.3s	465	Epoch 8, Step 30, Training Loss: 0.4336
+4096.0s	466	Epoch 8, Step 40, Training Loss: 0.4361
+4108.5s	467	Epoch 8, Step 50, Training Loss: 0.4317
+4121.0s	468	Epoch 8, Step 60, Training Loss: 0.4312
+4133.8s	469	Epoch 8, Step 70, Training Loss: 0.4343
+4146.3s	470	Epoch 8, Step 80, Training Loss: 0.4280
+4158.9s	471	Epoch 8, Step 90, Training Loss: 0.4291
+4171.7s	472	Epoch 8, Step 100, Training Loss: 0.4305
+4184.3s	473	Epoch 8, Step 110, Training Loss: 0.4327
+4196.8s	474	Epoch 8, Step 120, Training Loss: 0.4277
+4209.5s	475	Epoch 8, Step 130, Training Loss: 0.4247
+4222.1s	476	Epoch 8, Step 140, Training Loss: 0.4334
+4234.6s	477	Epoch 8, Step 150, Training Loss: 0.4323
+4240.0s	478	Validation batch 10
+4245.1s	479	Validation batch 20
+4250.3s	480	Validation batch 30
+4255.6s	481	Validation batch 40
+4260.8s	482	Validation batch 50
+4260.8s	483	Epoch 8, Validation Loss: 0.41574083983898164
+4260.8s	484	Validation loss decreased, saving new best model and resetting patience counter.
+4273.7s	485	Epoch 9, Step 10, Training Loss: 0.4235
+4286.2s	486	Epoch 9, Step 20, Training Loss: 0.4236
+4298.7s	487	Epoch 9, Step 30, Training Loss: 0.4275
+4311.6s	488	Epoch 9, Step 40, Training Loss: 0.4299
+4324.0s	489	Epoch 9, Step 50, Training Loss: 0.4254
+4336.5s	490	Epoch 9, Step 60, Training Loss: 0.4237
+4349.3s	491	Epoch 9, Step 70, Training Loss: 0.4281
+4361.8s	492	Epoch 9, Step 80, Training Loss: 0.4225
+4374.6s	493	Epoch 9, Step 90, Training Loss: 0.4247
+4387.1s	494	Epoch 9, Step 100, Training Loss: 0.4249
+4399.6s	495	Epoch 9, Step 110, Training Loss: 0.4278
+4412.3s	496	Epoch 9, Step 120, Training Loss: 0.4234
+4424.8s	497	Epoch 9, Step 130, Training Loss: 0.4195
+4437.3s	498	Epoch 9, Step 140, Training Loss: 0.4281
+4450.1s	499	Epoch 9, Step 150, Training Loss: 0.4276
+4455.2s	500	Validation batch 10
+4460.5s	501	Validation batch 20
+4465.6s	502	Validation batch 30
+4470.7s	503	Validation batch 40
+4476.0s	504	Validation batch 50
+4476.0s	505	Epoch 9, Validation Loss: 0.4119342887401581
+4476.0s	506	Validation loss decreased, saving new best model and resetting patience counter.
+4488.6s	507	Epoch 10, Step 10, Training Loss: 0.4189
+4501.1s	508	Epoch 10, Step 20, Training Loss: 0.4189
+4514.0s	509	Epoch 10, Step 30, Training Loss: 0.4222
+4526.5s	510	Epoch 10, Step 40, Training Loss: 0.4235
+4539.0s	511	Epoch 10, Step 50, Training Loss: 0.4195
+4551.8s	512	Epoch 10, Step 60, Training Loss: 0.4174
+4564.3s	513	Epoch 10, Step 70, Training Loss: 0.4227
+4576.8s	514	Epoch 10, Step 80, Training Loss: 0.4169
+4589.6s	515	Epoch 10, Step 90, Training Loss: 0.4212
+4602.2s	516	Epoch 10, Step 100, Training Loss: 0.4201
+4615.0s	517	Epoch 10, Step 110, Training Loss: 0.4226
+4627.5s	518	Epoch 10, Step 120, Training Loss: 0.4184
+4640.1s	519	Epoch 10, Step 130, Training Loss: 0.4143
+4652.8s	520	Epoch 10, Step 140, Training Loss: 0.4234
+4665.3s	521	Epoch 10, Step 150, Training Loss: 0.4230
+4670.4s	522	Validation batch 10
+4675.8s	523	Validation batch 20
+4681.0s	524	Validation batch 30
+4686.1s	525	Validation batch 40
+4691.4s	526	Validation batch 50
+4691.4s	527	Epoch 10, Validation Loss: 0.407031489610672
+4691.4s	528	model_norm_type_layer_activation_type_silu.pt best so far
+4691.4s	529	Validation loss decreased, saving new best model and resetting patience counter.
+4691.4s	530	Starting training loop...
+4691.4s	531	... norm_type=batch
+4691.4s	532	... activation_type=prelu
+4704.2s	533	Epoch 1, Step 10, Training Loss: 0.9251
+4717.2s	534	Epoch 1, Step 20, Training Loss: 0.7495
+4730.0s	535	Epoch 1, Step 30, Training Loss: 0.7289
+4742.7s	536	Epoch 1, Step 40, Training Loss: 0.7026
+4755.6s	537	Epoch 1, Step 50, Training Loss: 0.6884
+4768.3s	538	Epoch 1, Step 60, Training Loss: 0.6756
+4781.1s	539	Epoch 1, Step 70, Training Loss: 0.6569
+4794.0s	540	Epoch 1, Step 80, Training Loss: 0.6382
+4806.7s	541	Epoch 1, Step 90, Training Loss: 0.6242
+4819.7s	542	Epoch 1, Step 100, Training Loss: 0.6112
+4832.4s	543	Epoch 1, Step 110, Training Loss: 0.6007
+4845.3s	544	Epoch 1, Step 120, Training Loss: 0.5941
+4858.3s	545	Epoch 1, Step 130, Training Loss: 0.5822
+4871.1s	546	Epoch 1, Step 140, Training Loss: 0.5811
+4883.8s	547	Epoch 1, Step 150, Training Loss: 0.5689
+4889.2s	548	Validation batch 10
+4894.3s	549	Validation batch 20
+4899.4s	550	Validation batch 30
+4904.8s	551	Validation batch 40
+4909.9s	552	Validation batch 50
+4909.9s	553	Epoch 1, Validation Loss: 0.5566538679599762
+4909.9s	554	Validation loss decreased, saving new best model and resetting patience counter.
+4922.7s	555	Epoch 2, Step 10, Training Loss: 0.5647
+4935.6s	556	Epoch 2, Step 20, Training Loss: 0.5573
+4948.4s	557	Epoch 2, Step 30, Training Loss: 0.5556
+4961.5s	558	Epoch 2, Step 40, Training Loss: 0.5492
+4974.2s	559	Epoch 2, Step 50, Training Loss: 0.5420
+4986.9s	560	Epoch 2, Step 60, Training Loss: 0.5408
+5000.0s	561	Epoch 2, Step 70, Training Loss: 0.5397
+5012.7s	562	Epoch 2, Step 80, Training Loss: 0.5312
+5025.6s	563	Epoch 2, Step 90, Training Loss: 0.5279
+5038.6s	564	Epoch 2, Step 100, Training Loss: 0.5264
+5051.3s	565	Epoch 2, Step 110, Training Loss: 0.5257
+5064.3s	566	Epoch 2, Step 120, Training Loss: 0.5217
+5077.2s	567	Epoch 2, Step 130, Training Loss: 0.5134
+5089.9s	568	Epoch 2, Step 140, Training Loss: 0.5161
+5102.9s	569	Epoch 2, Step 150, Training Loss: 0.5087
+5108.0s	570	Validation batch 10
+5113.2s	571	Validation batch 20
+5118.6s	572	Validation batch 30
+5123.7s	573	Validation batch 40
+5128.9s	574	Validation batch 50
+5128.9s	575	Epoch 2, Validation Loss: 0.4961422711610794
+5128.9s	576	Validation loss decreased, saving new best model and resetting patience counter.
+5142.0s	577	Epoch 3, Step 10, Training Loss: 0.5033
+5154.8s	578	Epoch 3, Step 20, Training Loss: 0.5002
+5167.6s	579	Epoch 3, Step 30, Training Loss: 0.5013
+5180.7s	580	Epoch 3, Step 40, Training Loss: 0.4984
+5193.4s	581	Epoch 3, Step 50, Training Loss: 0.4913
+5206.1s	582	Epoch 3, Step 60, Training Loss: 0.4926
+5219.1s	583	Epoch 3, Step 70, Training Loss: 0.4954
+5231.8s	584	Epoch 3, Step 80, Training Loss: 0.4894
+5244.8s	585	Epoch 3, Step 90, Training Loss: 0.4853
+5257.6s	586	Epoch 3, Step 100, Training Loss: 0.4864
+5270.3s	587	Epoch 3, Step 110, Training Loss: 0.4855
+5283.3s	588	Epoch 3, Step 120, Training Loss: 0.4803
+5296.0s	589	Epoch 3, Step 130, Training Loss: 0.4756
+5308.7s	590	Epoch 3, Step 140, Training Loss: 0.4839
+5321.8s	591	Epoch 3, Step 150, Training Loss: 0.4784
+5326.9s	592	Validation batch 10
+5332.2s	593	Validation batch 20
+5337.2s	594	Validation batch 30
+5342.3s	595	Validation batch 40
+5347.6s	596	Validation batch 50
+5347.6s	597	Epoch 3, Validation Loss: 0.4678900700807571
+5347.6s	598	Validation loss decreased, saving new best model and resetting patience counter.
+5360.5s	599	Epoch 4, Step 10, Training Loss: 0.4717
+5373.2s	600	Epoch 4, Step 20, Training Loss: 0.4699
+5386.2s	601	Epoch 4, Step 30, Training Loss: 0.4716
+5399.0s	602	Epoch 4, Step 40, Training Loss: 0.4693
+5411.9s	603	Epoch 4, Step 50, Training Loss: 0.4645
+5424.7s	604	Epoch 4, Step 60, Training Loss: 0.4655
+5437.5s	605	Epoch 4, Step 70, Training Loss: 0.4704
+5450.5s	606	Epoch 4, Step 80, Training Loss: 0.4643
+5463.3s	607	Epoch 4, Step 90, Training Loss: 0.4625
+5476.1s	608	Epoch 4, Step 100, Training Loss: 0.4650
+5489.0s	609	Epoch 4, Step 110, Training Loss: 0.4634
+5501.8s	610	Epoch 4, Step 120, Training Loss: 0.4590
+5514.6s	611	Epoch 4, Step 130, Training Loss: 0.4552
+5527.5s	612	Epoch 4, Step 140, Training Loss: 0.4646
+5540.3s	613	Epoch 4, Step 150, Training Loss: 0.4606
+5545.4s	614	Validation batch 10
+5550.8s	615	Validation batch 20
+5555.9s	616	Validation batch 30
+5561.0s	617	Validation batch 40
+5566.4s	618	Validation batch 50
+5566.4s	619	Epoch 4, Validation Loss: 0.4477977168560028
+5566.4s	620	Validation loss decreased, saving new best model and resetting patience counter.
+5579.2s	621	Epoch 5, Step 10, Training Loss: 0.4526
+5592.2s	622	Epoch 5, Step 20, Training Loss: 0.4513
+5605.0s	623	Epoch 5, Step 30, Training Loss: 0.4533
+5617.8s	624	Epoch 5, Step 40, Training Loss: 0.4524
+5630.8s	625	Epoch 5, Step 50, Training Loss: 0.4490
+5643.5s	626	Epoch 5, Step 60, Training Loss: 0.4493
+5656.3s	627	Epoch 5, Step 70, Training Loss: 0.4554
+5669.2s	628	Epoch 5, Step 80, Training Loss: 0.4489
+5681.9s	629	Epoch 5, Step 90, Training Loss: 0.4479
+5695.0s	630	Epoch 5, Step 100, Training Loss: 0.4511
+5707.7s	631	Epoch 5, Step 110, Training Loss: 0.4485
+5720.5s	632	Epoch 5, Step 120, Training Loss: 0.4449
+5733.5s	633	Epoch 5, Step 130, Training Loss: 0.4409
+5746.2s	634	Epoch 5, Step 140, Training Loss: 0.4506
+5759.0s	635	Epoch 5, Step 150, Training Loss: 0.4475
+5764.4s	636	Validation batch 10
+5769.4s	637	Validation batch 20
+5774.7s	638	Validation batch 30
+5779.8s	639	Validation batch 40
+5784.9s	640	Validation batch 50
+5784.9s	641	Epoch 5, Validation Loss: 0.4377638041973114
+5784.9s	642	Validation loss decreased, saving new best model and resetting patience counter.
+5797.9s	643	Epoch 6, Step 10, Training Loss: 0.4392
+5810.7s	644	Epoch 6, Step 20, Training Loss: 0.4381
+5823.4s	645	Epoch 6, Step 30, Training Loss: 0.4406
+5836.5s	646	Epoch 6, Step 40, Training Loss: 0.4406
+5849.2s	647	Epoch 6, Step 50, Training Loss: 0.4373
+5861.9s	648	Epoch 6, Step 60, Training Loss: 0.4376
+5875.0s	649	Epoch 6, Step 70, Training Loss: 0.4431
+5887.7s	650	Epoch 6, Step 80, Training Loss: 0.4371
+5900.5s	651	Epoch 6, Step 90, Training Loss: 0.4377
+5913.6s	652	Epoch 6, Step 100, Training Loss: 0.4405
+5926.4s	653	Epoch 6, Step 110, Training Loss: 0.4377
+5939.1s	654	Epoch 6, Step 120, Training Loss: 0.4348
+5952.2s	655	Epoch 6, Step 130, Training Loss: 0.4311
+5964.9s	656	Epoch 6, Step 140, Training Loss: 0.4415
+5977.9s	657	Epoch 6, Step 150, Training Loss: 0.4383
+5983.0s	658	Validation batch 10
+5988.1s	659	Validation batch 20
+5993.5s	660	Validation batch 30
+5998.5s	661	Validation batch 40
+6003.6s	662	Validation batch 50
+6003.6s	663	Epoch 6, Validation Loss: 0.4298930931091309
+6003.6s	664	Validation loss decreased, saving new best model and resetting patience counter.
+6016.6s	665	Epoch 7, Step 10, Training Loss: 0.4309
+6029.4s	666	Epoch 7, Step 20, Training Loss: 0.4301
+6042.4s	667	Epoch 7, Step 30, Training Loss: 0.4319
+6055.3s	668	Epoch 7, Step 40, Training Loss: 0.4318
+6068.0s	669	Epoch 7, Step 50, Training Loss: 0.4292
+6080.9s	670	Epoch 7, Step 60, Training Loss: 0.4282
+6093.7s	671	Epoch 7, Step 70, Training Loss: 0.4347
+6106.4s	672	Epoch 7, Step 80, Training Loss: 0.4285
+6119.4s	673	Epoch 7, Step 90, Training Loss: 0.4299
+6132.2s	674	Epoch 7, Step 100, Training Loss: 0.4317
+6145.2s	675	Epoch 7, Step 110, Training Loss: 0.4299
+6157.9s	676	Epoch 7, Step 120, Training Loss: 0.4268
+6170.7s	677	Epoch 7, Step 130, Training Loss: 0.4228
+6183.6s	678	Epoch 7, Step 140, Training Loss: 0.4334
+6196.4s	679	Epoch 7, Step 150, Training Loss: 0.4315
+6201.5s	680	Validation batch 10
+6206.8s	681	Validation batch 20
+6211.9s	682	Validation batch 30
+6217.0s	683	Validation batch 40
+6222.3s	684	Validation batch 50
+6222.3s	685	Epoch 7, Validation Loss: 0.4230854451656342
+6222.3s	686	Validation loss decreased, saving new best model and resetting patience counter.
+6235.1s	687	Epoch 8, Step 10, Training Loss: 0.4242
+6247.9s	688	Epoch 8, Step 20, Training Loss: 0.4230
+6261.0s	689	Epoch 8, Step 30, Training Loss: 0.4246
+6273.8s	690	Epoch 8, Step 40, Training Loss: 0.4256
+6286.5s	691	Epoch 8, Step 50, Training Loss: 0.4223
+6299.5s	692	Epoch 8, Step 60, Training Loss: 0.4219
+6312.3s	693	Epoch 8, Step 70, Training Loss: 0.4283
+6325.3s	694	Epoch 8, Step 80, Training Loss: 0.4216
+6338.1s	695	Epoch 8, Step 90, Training Loss: 0.4230
+6350.9s	696	Epoch 8, Step 100, Training Loss: 0.4258
+6363.9s	697	Epoch 8, Step 110, Training Loss: 0.4244
+6376.6s	698	Epoch 8, Step 120, Training Loss: 0.4204
+6389.4s	699	Epoch 8, Step 130, Training Loss: 0.4167
+6402.4s	700	Epoch 8, Step 140, Training Loss: 0.4283
+6415.2s	701	Epoch 8, Step 150, Training Loss: 0.4262
+6420.6s	702	Validation batch 10
+6425.7s	703	Validation batch 20
+6430.8s	704	Validation batch 30
+6436.2s	705	Validation batch 40
+6441.3s	706	Validation batch 50
+6441.3s	707	Epoch 8, Validation Loss: 0.41920506477355957
+6441.3s	708	Validation loss decreased, saving new best model and resetting patience counter.
+6454.4s	709	Epoch 9, Step 10, Training Loss: 0.4183
+6467.1s	710	Epoch 9, Step 20, Training Loss: 0.4175
+6479.9s	711	Epoch 9, Step 30, Training Loss: 0.4196
+6492.9s	712	Epoch 9, Step 40, Training Loss: 0.4207
+6505.5s	713	Epoch 9, Step 50, Training Loss: 0.4174
+6518.2s	714	Epoch 9, Step 60, Training Loss: 0.4162
+6531.2s	715	Epoch 9, Step 70, Training Loss: 0.4223
+6543.9s	716	Epoch 9, Step 80, Training Loss: 0.4160
+6556.8s	717	Epoch 9, Step 90, Training Loss: 0.4161
+6569.8s	718	Epoch 9, Step 100, Training Loss: 0.4198
+6582.5s	719	Epoch 9, Step 110, Training Loss: 0.4182
+6595.4s	720	Epoch 9, Step 120, Training Loss: 0.4163
+6608.3s	721	Epoch 9, Step 130, Training Loss: 0.4127
+6621.0s	722	Epoch 9, Step 140, Training Loss: 0.4224
+6633.9s	723	Epoch 9, Step 150, Training Loss: 0.4216
+6639.1s	724	Validation batch 10
+6644.1s	725	Validation batch 20
+6649.5s	726	Validation batch 30
+6654.6s	727	Validation batch 40
+6659.7s	728	Validation batch 50
+6659.7s	729	Epoch 9, Validation Loss: 0.41591292202472685
+6659.7s	730	Validation loss decreased, saving new best model and resetting patience counter.
+6672.7s	731	Epoch 10, Step 10, Training Loss: 0.4133
+6685.6s	732	Epoch 10, Step 20, Training Loss: 0.4140
+6698.3s	733	Epoch 10, Step 30, Training Loss: 0.4151
+6711.4s	734	Epoch 10, Step 40, Training Loss: 0.4161
+6724.1s	735	Epoch 10, Step 50, Training Loss: 0.4122
+6736.9s	736	Epoch 10, Step 60, Training Loss: 0.4114
+6749.9s	737	Epoch 10, Step 70, Training Loss: 0.4173
+6762.7s	738	Epoch 10, Step 80, Training Loss: 0.4109
+6775.7s	739	Epoch 10, Step 90, Training Loss: 0.4120
+6788.6s	740	Epoch 10, Step 100, Training Loss: 0.4149
+6801.3s	741	Epoch 10, Step 110, Training Loss: 0.4142
+6814.3s	742	Epoch 10, Step 120, Training Loss: 0.4109
+6827.1s	743	Epoch 10, Step 130, Training Loss: 0.4076
+6840.1s	744	Epoch 10, Step 140, Training Loss: 0.4191
+6852.9s	745	Epoch 10, Step 150, Training Loss: 0.4171
+6858.1s	746	Validation batch 10
+6863.4s	747	Validation batch 20
+6868.5s	748	Validation batch 30
+6873.6s	749	Validation batch 40
+6879.0s	750	Validation batch 50
+6879.0s	751	Epoch 10, Validation Loss: 0.41260197103023527
+6879.0s	752	Validation loss decreased, saving new best model and resetting patience counter.
+6879.0s	753	Starting training loop...
+6879.0s	754	... norm_type=layer
+6879.0s	755	... activation_type=prelu
+6891.8s	756	Epoch 1, Step 10, Training Loss: 0.9522
+6904.4s	757	Epoch 1, Step 20, Training Loss: 0.7678
+6917.4s	758	Epoch 1, Step 30, Training Loss: 0.7384
+6930.1s	759	Epoch 1, Step 40, Training Loss: 0.7134
+6942.7s	760	Epoch 1, Step 50, Training Loss: 0.7009
+6955.4s	761	Epoch 1, Step 60, Training Loss: 0.6955
+6968.1s	762	Epoch 1, Step 70, Training Loss: 0.6843
+6980.9s	763	Epoch 1, Step 80, Training Loss: 0.6790
+6993.7s	764	Epoch 1, Step 90, Training Loss: 0.6761
+7006.4s	765	Epoch 1, Step 100, Training Loss: 0.6694
+7019.2s	766	Epoch 1, Step 110, Training Loss: 0.6630
+7031.9s	767	Epoch 1, Step 120, Training Loss: 0.6603
+7044.5s	768	Epoch 1, Step 130, Training Loss: 0.6534
+7057.4s	769	Epoch 1, Step 140, Training Loss: 0.6546
+7070.0s	770	Epoch 1, Step 150, Training Loss: 0.6437
+7075.2s	771	Validation batch 10
+7080.5s	772	Validation batch 20
+7085.7s	773	Validation batch 30
+7090.9s	774	Validation batch 40
+7096.2s	775	Validation batch 50
+7096.2s	776	Epoch 1, Validation Loss: 0.6398554682731629
+7096.2s	777	Validation loss decreased, saving new best model and resetting patience counter.
+7109.0s	778	Epoch 2, Step 10, Training Loss: 0.6399
+7122.0s	779	Epoch 2, Step 20, Training Loss: 0.6337
+7134.7s	780	Epoch 2, Step 30, Training Loss: 0.6301
+7147.4s	781	Epoch 2, Step 40, Training Loss: 0.6182
+7160.2s	782	Epoch 2, Step 50, Training Loss: 0.6124
+7172.9s	783	Epoch 2, Step 60, Training Loss: 0.6072
+7185.9s	784	Epoch 2, Step 70, Training Loss: 0.6006
+7198.5s	785	Epoch 2, Step 80, Training Loss: 0.5911
+7211.2s	786	Epoch 2, Step 90, Training Loss: 0.5897
+7224.2s	787	Epoch 2, Step 100, Training Loss: 0.5823
+7236.8s	788	Epoch 2, Step 110, Training Loss: 0.5808
+7249.5s	789	Epoch 2, Step 120, Training Loss: 0.5788
+7262.4s	790	Epoch 2, Step 130, Training Loss: 0.5672
+7275.0s	791	Epoch 2, Step 140, Training Loss: 0.5713
+7287.6s	792	Epoch 2, Step 150, Training Loss: 0.5619
+7293.1s	793	Validation batch 10
+7298.2s	794	Validation batch 20
+7303.6s	795	Validation batch 30
+7308.8s	796	Validation batch 40
+7313.9s	797	Validation batch 50
+7313.9s	798	Epoch 2, Validation Loss: 0.5526618587970734
+7313.9s	799	Validation loss decreased, saving new best model and resetting patience counter.
+7326.9s	800	Epoch 3, Step 10, Training Loss: 0.5575
+7339.6s	801	Epoch 3, Step 20, Training Loss: 0.5539
+7352.2s	802	Epoch 3, Step 30, Training Loss: 0.5546
+7365.2s	803	Epoch 3, Step 40, Training Loss: 0.5464
+7377.7s	804	Epoch 3, Step 50, Training Loss: 0.5430
+7390.3s	805	Epoch 3, Step 60, Training Loss: 0.5439
+7403.3s	806	Epoch 3, Step 70, Training Loss: 0.5414
+7415.9s	807	Epoch 3, Step 80, Training Loss: 0.5364
+7428.5s	808	Epoch 3, Step 90, Training Loss: 0.5343
+7441.4s	809	Epoch 3, Step 100, Training Loss: 0.5306
+7453.9s	810	Epoch 3, Step 110, Training Loss: 0.5344
+7466.6s	811	Epoch 3, Step 120, Training Loss: 0.5343
+7479.4s	812	Epoch 3, Step 130, Training Loss: 0.5234
+7492.0s	813	Epoch 3, Step 140, Training Loss: 0.5268
+7504.8s	814	Epoch 3, Step 150, Training Loss: 0.5184
+7510.0s	815	Validation batch 10
+7515.0s	816	Validation batch 20
+7520.4s	817	Validation batch 30
+7525.5s	818	Validation batch 40
+7530.8s	819	Validation batch 50
+7530.8s	820	Epoch 3, Validation Loss: 0.5084080547094345
+7530.8s	821	Validation loss decreased, saving new best model and resetting patience counter.
+7543.5s	822	Epoch 4, Step 10, Training Loss: 0.5174
+7556.2s	823	Epoch 4, Step 20, Training Loss: 0.5167
+7569.1s	824	Epoch 4, Step 30, Training Loss: 0.5179
+7581.8s	825	Epoch 4, Step 40, Training Loss: 0.5136
+7594.3s	826	Epoch 4, Step 50, Training Loss: 0.5087
+7607.1s	827	Epoch 4, Step 60, Training Loss: 0.5101
+7619.8s	828	Epoch 4, Step 70, Training Loss: 0.5100
+7632.4s	829	Epoch 4, Step 80, Training Loss: 0.5067
+7645.2s	830	Epoch 4, Step 90, Training Loss: 0.5038
+7657.9s	831	Epoch 4, Step 100, Training Loss: 0.5025
+7670.6s	832	Epoch 4, Step 110, Training Loss: 0.5059
+7683.3s	833	Epoch 4, Step 120, Training Loss: 0.5034
+7696.0s	834	Epoch 4, Step 130, Training Loss: 0.4944
+7708.8s	835	Epoch 4, Step 140, Training Loss: 0.5009
+7721.4s	836	Epoch 4, Step 150, Training Loss: 0.4966
+7726.5s	837	Validation batch 10
+7731.8s	838	Validation batch 20
+7736.8s	839	Validation batch 30
+7742.0s	840	Validation batch 40
+7747.3s	841	Validation batch 50
+7747.3s	842	Epoch 4, Validation Loss: 0.4859019207954407
+7747.3s	843	Validation loss decreased, saving new best model and resetting patience counter.
+7760.0s	844	Epoch 5, Step 10, Training Loss: 0.4925
+7772.7s	845	Epoch 5, Step 20, Training Loss: 0.4929
+7785.7s	846	Epoch 5, Step 30, Training Loss: 0.4976
+7798.6s	847	Epoch 5, Step 40, Training Loss: 0.4934
+7811.3s	848	Epoch 5, Step 50, Training Loss: 0.4877
+7824.1s	849	Epoch 5, Step 60, Training Loss: 0.4893
+7836.9s	850	Epoch 5, Step 70, Training Loss: 0.4916
+7849.7s	851	Epoch 5, Step 80, Training Loss: 0.4882
+7862.4s	852	Epoch 5, Step 90, Training Loss: 0.4870
+7875.2s	853	Epoch 5, Step 100, Training Loss: 0.4846
+7888.0s	854	Epoch 5, Step 110, Training Loss: 0.4879
+7900.7s	855	Epoch 5, Step 120, Training Loss: 0.4834
+7913.6s	856	Epoch 5, Step 130, Training Loss: 0.4759
+7926.2s	857	Epoch 5, Step 140, Training Loss: 0.4846
+7938.8s	858	Epoch 5, Step 150, Training Loss: 0.4807
+7944.2s	859	Validation batch 10
+7949.2s	860	Validation batch 20
+7954.3s	861	Validation batch 30
+7959.6s	862	Validation batch 40
+7964.7s	863	Validation batch 50
+7964.7s	864	Epoch 5, Validation Loss: 0.4671634167432785
+7964.7s	865	Validation loss decreased, saving new best model and resetting patience counter.
+7977.4s	866	Epoch 6, Step 10, Training Loss: 0.4743
+7990.3s	867	Epoch 6, Step 20, Training Loss: 0.4742
+8003.0s	868	Epoch 6, Step 30, Training Loss: 0.4812
+8015.9s	869	Epoch 6, Step 40, Training Loss: 0.4787
+8028.5s	870	Epoch 6, Step 50, Training Loss: 0.4729
+8041.1s	871	Epoch 6, Step 60, Training Loss: 0.4730
+8054.0s	872	Epoch 6, Step 70, Training Loss: 0.4757
+8066.6s	873	Epoch 6, Step 80, Training Loss: 0.4723
+8079.2s	874	Epoch 6, Step 90, Training Loss: 0.4726
+8092.2s	875	Epoch 6, Step 100, Training Loss: 0.4704
+8104.8s	876	Epoch 6, Step 110, Training Loss: 0.4736
+8117.4s	877	Epoch 6, Step 120, Training Loss: 0.4688
+8130.3s	878	Epoch 6, Step 130, Training Loss: 0.4637
+8142.9s	879	Epoch 6, Step 140, Training Loss: 0.4731
+8155.6s	880	Epoch 6, Step 150, Training Loss: 0.4690
+8161.0s	881	Validation batch 10
+8166.1s	882	Validation batch 20
+8171.2s	883	Validation batch 30
+8176.6s	884	Validation batch 40
+8181.7s	885	Validation batch 50
+8181.7s	886	Epoch 6, Validation Loss: 0.4547765439748764
+8181.7s	887	Validation loss decreased, saving new best model and resetting patience counter.
+8194.6s	888	Epoch 7, Step 10, Training Loss: 0.4611
+8207.3s	889	Epoch 7, Step 20, Training Loss: 0.4609
+8219.9s	890	Epoch 7, Step 30, Training Loss: 0.4686
+8232.9s	891	Epoch 7, Step 40, Training Loss: 0.4672
+8245.5s	892	Epoch 7, Step 50, Training Loss: 0.4615
+8258.3s	893	Epoch 7, Step 60, Training Loss: 0.4614
+8270.9s	894	Epoch 7, Step 70, Training Loss: 0.4652
+8283.5s	895	Epoch 7, Step 80, Training Loss: 0.4598
+8296.4s	896	Epoch 7, Step 90, Training Loss: 0.4619
+8309.1s	897	Epoch 7, Step 100, Training Loss: 0.4595
+8321.6s	898	Epoch 7, Step 110, Training Loss: 0.4626
+8334.5s	899	Epoch 7, Step 120, Training Loss: 0.4557
+8347.2s	900	Epoch 7, Step 130, Training Loss: 0.4513
+8359.8s	901	Epoch 7, Step 140, Training Loss: 0.4611
+8372.6s	902	Epoch 7, Step 150, Training Loss: 0.4592
+8377.8s	903	Validation batch 10
+8383.1s	904	Validation batch 20
+8388.2s	905	Validation batch 30
+8393.4s	906	Validation batch 40
+8398.8s	907	Validation batch 50
+8398.8s	908	Epoch 7, Validation Loss: 0.44517541587352755
+8398.8s	909	Validation loss decreased, saving new best model and resetting patience counter.
+8411.5s	910	Epoch 8, Step 10, Training Loss: 0.4502
+8424.2s	911	Epoch 8, Step 20, Training Loss: 0.4507
+8437.1s	912	Epoch 8, Step 30, Training Loss: 0.4579
+8449.8s	913	Epoch 8, Step 40, Training Loss: 0.4587
+8462.3s	914	Epoch 8, Step 50, Training Loss: 0.4534
+8475.2s	915	Epoch 8, Step 60, Training Loss: 0.4523
+8487.9s	916	Epoch 8, Step 70, Training Loss: 0.4568
+8500.5s	917	Epoch 8, Step 80, Training Loss: 0.4504
+8513.4s	918	Epoch 8, Step 90, Training Loss: 0.4560
+8526.1s	919	Epoch 8, Step 100, Training Loss: 0.4507
+8538.8s	920	Epoch 8, Step 110, Training Loss: 0.4544
+8551.6s	921	Epoch 8, Step 120, Training Loss: 0.4470
+8564.3s	922	Epoch 8, Step 130, Training Loss: 0.4427
+8577.1s	923	Epoch 8, Step 140, Training Loss: 0.4529
+8589.8s	924	Epoch 8, Step 150, Training Loss: 0.4508
+8595.0s	925	Validation batch 10
+8600.2s	926	Validation batch 20
+8605.3s	927	Validation batch 30
+8610.7s	928	Validation batch 40
+8615.8s	929	Validation batch 50
+8615.8s	930	Epoch 8, Validation Loss: 0.4360739594697952
+8615.8s	931	Validation loss decreased, saving new best model and resetting patience counter.
+8628.5s	932	Epoch 9, Step 10, Training Loss: 0.4403
+8641.4s	933	Epoch 9, Step 20, Training Loss: 0.4417
+8654.1s	934	Epoch 9, Step 30, Training Loss: 0.4488
+8666.8s	935	Epoch 9, Step 40, Training Loss: 0.4490
+8679.5s	936	Epoch 9, Step 50, Training Loss: 0.4473
+8692.1s	937	Epoch 9, Step 60, Training Loss: 0.4445
+8704.9s	938	Epoch 9, Step 70, Training Loss: 0.4473
+8717.7s	939	Epoch 9, Step 80, Training Loss: 0.4412
+8730.3s	940	Epoch 9, Step 90, Training Loss: 0.4434
+8743.3s	941	Epoch 9, Step 100, Training Loss: 0.4425
+8755.9s	942	Epoch 9, Step 110, Training Loss: 0.4477
+8768.6s	943	Epoch 9, Step 120, Training Loss: 0.4430
+8781.5s	944	Epoch 9, Step 130, Training Loss: 0.4380
+8794.0s	945	Epoch 9, Step 140, Training Loss: 0.4492
+8806.7s	946	Epoch 9, Step 150, Training Loss: 0.4438
+8812.2s	947	Validation batch 10
+8817.2s	948	Validation batch 20
+8822.4s	949	Validation batch 30
+8827.7s	950	Validation batch 40
+8832.9s	951	Validation batch 50
+8832.9s	952	Epoch 9, Validation Loss: 0.4279954993724823
+8832.9s	953	Validation loss decreased, saving new best model and resetting patience counter.
+8845.6s	954	Epoch 10, Step 10, Training Loss: 0.4325
+8858.5s	955	Epoch 10, Step 20, Training Loss: 0.4346
+8871.3s	956	Epoch 10, Step 30, Training Loss: 0.4415
+8884.0s	957	Epoch 10, Step 40, Training Loss: 0.4404
+8896.7s	958	Epoch 10, Step 50, Training Loss: 0.4398
+8909.3s	959	Epoch 10, Step 60, Training Loss: 0.4377
+8922.3s	960	Epoch 10, Step 70, Training Loss: 0.4409
+8934.8s	961	Epoch 10, Step 80, Training Loss: 0.4345
+8947.5s	962	Epoch 10, Step 90, Training Loss: 0.4339
+8960.5s	963	Epoch 10, Step 100, Training Loss: 0.4350
+8973.1s	964	Epoch 10, Step 110, Training Loss: 0.4416
+8985.9s	965	Epoch 10, Step 120, Training Loss: 0.4368
+8998.6s	966	Epoch 10, Step 130, Training Loss: 0.4323
+9011.1s	967	Epoch 10, Step 140, Training Loss: 0.4435
+9024.0s	968	Epoch 10, Step 150, Training Loss: 0.4378
+9029.2s	969	Validation batch 10
+9034.2s	970	Validation batch 20
+9039.5s	971	Validation batch 30
+9044.6s	972	Validation batch 40
+9049.8s	973	Validation batch 50
+9049.8s	974	Epoch 10, Validation Loss: 0.4218912446498871
+9049.8s	975	Validation loss decreased, saving new best model and resetting patience counter.
+9049.8s	976	Loading test HoloFrame...
+9049.8s	977	Using model model_norm_type_layer_activation_type_silu.pt for test run and submission

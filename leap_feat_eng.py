@@ -2,10 +2,11 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = True
+debug = False
 do_test = True
 use_cnn = True
-is_rerun = False
+is_rerun = True
+is_analysis = True
 
 #
 
@@ -18,24 +19,24 @@ if debug:
     max_epochs = 10
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000000
+    max_train_rows = 100
     max_test_rows  = 1000000000
-    max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 10  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 50
 
-multitrain_params = {"norm_type" : ["batch", "layer"],
-                     "activation_type" : ["silu", "prelu"]}
+multitrain_params = {}
 
 show_timings = False # debug
 batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
-try_reload_model = is_rerun
+try_reload_model = is_rerun or is_analysis
 clear_batch_cache_at_start = False # forgot before starting # not is_rerun #debug # True if processing has changed
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
-
+if is_analysis: max_epochs = 1
+max_analysis_output_rows = 1000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
 multitrain_keys = list(multitrain_params.keys())
@@ -922,7 +923,57 @@ input_size = len(expanded_names_input) # number of input features/columns
 output_size = len(expanded_names_output)
 
 
-#
+def unscale_outputs(y, sy):
+    """Undo normalisation to return to true values (but with submission
+    weights still multiplied in)"""
+
+    for i in range(sy.shape[0]):
+        # CW: still using original threshold although now premultiplying outputs by
+        # submission weightings, though does zero out those with zero weights
+        # (and some others)
+        if sy[i] < min_std * 1.1:
+            y[:,i] = 0 # Although zero here after rescaling will be y.mean
+
+    # undo y scaling
+    y *= sy
+
+
+
+def create_analysis_dataframe():
+    """Output file to show which columns contributing to loss"""
+    schema_col_names = expanded_names_input
+    for expanded_output in expanded_names_output:
+        schema_col_names.append(expanded_output + '_act')
+        schema_col_names.append(expanded_output + '_pred')
+        schema_col_names.append(expanded_output + '_r2')
+    for vector_output in unexpanded_output_vector_col_names:
+        schema_col_names.append(vector_output + '_r2avg')
+
+    analysis_df = pl.DataFrame(schema=schema_col_names)
+    return analysis_df
+
+def analyse_batch(analysis_df, inputs, outputs_pred, outputs_true):
+    """Analyse batch of true versus predicted outputs"""
+
+    # Return to original output scalings (but with submission weights
+    # multiplied in) to match competition metric
+    sy = mean_vector_across_samples(sy_sample) # 
+    outputs_pred_np = outputs_pred.cpu().numpy()
+    outputs_true_np = outputs_true.cpu().numpy()
+    unscale_outputs(outputs_pred_np, sy)
+    unscale_outputs(outputs_true_np, sy)
+
+    # Assuming variance of dataset outputs foudn in training more 
+    # representative than variance in this small batch?
+    true_variance_sqd = sy * sy # undo sqrt in stdev
+
+    error_residues = outputs_true_np - outputs_pred_np
+    error_variance_sqd = np.square(error_residues)
+    avg_error_variance_sqd = np.mean(error_variance_sqd, axis=0)
+    r2_metric = 1.0 - (avg_error_variance_sqd / true_variance_sqd)
+    
+    pass
+
 
 if is_rerun and os.path.exists(epoch_counter_path):
     try:
@@ -945,6 +996,9 @@ overall_best_val_loss = float('inf')
 for param_permutation in param_permutations:
     if stop_requested:
         break
+
+    if is_analysis:
+        analysis_df = create_analysis_dataframe()
 
     print("Starting training loop...")
     suffix = ""
@@ -977,36 +1031,38 @@ for param_permutation in param_permutations:
         tot_epochs = 0
 
     for epoch in range(max_epochs):
-        model.train()
-        total_loss = 0
-        steps = 0
-        for batch_idx, (inputs, labels) in enumerate(train_loader):
-            start_time = time.time()
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward() # Calculates gradients by backpropagation (chain rule)
-            optimizer.step()
+        if not is_analysis:
+            model.train()
+            total_loss = 0
+            steps = 0
+            for batch_idx, (inputs, outputs_true) in enumerate(train_loader):
+                start_time = time.time()
+                optimizer.zero_grad()
+                outputs_pred = model(inputs)
+                loss = criterion(outputs_pred, outputs_true)
+                loss.backward() # Calculates gradients by backpropagation (chain rule)
+                optimizer.step()
 
-            total_loss += loss.item()
-            steps += 1
+                total_loss += loss.item()
+                steps += 1
 
-            if show_timings: print(f'Training batch of {max_batch_size} took {time.time() - start_time} s')
+                if show_timings: print(f'Training batch of {max_batch_size} took {time.time() - start_time} s')
 
-            # Print every n steps
-            if (batch_idx + 1) % batch_report_interval == 0:
-                print(f'Epoch {tot_epochs + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / steps:.4f}')
-                total_loss = 0  # Reset the loss for the next n steps
-                steps = 0  # Reset step count
+                # Print every n steps
+                if (batch_idx + 1) % batch_report_interval == 0:
+                    print(f'Epoch {tot_epochs + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / steps:.4f}')
+                    total_loss = 0  # Reset the loss for the next n steps
+                    steps = 0  # Reset step count
         
-
         # Validation step
         model.eval()
         val_loss = 0
         with torch.no_grad():
-            for batch_idx, (inputs, labels) in enumerate(val_loader):
-                outputs = model(inputs)
-                val_loss += criterion(outputs, labels).item()
+            for batch_idx, (inputs, outputs_true) in enumerate(val_loader):
+                outputs_pred = model(inputs)
+                val_loss += criterion(outputs_pred, outputs_true).item()
+                if is_analysis:
+                    analyse_batch(analysis_df, inputs, outputs_pred, outputs_true)
 
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Validation batch {batch_idx + 1}')
@@ -1024,27 +1080,28 @@ for param_permutation in param_permutations:
         
         scheduler.step(avg_val_loss)  # Adjust learning rate
 
-        if avg_val_loss < overall_best_val_loss:
-            overall_best_val_loss = avg_val_loss
-            overall_best_model = model
-            overall_best_model_state = model.state_dict() # TODO is this static anyway?
-            overall_best_model_name = model_save_path
-            print(f"{model_save_path} best so far")
+        if not is_analysis:
+            if avg_val_loss < overall_best_val_loss:
+                overall_best_val_loss = avg_val_loss
+                overall_best_model = model
+                overall_best_model_state = model.state_dict() # TODO is this static anyway?
+                overall_best_model_name = model_save_path
+                print(f"{model_save_path} best so far")
 
-        # Update best model if current epoch's validation loss is lower
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            best_model_state = model.state_dict()  # Save the best model state
-            patience_count = 0
-            print("Validation loss decreased, saving new best model and resetting patience counter.")
-            torch.save(model.state_dict(), model_save_path)
-        else:
-            patience_count += 1
-            print(f"No improvement in validation loss for {patience_count} epochs.")
-            
-        if patience_count >= patience:
-            print("Stopping early due to no improvement in validation loss.")
-            break
+            # Update best model if current epoch's validation loss is lower
+            if avg_val_loss < best_val_loss:
+                best_val_loss = avg_val_loss
+                best_model_state = model.state_dict()  # Save the best model state
+                patience_count = 0
+                print("Validation loss decreased, saving new best model and resetting patience counter.")
+                torch.save(model.state_dict(), model_save_path)
+            else:
+                patience_count += 1
+                print(f"No improvement in validation loss for {patience_count} epochs.")
+                
+            if patience_count >= patience:
+                print("Stopping early due to no improvement in validation loss.")
+                break
 
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
@@ -1081,18 +1138,10 @@ if do_test:
 
         # No need to track gradients for inference
         with torch.no_grad():
-            outputs = overall_best_model(inputs)  # Get model predictions
-            y_predictions = outputs.cpu().numpy()  # Store predictions in predt
+            outputs_pred = overall_best_model(inputs)
+            y_predictions = outputs_pred.cpu().numpy()
 
-        for i in range(sy.shape[0]):
-            # CW: still using original threshold although now premultiplying outputs by
-            # submission weightings, though does zero out those with zero weights
-            # (and some others)
-            if sy[i] < min_std * 1.1:
-                y_predictions[:,i] = 0 # Although zero here after rescaling will be y.mean
-
-        # undo y scaling
-        y_predictions = y_predictions * sy
+        unscale_outputs(y_predictions, sy)
 
         # We already premultiplied training values by submission weights
         # so predictions should already be scaled the same way
