@@ -10,7 +10,10 @@ Ideas to progress
 -----------------
 
 o Try starting with single layer, then 3, wider, wider, narrower...?
-o Analyse which columns contributing most to error metric
+o Analyse which columns contributing most to error metric:
+   - ptend_q0001 moistening tendency low indices >=12, then higher ~45
+   - ptend_q0002 cloud liquid/ice mixing ratios and ptend_q0002 ice mixing ratios
+   -- both to do with condensation/evaporation 
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
 o Understand physics of each target col better

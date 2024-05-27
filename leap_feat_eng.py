@@ -5,9 +5,9 @@ run_local = True
 debug = False
 do_test = False
 use_cnn = True
-is_rerun = False
+is_rerun = True
 do_analysis = True
-do_train = True
+do_train = False
 
 #
 
@@ -25,7 +25,7 @@ else:
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    max_epochs = 50
+    max_epochs = 10
 
 multitrain_params = {"init_1x1" : [True]}
 
@@ -36,7 +36,7 @@ initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
 clear_batch_cache_at_start = False # forgot before starting # not is_rerun #debug # True if processing has changed
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
-max_analysis_output_rows = 1000
+max_analysis_output_rows = 10000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 
 multitrain_keys = list(multitrain_params.keys())
@@ -105,7 +105,8 @@ train_offsets_path = os.path.join(offsets_path, train_root + '.pkl')
 test_path = os.path.join(base_path, test_root + '.csv')
 test_offsets_path = os.path.join(offsets_path, test_root + '.pkl')
 submission_template_path = os.path.join(base_path, submission_root + '.csv')
-analysis_df_path = 'analysis.csv'
+analysis_df_path = 'r2_analysis.csv'
+r2_ranking_path = 'r2_ranking.csv'
 if debug:
     model_root_path = 'model_debug'
     epoch_counter_path = 'epochs_debug.txt'
@@ -709,7 +710,7 @@ class FFNN(nn.Module):
         return self.layers(x)
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=False, 
+    def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
                  norm_type="layer", activation_type="silu"):
         super().__init__()
         
@@ -977,6 +978,19 @@ def analyse_batch(analysis_df, inputs, outputs_pred, outputs_true):
     return pl.concat([analysis_df, batch_df])
     
 
+def calc_output_r2_ranking(analysis_df):
+    """List columns in order of R2 goodness to identify worst offenders"""
+
+    ranking_list = []
+    for i, col_name in enumerate(expanded_names_output):
+        r2_name = col_name + "_r2"
+        r2_avg = analysis_df[r2_name].mean()
+        r2_description = expanded_cols_by_name[col_name].description
+        ranking_list.append((r2_name, r2_avg, r2_description))
+    ranking_list.sort(key=lambda x: x[1])
+    ranking_df = pl.DataFrame(ranking_list, ["Var name", "R2", "Description"])
+    ranking_df.write_csv(r2_ranking_path)
+
 
 if is_rerun and os.path.exists(epoch_counter_path):
     try:
@@ -1085,6 +1099,7 @@ for param_permutation in param_permutations:
 
         if do_analysis:
             analysis_df.head(max_analysis_output_rows).write_csv(analysis_df_path)
+            calc_output_r2_ranking(analysis_df)
 
         if avg_val_loss < overall_best_val_loss:
             overall_best_val_loss = avg_val_loss
