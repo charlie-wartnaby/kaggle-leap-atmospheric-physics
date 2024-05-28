@@ -239,19 +239,21 @@ unexpanded_col_list = [
 ]
 
 # Add columns for new features
-unexpanded_col_list.append(ColumnInfo(True, 'pressure',          'air pressure',                        60, 'N/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'density',           'air density',                         60, 'kg/m3'      ))
-unexpanded_col_list.append(ColumnInfo(True, 'recip_density',     'reciprocal air density',              60, 'm3/kg'      ))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',        'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',        'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
-unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',      'relative humidity (proportion)',      60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity','reciprocal lative humidity',          60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'buoyancy',          'Beucler buoyancy metric',             60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'vert_insolation',   'zenith-adjusted insolation',           1, 'W/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'direct_sw_absorb',  'direct shortwave absorbance',          1, 'W/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'diffuse_sw_absorb', 'diffuse shortwave absorbance',         1, 'W/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'direct_lw_absorb',  'direct longwave absorbance',           1, 'W/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'diffuse_lw_absorb', 'diffuse longwave absorbance',          1, 'W/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'pressure',             'air pressure',                        60, 'N/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'density',              'air density',                         60, 'kg/m3'      ))
+unexpanded_col_list.append(ColumnInfo(True, 'recip_density',        'reciprocal air density',              60, 'm3/kg'      ))
+unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',           'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',           'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',         'relative humidity (proportion)',      60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity',   'reciprocal lative humidity',          60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'buoyancy',             'Beucler buoyancy metric',             60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'up_integ_tot_cloud',   'Ground-up integral of total cloud',   60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'down_integ_tot_cloud', 'Sky-down integral of total cloud',    60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'vert_insolation',      'zenith-adjusted insolation',           1, 'W/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'direct_sw_absorb',     'direct shortwave absorbance',          1, 'W/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'diffuse_sw_absorb',    'diffuse shortwave absorbance',         1, 'W/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'direct_lw_absorb',     'direct longwave absorbance',           1, 'W/m2'       ))
+unexpanded_col_list.append(ColumnInfo(True, 'diffuse_lw_absorb',    'diffuse longwave absorbance',          1, 'W/m2'       ))
 
 unexpanded_col_names = [col.name for col in unexpanded_col_list]
 unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
@@ -446,6 +448,11 @@ def add_vector_features(vector_dict):
     vector_dict['recip_rel_humidity'] = recip_rel_humidity_np
     buoyancy_np = bmse_calc(temperature_np, specific_humidity_np, pressure_np)
     vector_dict['buoyancy'] = buoyancy_np
+    tot_cloud_np = vector_dict['state_q0002'] + vector_dict['state_q0003']
+    down_integ_tot_cloud_np = np.cumsum(tot_cloud_np) # lower indices higher altitude
+    up_integ_tot_cloud_np = np.cumsum(tot_cloud_np[::-1])[::-1] # reverse before sum, then re-reverse
+    vector_dict['down_integ_tot_cloud'] = down_integ_tot_cloud_np
+    vector_dict['up_integ_tot_cloud'] = up_integ_tot_cloud_np
 
     # Single-value new features
 
