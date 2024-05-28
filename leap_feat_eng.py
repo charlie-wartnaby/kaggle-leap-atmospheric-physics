@@ -22,10 +22,10 @@ else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000
     max_test_rows  = 1000000000
-    max_batch_size = 2000  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.9
-    max_epochs = 8
+    train_proportion = 0.8
+    max_epochs = 6
 
 multitrain_params = {}
 
@@ -643,7 +643,7 @@ submission_weights = sample_submission_df[expanded_names_output].to_numpy().asty
 #
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
+    def __init__(self, gen_conv_width=5, gen_conv_depth=5, init_1x1=False, 
                  norm_type="layer", activation_type="silu"):
         super().__init__()
         
@@ -959,8 +959,11 @@ for param_permutation in param_permutations:
         # permutation is just index of feature to knock out
         model_params = {}
         feature_knockout_idx = param_permutation
-        print(f"... knocking out feature {feature_knockout_idx}: {unexpanded_col_list[feature_knockout_idx].name} - {unexpanded_col_list[feature_knockout_idx].description}")
-        suffix = f"_knockout_{feature_knockout_idx}_{unexpanded_col_names[feature_knockout_idx]}"
+        feature_knockout_name = unexpanded_input_col_names[feature_knockout_idx]
+        feature_knockout_col = unexpanded_cols_by_name[feature_knockout_name]
+        feature_knockout_description = feature_knockout_col.description
+        print(f"... knocking out feature {feature_knockout_idx}: {feature_knockout_name} - {feature_knockout_description}")
+        suffix = f"_knockout_{feature_knockout_idx}_{feature_knockout_name}"
     else:
         model_params = param_permutation
         suffix = ""
@@ -1075,7 +1078,7 @@ for param_permutation in param_permutations:
 
     if do_feature_knockout:
         with open(feature_knockout_path, 'a') as fd:
-            fd.write(f"{feature_knockout_idx},{best_val_loss},{unexpanded_col_list[feature_knockout_idx].name},{unexpanded_col_list[feature_knockout_idx].description}\n")
+            fd.write(f"{feature_knockout_idx},{best_val_loss},{feature_knockout_name},{feature_knockout_description}\n")
 
 # Test
 if do_test:
