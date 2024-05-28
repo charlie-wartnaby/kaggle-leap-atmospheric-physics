@@ -2,7 +2,7 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = True
+debug = False
 do_test = False
 is_rerun = False
 do_analysis = False
@@ -25,7 +25,7 @@ else:
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    max_epochs = 50
+    max_epochs = 5
 
 multitrain_params = {}
 
@@ -34,7 +34,7 @@ batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
-clear_batch_cache_at_start = debug
+clear_batch_cache_at_start = debug or do_feature_knockout
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
@@ -118,6 +118,7 @@ else:
     loss_log_path = 'loss_log.csv'
     batch_cache_dir = 'batch_cache'
 
+feature_knockout_path = 'feature_knockout.csv'
 stopfile_path = 'stop.txt'
 
 if os.path.exists(stopfile_path):
@@ -304,6 +305,8 @@ num_total_expanded_outputs = len(expanded_names_output)
 
 if do_feature_knockout:
     param_permutations = range(len(unexpanded_input_col_names))
+    with open(feature_knockout_path, 'w') as fd:
+        fd.write(f"i,best_val_loss,Variable,Description\n")
 
 
 # Functions to compute saturation pressure at given temperature taken from
@@ -956,7 +959,7 @@ for param_permutation in param_permutations:
         # permutation is just index of feature to knock out
         model_params = {}
         feature_knockout_idx = param_permutation
-        print(f"... knocking out feature {feature_knockout_idx}: {unexpanded_col_names[feature_knockout_idx]}")
+        print(f"... knocking out feature {feature_knockout_idx}: {unexpanded_col_list[feature_knockout_idx].name} - {unexpanded_col_list[feature_knockout_idx].description}")
         suffix = f"_knockout_{feature_knockout_idx}_{unexpanded_col_names[feature_knockout_idx]}"
     else:
         model_params = param_permutation
@@ -1070,6 +1073,9 @@ for param_permutation in param_permutations:
             stop_requested = True
             break
 
+    if do_feature_knockout:
+        with open(feature_knockout_path, 'a') as fd:
+            fd.write(f"{feature_knockout_idx},{best_val_loss},{unexpanded_col_list[feature_knockout_idx].name},{unexpanded_col_list[feature_knockout_idx].description}\n")
 
 # Test
 if do_test:
