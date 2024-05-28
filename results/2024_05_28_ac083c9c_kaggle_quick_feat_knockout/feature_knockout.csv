@@ -1,0 +1,41 @@
+i,best_val_loss,Variable (corrected),Description
+0,0.644446075,state_t,air temperature
+1,0.650863498,state_q0001,specific humidity
+2,0.657133654,state_q0002,cloud liquid mixing ratio
+3,0.675079346,state_q0003,cloud ice mixing ratio
+4,0.642325103,state_u,zonal wind speed
+5,0.646446019,state_v,meridional wind speed
+6,0.653075561,state_ps,surface pressure
+7,0.648809716,pbuf_SOLIN,solar insolation
+8,0.625109211,pbuf_LHFLX,surface latent heat flux
+9,0.638277099,pbuf_SHFLX,surface sensible heat flux
+10,0.637256652,pbuf_TAUX,zonal surface stress
+11,0.643476039,pbuf_TAUY,meridional surface stress
+12,0.65370813,pbuf_COSZRS,cosine of solar zenith angle
+13,0.635862768,cam_in_ALDIF,albedo for diffuse longwave radiation
+14,0.644393623,cam_in_ALDIR,albedo for direct longwave radiation
+15,0.641682655,cam_in_ASDIF,albedo for diffuse shortwave radiation
+16,0.649170011,cam_in_ASDIR,albedo for direct shortwave radiation
+17,0.646411374,cam_in_LWUP,upward longwave flux
+18,0.639959708,cam_in_ICEFRAC,sea-ice areal fraction
+19,0.639437348,cam_in_LANDFRAC,land areal fraction
+20,0.636075094,cam_in_OCNFRAC,ocean areal fraction
+21,0.650995091,cam_in_SNOWHLAND,snow depth over land
+22,0.639023766,pbuf_ozone,ozone volume mixing ratio
+23,0.633522347,pbuf_CH4,methane volume mixing ratio
+24,0.646402106,pbuf_N2O,nitrous oxide volume mixing ratio
+25,0.63209492,pressure,
+26,0.644754425,density,
+27,0.652730152,recip_density,
+28,0.636796921,momentum_u,
+29,0.639352381,momentum_v,
+30,0.643115148,rel_humidity,
+31,0.636442274,recip_rel_humidity,
+32,0.639990583,buoyancy,
+33,0.64624314,up_integ_tot_cloud,
+34,0.650536627,down_integ_tot_cloud,
+35,0.66638428,vert_insolation,
+36,0.632325739,direct_sw_absorb,
+37,0.642591879,diffuse_sw_absorb,
+38,0.643300593,direct_lw_absorb,
+39,0.642222688,diffuse_lw_absorb,
