@@ -2,11 +2,12 @@
 
 # This block will be different in Kaggle notebook:
 run_local = True
-debug = False
-do_test = True
+debug = True
+do_test = False
 is_rerun = False
 do_analysis = False
 do_train = True
+do_feature_knockout = True
 
 #
 
@@ -16,7 +17,7 @@ if debug:
     max_batch_size = 1000
     patience = 4
     train_proportion = 0.8
-    max_epochs = 10
+    max_epochs = 3
 else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000000
@@ -127,6 +128,7 @@ if not is_rerun and os.path.exists(epoch_counter_path):
 if not is_rerun and os.path.exists(loss_log_path):
     os.remove(loss_log_path)
 
+
 class HoloFrame:
     """Manage data extraction from large .csv file with random access
     using precomputed byte offsets of each text row"""
@@ -198,23 +200,23 @@ class ColumnInfo():
 unexpanded_col_list = [
     #         input?   Name                Description                                    Dimension   Units   Useful-from-idx
     ColumnInfo(True,  'state_t',          'air temperature',                                     60, 'K'      ),
-    #ColumnInfo(True,  'state_q0001',      'specific humidity',                                   60, 'kg/kg'  ),
+    ColumnInfo(True,  'state_q0001',      'specific humidity',                                   60, 'kg/kg'  ),
     ColumnInfo(True,  'state_q0002',      'cloud liquid mixing ratio',                           60, 'kg/kg'  ),
     ColumnInfo(True,  'state_q0003',      'cloud ice mixing ratio',                              60, 'kg/kg'  ),
-    #ColumnInfo(True,  'state_u',          'zonal wind speed',                                    60, 'm/s'    ),
-    #ColumnInfo(True,  'state_v',          'meridional wind speed',                               60, 'm/s'    ),
+    ColumnInfo(True,  'state_u',          'zonal wind speed',                                    60, 'm/s'    ),
+    ColumnInfo(True,  'state_v',          'meridional wind speed',                               60, 'm/s'    ),
     ColumnInfo(True,  'state_ps',         'surface pressure',                                     1, 'Pa'     ),
-    #ColumnInfo(True,  'pbuf_SOLIN',       'solar insolation',                                     1, 'W/m2'   ),
+    ColumnInfo(True,  'pbuf_SOLIN',       'solar insolation',                                     1, 'W/m2'   ),
     ColumnInfo(True,  'pbuf_LHFLX',       'surface latent heat flux',                             1, 'W/m2'   ),
     ColumnInfo(True,  'pbuf_SHFLX',       'surface sensible heat flux',                           1, 'W/m2'   ),
     ColumnInfo(True,  'pbuf_TAUX',        'zonal surface stress',                                 1, 'N/m2'   ),
     ColumnInfo(True,  'pbuf_TAUY',        'meridional surface stress',                            1, 'N/m2'   ),
-    #ColumnInfo(True,  'pbuf_COSZRS',      'cosine of solar zenith angle',                         1           ),
-    #ColumnInfo(True,  'cam_in_ALDIF',     'albedo for diffuse longwave radiation',                1           ),
-    #ColumnInfo(True,  'cam_in_ALDIR',     'albedo for direct longwave radiation',                 1           ),
-    #ColumnInfo(True,  'cam_in_ASDIF',     'albedo for diffuse shortwave radiation',               1           ),
-    #ColumnInfo(True,  'cam_in_ASDIR',     'albedo for direct shortwave radiation',                1           ),
-    #ColumnInfo(True,  'cam_in_LWUP',      'upward longwave flux',                                 1, 'W/m2'   ),
+    ColumnInfo(True,  'pbuf_COSZRS',      'cosine of solar zenith angle',                         1           ),
+    ColumnInfo(True,  'cam_in_ALDIF',     'albedo for diffuse longwave radiation',                1           ),
+    ColumnInfo(True,  'cam_in_ALDIR',     'albedo for direct longwave radiation',                 1           ),
+    ColumnInfo(True,  'cam_in_ASDIF',     'albedo for diffuse shortwave radiation',               1           ),
+    ColumnInfo(True,  'cam_in_ASDIR',     'albedo for direct shortwave radiation',                1           ),
+    ColumnInfo(True,  'cam_in_LWUP',      'upward longwave flux',                                 1, 'W/m2'   ),
     ColumnInfo(True,  'cam_in_ICEFRAC',   'sea-ice areal fraction',                               1           ),
     ColumnInfo(True,  'cam_in_LANDFRAC',  'land areal fraction',                                  1           ),
     ColumnInfo(True,  'cam_in_OCNFRAC',   'ocean areal fraction',                                 1           ),
@@ -237,6 +239,19 @@ unexpanded_col_list = [
     ColumnInfo(False, 'cam_out_SOLSD',    'downward diffuse solar flux to surface',               1, 'W/m2'   ),
     ColumnInfo(False, 'cam_out_SOLLD',    'downward diffuse near-infrared solar flux to surface', 1, 'W/m2'   ),
 ]
+
+if do_feature_knockout:
+    current_normal_knockout_features = []
+else:
+    current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
+                                    'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
+
+for feature in current_normal_knockout_features:
+    # Slow but trivial one-off
+    for i in range(len(unexpanded_col_list)):
+        if unexpanded_col_list[i].name == feature:
+            del unexpanded_col_list[i]
+            break
 
 # Add columns for new features
 unexpanded_col_list.append(ColumnInfo(True, 'pressure',             'air pressure',                        60, 'N/m2'       ))
@@ -286,6 +301,9 @@ num_all_outputs_as_vectors = len(unexpanded_output_col_names)
 num_pure_vector_outputs = len(unexpanded_output_vector_col_names)
 num_scalar_outputs = len(unexpanded_output_scalar_col_names)
 num_total_expanded_outputs = len(expanded_names_output)
+
+if do_feature_knockout:
+    param_permutations = range(len(unexpanded_input_col_names))
 
 
 # Functions to compute saturation pressure at given temperature taken from
@@ -631,6 +649,8 @@ class AtmLayerCNN(nn.Module):
         self.activation_type = activation_type
 
         num_input_feature_chans = len(unexpanded_input_col_names)
+        if do_feature_knockout:
+            num_input_feature_chans -= 1
 
         # Initialize the layers
 
@@ -786,8 +806,13 @@ class HoloDataset(Dataset):
 
         # Convert the RAM numpy data to tensors when requested
         cache_idx = index - self.cache_base_idx
-        return torch.from_numpy(self.cache_np_x[cache_idx]).float().to(device), \
-               torch.from_numpy(self.cache_np_y[cache_idx]).float().to(device)
+        x_np = self.cache_np_x[cache_idx]
+        y_np = self.cache_np_y[cache_idx]
+        if do_feature_knockout:
+            # Doing this post-processing so cached data can be used unchanged throughout
+            x_np = np.delete(x_np, feature_knockout_idx, axis=0)
+        return torch.from_numpy(x_np).float().to(device), \
+               torch.from_numpy(y_np).float().to(device)
     
 #
 
@@ -927,15 +952,23 @@ for param_permutation in param_permutations:
         break
 
     print("Starting training loop...")
-    suffix = ""
-    for key in param_permutation.keys():
-        print(f"... {key}={param_permutation[key]}")
-        suffix += f"_{key}_{param_permutation[key]}"
+    if do_feature_knockout:
+        # permutation is just index of feature to knock out
+        model_params = {}
+        feature_knockout_idx = param_permutation
+        print(f"... knocking out feature {feature_knockout_idx}: {unexpanded_col_names[feature_knockout_idx]}")
+        suffix = f"_knockout_{feature_knockout_idx}_{unexpanded_col_names[feature_knockout_idx]}"
+    else:
+        model_params = param_permutation
+        suffix = ""
+        for key in param_permutation.keys():
+            print(f"... {key}={param_permutation[key]}")
+            suffix += f"_{key}_{param_permutation[key]}"
     model_save_path = model_root_path + suffix + ".pt"
     with open(loss_log_path, 'a') as fd:
         fd.write(f'{model_save_path}\n')
 
-    model = AtmLayerCNN(**param_permutation).to(device)
+    model = AtmLayerCNN(**model_params).to(device)
 
     if try_reload_model and os.path.exists(model_save_path):
         print('Attempting to reload model from disk...')

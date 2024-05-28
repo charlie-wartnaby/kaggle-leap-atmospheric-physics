@@ -18,6 +18,7 @@ o Analyse which columns contributing most to error metric:
 o Integral features? E.g. cloud from ground up cumulatively absorbs IR,
   cloud from sky down cumulatively blocks sunshine
 o Reinstate deleted features and do systematic knockout sweep to determine important ones
+o Sum greenhouse gases weighted by GWP as single feature
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
 o Understand physics of each target col better
