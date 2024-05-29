@@ -1,13 +1,12 @@
 # LEAP competition with feature engineering
 
 # This block will be different in Kaggle notebook:
-run_local = True
-debug = False
-do_test = False
+debug = True
+do_test = True
 is_rerun = False
 do_analysis = False
 do_train = True
-do_feature_knockout = True
+do_feature_knockout = False
 
 #
 
@@ -27,7 +26,7 @@ else:
     train_proportion = 0.8
     max_epochs = 6
 
-subset_base_row = 5000000
+subset_base_row = 0 # To force using data further down file when using subset
 
 multitrain_params = {}
 
@@ -80,11 +79,13 @@ import polars as pl
 import re
 import shutil
 import sklearn.model_selection
+import socket
 import sys
 import time
 
-import socket
 machine = socket.gethostname()
+is_kaggle = re.match(r"[a-f0-9]{12}", machine) # Kaggle e.g. machine "1e5e4ffe5117"
+run_local = not is_kaggle
 
 if machine == 'narg':
     train_root = 'train-top-5000'
@@ -517,6 +518,7 @@ def vectorise_data(pl_df):
             row_level_matrix = df_level_subset.to_numpy().astype(np.float64)
             col_idx += num_atm_levels
         else:
+            # Scalar column
             row_vector = pl_df[: , col_name].to_numpy().astype(np.float64)
             row_vector = row_vector.reshape(len(row_vector), 1)
             col_info = unexpanded_cols_by_name.get(col_name)
@@ -556,8 +558,8 @@ def mean_vector_across_samples(sample_list):
 def preprocess_data(pl_df, has_outputs):
     vector_dict = vectorise_data(pl_df)
     add_vector_features(vector_dict)
-    # Glue input columns together by row, then feature, then atm level
-    # (Hope this will work with torch.nn.Conv1d taking N, C, L)
+    # Glue input columns together by rows in batch, then feature, then atm level
+    # (Works with torch.nn.Conv1d)
     for i, col_name in enumerate(unexpanded_input_col_names):
         if i == 0:
             x = vector_dict[col_name]
@@ -567,8 +569,7 @@ def preprocess_data(pl_df, has_outputs):
             x = np.concatenate((x, vector_dict[col_name].reshape(rows, 1, cols)), axis=1)
 
     if has_outputs:
-        # Leaving y-data expanded, will need to design model to explode CNN output across
-        # columns, as also need to cope with scalar outputs
+        # Leaving y-data expanded, model has to expand outputs to match
         for i, col_name in enumerate(unexpanded_output_col_names):
             if i == 0:
                 y = vector_dict[col_name]
@@ -872,12 +873,15 @@ def unscale_outputs(y, sy):
     """Undo normalisation to return to true values (but with submission
     weights still multiplied in)"""
 
+    zeroed_cols = []
     for i in range(sy.shape[0]):
         # CW: still using original threshold although now premultiplying outputs by
         # submission weightings, though does zero out those with zero weights
         # (and some others)
         if sy[i] < min_std * 1.1:
-            y[:,i] = 0 # Although zero here after rescaling will be y.mean
+            y[:,i] = 0 # After rescaling would have been y.mean but really is zero now
+            zeroed_cols.append(expanded_names_output[i])
+    print(f"Zeroed-out: " + str(zeroed_cols))
 
     # undo y scaling
     y *= sy

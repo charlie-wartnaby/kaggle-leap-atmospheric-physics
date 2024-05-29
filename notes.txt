@@ -22,9 +22,9 @@ o Would I do better by just zeroing/averaging some output columns with poor R2?
     output col. But beware train/val overlap if random split not reproducible.
   - But existing R2 analysis had all R2 > 0, whereas mean would only score 0.
 o Sum greenhouse gases weighted by GWP as single feature
-o Double-check preprocess_data() keeping output vectorised and recomment
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
+o Scrutinise use of min_std both in normalisation and zeroing output cols
 o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
 o Reciprocal of new features, e.g. heating in K/s will be inversely proportional to density
@@ -35,6 +35,7 @@ o Ensemble method combining independent technique(s) and NN
 o Would it help to remove more old feature columns? Could automate experiment
   - brief expt removed temperature, bit worse
 o Would it help to group columns differently depending on technique?
+o Train/val split does appear deterministic (random seeds set)
 
 Scoring and why predictions zeroed for low-variance cols in example
 -------------------------------------------------------------------
