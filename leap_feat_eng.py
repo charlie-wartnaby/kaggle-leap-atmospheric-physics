@@ -20,12 +20,14 @@ if debug:
     max_epochs = 3
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000
+    max_train_rows = 3000000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.8
     max_epochs = 6
+
+subset_base_row = 5000000
 
 multitrain_params = {}
 
@@ -263,8 +265,8 @@ unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',           'meridional 
 unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',         'relative humidity (proportion)',      60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity',   'reciprocal lative humidity',          60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'buoyancy',             'Beucler buoyancy metric',             60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'up_integ_tot_cloud',   'Ground-up integral of total cloud',   60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'down_integ_tot_cloud', 'Sky-down integral of total cloud',    60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'up_integ_tot_cloud',   'ground-up integral of total cloud',   60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'down_integ_tot_cloud', 'sky-down integral of total cloud',    60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'vert_insolation',      'zenith-adjusted insolation',           1, 'W/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'direct_sw_absorb',     'direct shortwave absorbance',          1, 'W/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'diffuse_sw_absorb',    'diffuse shortwave absorbance',         1, 'W/m2'       ))
@@ -643,7 +645,7 @@ submission_weights = sample_submission_df[expanded_names_output].to_numpy().asty
 #
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self, gen_conv_width=5, gen_conv_depth=5, init_1x1=False, 
+    def __init__(self, gen_conv_width=7, gen_conv_depth=11, init_1x1=False, 
                  norm_type="layer", activation_type="silu"):
         super().__init__()
         
@@ -795,7 +797,8 @@ class HoloDataset(Dataset):
                 if show_timings: print(f'HoloDataset slice cache load at row {self.cache_base_idx} took {time.time() - start_time} s')    
             else:
                 # Process slice of large dataframe corresponding to batch
-                pl_slice_df = self.holo_df.get_slice(index, index + self.cache_rows)
+                true_file_index = subset_base_row + index
+                pl_slice_df = self.holo_df.get_slice(true_file_index, true_file_index + self.cache_rows)
                 self.cache_np_x, self.cache_np_y = preprocess_data(pl_slice_df, True)
                 if show_timings: print(f'HoloDataset slice build at row {self.cache_base_idx} took {time.time() - start_time} s')
                 start_time = time.time()

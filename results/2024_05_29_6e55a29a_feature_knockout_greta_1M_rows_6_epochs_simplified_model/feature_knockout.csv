@@ -1,0 +1,41 @@
+i,best_val_loss,Variable,Description
+0,0.43967312574386597,state_t,air temperature
+1,0.44030929878354075,state_q0001,specific humidity
+2,0.4671953283250332,state_q0002,cloud liquid mixing ratio
+3,0.4721789538860321,state_q0003,cloud ice mixing ratio
+4,0.43852012380957606,state_u,zonal wind speed
+5,0.4401633642613888,state_v,meridional wind speed
+6,0.44030464589595797,state_ps,surface pressure
+7,0.4397198110818863,pbuf_SOLIN,solar insolation
+8,0.4393949292600155,pbuf_LHFLX,surface latent heat flux
+9,0.4377545461058617,pbuf_SHFLX,surface sensible heat flux
+10,0.44057869240641595,pbuf_TAUX,zonal surface stress
+11,0.43830533400177957,pbuf_TAUY,meridional surface stress
+12,0.43824711367487906,pbuf_COSZRS,cosine of solar zenith angle
+13,0.4400273509323597,cam_in_ALDIF,albedo for diffuse longwave radiation
+14,0.4374889604747295,cam_in_ALDIR,albedo for direct longwave radiation
+15,0.43832237645983696,cam_in_ASDIF,albedo for diffuse shortwave radiation
+16,0.4388854458928108,cam_in_ASDIR,albedo for direct shortwave radiation
+17,0.44057045727968214,cam_in_LWUP,upward longwave flux
+18,0.4377186708152294,cam_in_ICEFRAC,sea-ice areal fraction
+19,0.4376061871647835,cam_in_LANDFRAC,land areal fraction
+20,0.43783909305930135,cam_in_OCNFRAC,ocean areal fraction
+21,0.4399372130632401,cam_in_SNOWHLAND,snow depth over land
+22,0.4406524524092674,pbuf_ozone,ozone volume mixing ratio
+23,0.4380239486694336,pbuf_CH4,methane volume mixing ratio
+24,0.44097987562417984,pbuf_N2O,nitrous oxide volume mixing ratio
+25,0.4367733635008335,pressure,air pressure
+26,0.43755256906151774,density,air density
+27,0.44092933312058447,recip_density,reciprocal air density
+28,0.44363527595996854,momentum_u,zonal momentum per unit volume
+29,0.44036532267928125,momentum_v,meridional momentum per unit volume
+30,0.45379229858517645,rel_humidity,relative humidity (proportion)
+31,0.4387627549469471,recip_rel_humidity,reciprocal lative humidity
+32,0.4378460131585598,buoyancy,Beucler buoyancy metric
+33,0.4401144780218601,up_integ_tot_cloud,Ground-up integral of total cloud
+34,0.44159119203686714,down_integ_tot_cloud,Sky-down integral of total cloud
+35,0.4388265073299408,vert_insolation,zenith-adjusted insolation
+36,0.4371997587382793,direct_sw_absorb,direct shortwave absorbance
+37,0.4412420615553856,diffuse_sw_absorb,diffuse shortwave absorbance
+38,0.43676686882972715,direct_lw_absorb,direct longwave absorbance
+39,0.43962510824203493,diffuse_lw_absorb,diffuse longwave absorbance

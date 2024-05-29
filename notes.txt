@@ -15,9 +15,7 @@ o Analyse which columns contributing most to error metric:
    - ptend_q0002 cloud liquid/ice mixing ratios and ptend_q0002 ice mixing ratios
    -- both to do with condensation/
    -- mass mixing ratio is m(ice/water) / m(dry air) 
-o Integral features? E.g. cloud from ground up cumulatively absorbs IR,
-  cloud from sky down cumulatively blocks sunshine
-o Reinstate deleted features and do systematic knockout sweep to determine important ones
+o Would I do better by just zeroing/averaging some output columns with poor R2?
 o Sum greenhouse gases weighted by GWP as single feature
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
@@ -69,8 +67,13 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 6m ago · Commit 77a04229 with integral cloud features
+0.65123
+Ran until patience counter of 3 exhausted, 35 epochs validation loss 0.31098 best
+
+submission.csv
 Complete · 6m ago · Commit b1472343 with corrected width 1-deep initial conv
-Ran until patience counter of 3 exhausted, 42 epochs validation loss 0.312
+Ran until patience counter of 3 exhausted, 42 epochs validation loss 0.31218 beset
 0.65009
 
 submission.csv

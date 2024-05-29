@@ -1,0 +1,5 @@
+notes.txt
+
+For some reason only saved results as far as input feature 32 (buoyancy), manually
+edited to rerun from there. Failed after 3 hrs, maybe ssh inactivity timeout
+though started process in background. Should have used nohup command.
