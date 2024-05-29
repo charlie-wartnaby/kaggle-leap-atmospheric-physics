@@ -15,8 +15,14 @@ o Analyse which columns contributing most to error metric:
    - ptend_q0002 cloud liquid/ice mixing ratios and ptend_q0002 ice mixing ratios
    -- both to do with condensation/
    -- mass mixing ratio is m(ice/water) / m(dry air) 
+o Is current logic zero/mean-ing some cols that should be left as-is?
 o Would I do better by just zeroing/averaging some output columns with poor R2?
+  - Should be able to analyse without retraining on best model, extending R2
+    analysis to all validation set and checking if substitute with avg of training
+    output col. But beware train/val overlap if random split not reproducible.
+  - But existing R2 analysis had all R2 > 0, whereas mean would only score 0.
 o Sum greenhouse gases weighted by GWP as single feature
+o Double-check preprocess_data() keeping output vectorised and recomment
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
 o Understand physics of each target col better
