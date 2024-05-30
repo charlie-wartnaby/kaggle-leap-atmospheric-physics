@@ -19,14 +19,14 @@ if debug:
     max_epochs = 3
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 500000
+    max_train_rows = 2000000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.8
-    max_epochs = 6
+    train_proportion = 0.9
+    max_epochs = 20
 
-subset_base_row = 5000000
+subset_base_row = 0
 
 multitrain_params = {}
 
@@ -920,7 +920,7 @@ input_size = len(expanded_names_input) # number of input features/columns
 output_size = len(expanded_names_output)
 
 
-def unscale_outputs(y, sy):
+def unscale_outputs(y, my, sy):
     """Undo normalisation to return to true values (but with submission
     weights still multiplied in)"""
 
@@ -930,12 +930,12 @@ def unscale_outputs(y, sy):
         # submission weightings, though does zero out those with zero weights
         # (and some others)
         if sy[i] < min_std * 1.1:
-            y[:,i] = 0 # After rescaling would have been y.mean but really is zero now
+            y[:,i] = 0 # After rescaling becomes mean
             zeroed_cols.append(expanded_names_output[i])
     print(f"Zeroed-out: " + str(zeroed_cols))
 
     # undo y scaling
-    y *= sy
+    y = (y * sy) + my
 
 
 
@@ -947,8 +947,8 @@ def analyse_batch(analysis_df, inputs, outputs_pred, outputs_true):
     sy = mean_vector_across_samples(sy_sample) # 
     outputs_pred_np = outputs_pred.cpu().numpy()
     outputs_true_np = outputs_true.cpu().numpy()
-    unscale_outputs(outputs_pred_np, sy)
-    unscale_outputs(outputs_true_np, sy)
+    unscale_outputs(outputs_pred_np, my, sy)
+    unscale_outputs(outputs_true_np, my, sy)
 
     # Assuming variance of dataset outputs foudn in training more 
     # representative than variance in this small batch?
@@ -1168,7 +1168,7 @@ if do_test:
             outputs_pred = overall_best_model(inputs)
             y_predictions = outputs_pred.cpu().numpy()
 
-        unscale_outputs(y_predictions, sy)
+        unscale_outputs(y_predictions, my, sy)
 
         # We already premultiplied training values by submission weights
         # so predictions should already be scaled the same way
