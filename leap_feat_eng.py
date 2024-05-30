@@ -1,7 +1,7 @@
 # LEAP competition with feature engineering
 
 # This block will be different in Kaggle notebook:
-debug = True
+debug = False
 do_test = True
 is_rerun = False
 do_analysis = False
@@ -19,7 +19,7 @@ if debug:
     max_epochs = 3
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 3000000
+    max_train_rows = 500000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
@@ -39,6 +39,7 @@ clear_batch_cache_at_start = debug or do_feature_knockout
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
+min_std = 1e-8 # TODO suspicious needs investigating
 
 multitrain_keys = list(multitrain_params.keys())
 if len(multitrain_keys) < 1:
@@ -538,11 +539,12 @@ scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
 if os.path.exists(scaling_cache_path):
     print("Opening previous scalings...")
     with open(scaling_cache_path, 'rb') as fd:
-        (mx_sample, sx_sample, sy_sample) = pickle.load(fd)
+        (mx_sample, sx_sample, my_sample, sy_sample) = pickle.load(fd)
 else:
     print("No previous scalings so starting afresh")
     mx_sample = [] # Each element vector of means of input columns, from one holo batch
     sx_sample = [] # ... and scaling factor
+    my_sample = []
     sy_sample = []
 
 def mean_vector_across_samples(sample_list):
@@ -576,9 +578,10 @@ def preprocess_data(pl_df, has_outputs):
             else:
                 y_add = vector_dict[col_name]
                 y = np.concatenate((y, y_add), axis=1)
-    del pl_df
+    else:
+        y = None
 
-    # norm X
+    # Accumulate batch statistics to use in normalisation later from training data only
     if has_outputs:
         # Now applying same scaling across whole 60-level channel, for x at least:
         mx = x.mean(axis=(0,2))
@@ -587,10 +590,26 @@ def preprocess_data(pl_df, has_outputs):
         sx = sx.reshape(1, len(unexpanded_input_col_names), 1)
         mx_sample.append(mx)
         sx_sample.append(sx)
-    else:
-        # Using scaling found in training data; though could use test data if big enough?
-        mx = mean_vector_across_samples(mx_sample)
-        sx = mean_vector_across_samples(sx_sample)
+
+        # Scaling outputs by weights that wil be used anyway for submission, so we get
+        # rid of very tiny values that will give very small variances, and will make
+        # them suitable hopefully for conversion to float32
+        y = y * submission_weights
+
+        my = y.mean(axis=0)
+        # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
+        # gives loss value like competition criterion but I see no training advantage:
+        # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
+        sy = np.maximum(y.std(axis=0), min_std)
+        my_sample.append(my)
+        sy_sample.append(sy)
+
+    del pl_df
+
+    return x, y
+
+
+def normalise_data(x, y, mx, sx, my, sy, has_outputs):
 
     # Original had mx.reshape(1,-1) to go from 1D row vector to 2D array with
     # one row but seems unnecessary
@@ -598,18 +617,7 @@ def preprocess_data(pl_df, has_outputs):
     x = x.astype(np.float32)
 
     if has_outputs:
-        # norm Y
-        # Scaling outputs by weights that wil be used anyway for submission, so we get
-        # rid of very tiny values that will give very small variances, and will make
-        # them suitable hopefully for conversion to float32
-        y = y * submission_weights
-
-        # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
-        # gives loss value like competition criterion but I see no training advantage:
-        # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
-        sy = np.maximum(y.std(axis=0), min_std)
-        sy_sample.append(sy)
-        y /= sy
+        y = (y - my) / sy
         y = y.astype(np.float32)
     else:
         y = None
@@ -617,7 +625,63 @@ def preprocess_data(pl_df, has_outputs):
     return x, y
 
 
-# Now trying same as public notebook but with the new features:
+
+# Preprocess entire dataset, gathering statistics for subsequent normalisation along the way
+
+# Single row of weights for outputs
+submission_weights = sample_submission_df[expanded_names_output].to_numpy().astype(np.float64)
+
+for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
+                    # Process slice of large dataframe corresponding to batch
+    prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
+    prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
+    postnorm_cache_filename = f'{true_file_index}.pkl'
+    postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
+
+    if not os.path.exists(postnorm_cache_path) and not os.path.exists(prenorm_cache_path):
+        print(f"Building {prenorm_cache_path}...")
+        pl_slice_df = train_hf.get_slice(true_file_index, true_file_index + max_batch_size)
+        cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True)
+        if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
+        start_time = time.time()
+        with open(prenorm_cache_path, 'wb') as fd:
+            pickle.dump((cache_np_x, cache_np_y), fd)
+        # Cache normalisation data needed for any rerun later
+        with open(scaling_cache_path, 'wb') as fd:
+            pickle.dump((mx_sample, sx_sample, my_sample, sy_sample), fd)
+
+        if show_timings: print(f'HoloDataset slice cache save at row {true_file_index} took {time.time() - start_time} s')
+
+# Now normalise whole dataset using statistics gathered during preprocessing
+
+# Using scaling found in training data; though could use test data if big enough?
+mx = mean_vector_across_samples(mx_sample)
+sx = mean_vector_across_samples(sx_sample)
+my = mean_vector_across_samples(my_sample)
+sy = mean_vector_across_samples(sy_sample)
+
+for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
+                    # Process slice of large dataframe corresponding to batch
+    prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
+    postnorm_cache_filename = f'{true_file_index}.pkl'
+    
+    prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
+    postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
+
+    if not os.path.exists(postnorm_cache_path):
+        print(f"Building {postnorm_cache_path}...")
+        with open(prenorm_cache_path, 'rb') as fd:
+            (x_prenorm, y_prenorm) = pickle.load(fd)
+
+        x_postnorm, y_postnorm = normalise_data(x_prenorm, y_prenorm, mx, sx, my, sy, True)
+        if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
+        start_time = time.time()
+        with open(postnorm_cache_path, 'wb') as fd:
+            pickle.dump((x_postnorm, y_postnorm), fd)
+        os.remove(prenorm_cache_path)
+
+
+# Now very loosely based on public notebook but with the new features and model:
 # https://www.kaggle.com/code/airazusta014/pytorch-nn/notebook
 
 import random, gc, warnings
@@ -632,7 +696,6 @@ import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 np.random.seed(42)
 random.seed(42)
-min_std = 1e-8
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 DEBUGGING = not do_test
@@ -640,8 +703,6 @@ DEBUGGING = not do_test
 #
 
 
-# Single row of weights for outputs
-submission_weights = sample_submission_df[expanded_names_output].to_numpy().astype(np.float64)
 
 #
 
@@ -789,7 +850,8 @@ class HoloDataset(Dataset):
             # We don't already have this converted and processed in RAM
             start_time = time.time()
             self.cache_base_idx = index
-            cache_filename = f'{self.cache_base_idx}.pkl'
+            true_file_idx = self.cache_base_idx + subset_base_row
+            cache_filename = f'{true_file_idx}.pkl'
             cache_path = os.path.join(batch_cache_dir, cache_filename)
             if os.path.exists(cache_path):
                 # Preprocessing already done, retrieve from binary cache file
@@ -797,19 +859,8 @@ class HoloDataset(Dataset):
                     (self.cache_np_x, self.cache_np_y) = pickle.load(fd)
                 if show_timings: print(f'HoloDataset slice cache load at row {self.cache_base_idx} took {time.time() - start_time} s')    
             else:
-                # Process slice of large dataframe corresponding to batch
-                true_file_index = subset_base_row + index
-                pl_slice_df = self.holo_df.get_slice(true_file_index, true_file_index + self.cache_rows)
-                self.cache_np_x, self.cache_np_y = preprocess_data(pl_slice_df, True)
-                if show_timings: print(f'HoloDataset slice build at row {self.cache_base_idx} took {time.time() - start_time} s')
-                start_time = time.time()
-                with open(cache_path, 'wb') as fd:
-                    pickle.dump((self.cache_np_x, self.cache_np_y), fd)
-                # Cache normalisation data needed for any rerun later
-                with open(scaling_cache_path, 'wb') as fd:
-                    pickle.dump((mx_sample, sx_sample, sy_sample), fd)
-
-                if show_timings: print(f'HoloDataset slice cache save at row {self.cache_base_idx} took {time.time() - start_time} s')
+                print(f"ERROR: cached data not found at row {index}")
+                sys.exit(1)
 
         # Convert the RAM numpy data to tensors when requested
         cache_idx = index - self.cache_base_idx
@@ -1094,8 +1145,6 @@ if do_test:
 
     submission_df = None
 
-    sy = mean_vector_across_samples(sy_sample)
-
     print(f'Using model {overall_best_model_name} for test run and submission')
     overall_best_model.load_state_dict(overall_best_model_state)
     overall_best_model.eval()
@@ -1108,7 +1157,8 @@ if do_test:
         subset_df = test_hf.get_slice(base_row_idx, base_row_idx + num_rows)
         base_row_idx += num_rows
 
-        xt, _ = preprocess_data(subset_df, False)
+        xt_prenorm, _ = preprocess_data(subset_df, False)
+        xt, _         = normalise_data(xt_prenorm, None, mx, sx, my, sy, False)
 
         # Convert the current slice of xt to a PyTorch tensor
         inputs = torch.from_numpy(xt).float().to(device)
