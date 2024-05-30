@@ -11,8 +11,8 @@ do_feature_knockout = False
 #
 
 if debug:
-    max_train_rows = 5000
-    max_test_rows  = 1000
+    max_train_rows = 10000
+    max_test_rows  = 100
     max_batch_size = 1000
     patience = 4
     train_proportion = 0.8
@@ -35,7 +35,7 @@ batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
-clear_batch_cache_at_start = debug or do_feature_knockout
+clear_batch_cache_at_start = True # Currently not saving scalings to unscale test data    debug or do_feature_knockout
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
@@ -546,6 +546,8 @@ else:
     sx_sample = [] # ... and scaling factor
     my_sample = []
     sy_sample = []
+    xlim_sample = [] # min/max values found
+    ylim_sample = []
 
 def mean_vector_across_samples(sample_list):
     """Given series of sample row vectors across data columns, form
@@ -586,10 +588,7 @@ def preprocess_data(pl_df, has_outputs):
         # Now applying same scaling across whole 60-level channel, for x at least:
         mx = x.mean(axis=(0,2))
         mx = mx.reshape(1, len(unexpanded_input_col_names), 1)
-        sx = np.maximum(x.std(axis=(0,2)), min_std)
-        sx = sx.reshape(1, len(unexpanded_input_col_names), 1)
         mx_sample.append(mx)
-        sx_sample.append(sx)
 
         # Scaling outputs by weights that wil be used anyway for submission, so we get
         # rid of very tiny values that will give very small variances, and will make
@@ -597,12 +596,7 @@ def preprocess_data(pl_df, has_outputs):
         y = y * submission_weights
 
         my = y.mean(axis=0)
-        # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
-        # gives loss value like competition criterion but I see no training advantage:
-        # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
-        sy = np.maximum(y.std(axis=0), min_std)
         my_sample.append(my)
-        sy_sample.append(sy)
 
     del pl_df
 
@@ -617,7 +611,7 @@ def normalise_data(x, y, mx, sx, my, sy, has_outputs):
     x = x.astype(np.float32)
 
     if has_outputs:
-        y = (y) / sy
+        y = (y - my) / sy
         y = y.astype(np.float32)
     else:
         y = None
@@ -646,19 +640,44 @@ for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, 
         start_time = time.time()
         with open(prenorm_cache_path, 'wb') as fd:
             pickle.dump((cache_np_x, cache_np_y), fd)
-        # Cache normalisation data needed for any rerun later
-        with open(scaling_cache_path, 'wb') as fd:
-            pickle.dump((mx_sample, sx_sample, my_sample, sy_sample), fd)
 
-        if show_timings: print(f'HoloDataset slice cache save at row {true_file_index} took {time.time() - start_time} s')
+# Mean of means gives us overall mean for each quantity (whole vectors for inputs,
+# individual columns for outputs with their differing submission weightings)
+
+mx = mean_vector_across_samples(mx_sample)
+my = mean_vector_across_samples(my_sample)
+
+# Do another pass to get standard deviation stats across whole dataset, which we
+# needed means across whole dataset for
+x_sumsq_sample = []
+y_sumsq_sample = []
+for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
+    prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
+    prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
+    postnorm_cache_filename = f'{true_file_index}.pkl'
+    postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
+
+    if not os.path.exists(postnorm_cache_path):
+        print(f"Getting variances from {prenorm_cache_path}...")
+        with open(prenorm_cache_path, 'rb') as fd:
+            (x_prenorm, y_prenorm) = pickle.load(fd)
+        x_diffs_sqd = (x_prenorm - mx) ** 2
+        x_sum_sqs = x_diffs_sqd.sum(axis=0)
+        x_sumsq_sample.append(x_sum_sqs)
+        y_diffs_sqd = (y_prenorm - my) ** 2
+        y_sum_sqs = y_diffs_sqd.sum(axis=0)
+        y_sumsq_sample.append(y_sum_sqs)
 
 # Now normalise whole dataset using statistics gathered during preprocessing
-
 # Using scaling found in training data; though could use test data if big enough?
-mx = mean_vector_across_samples(mx_sample)
-sx = mean_vector_across_samples(sx_sample)
-my = mean_vector_across_samples(my_sample)
-sy = mean_vector_across_samples(sy_sample)
+
+x_sumsq_avg = mean_vector_across_samples(x_sumsq_sample) / max_batch_size
+y_sumsq_avg = mean_vector_across_samples(y_sumsq_sample) / max_batch_size
+sx = np.sqrt(x_sumsq_avg)
+# Donor notebook used RMS instead of stdev here, discussion thread suggesting that
+# gives loss value like competition criterion but I see no training advantage:
+# https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
+sy = np.maximum(np.sqrt(y_sumsq_avg), min_std)
 
 for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
                     # Process slice of large dataframe corresponding to batch
@@ -935,7 +954,7 @@ def unscale_outputs(y, my, sy):
     print(f"Zeroed-out: " + str(zeroed_cols))
 
     # undo y scaling
-    y = (y * sy) # + my
+    y = (y * sy) + my
 
 
 
@@ -944,7 +963,6 @@ def analyse_batch(analysis_df, inputs, outputs_pred, outputs_true):
 
     # Return to original output scalings (but with submission weights
     # multiplied in) to match competition metric
-    sy = mean_vector_across_samples(sy_sample) # 
     outputs_pred_np = outputs_pred.cpu().numpy()
     outputs_true_np = outputs_true.cpu().numpy()
     unscale_outputs(outputs_pred_np, my, sy)
