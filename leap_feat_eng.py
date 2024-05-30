@@ -26,7 +26,7 @@ else:
     train_proportion = 0.8
     max_epochs = 6
 
-subset_base_row = 0 # To force using data further down file when using subset
+subset_base_row = 5000000
 
 multitrain_params = {}
 
