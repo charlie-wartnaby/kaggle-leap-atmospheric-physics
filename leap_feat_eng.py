@@ -19,12 +19,12 @@ if debug:
     max_epochs = 3
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 2000000
+    max_train_rows = 10000000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    max_epochs = 20
+    max_epochs = 50
 
 subset_base_row = 0
 
@@ -726,7 +726,7 @@ DEBUGGING = not do_test
 #
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self, gen_conv_width=7, gen_conv_depth=11, init_1x1=False, 
+    def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
                  norm_type="layer", activation_type="silu"):
         super().__init__()
         
@@ -938,6 +938,11 @@ val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
 input_size = len(expanded_names_input) # number of input features/columns
 output_size = len(expanded_names_output)
 
+# Currently have problem with large R2 for ptend_q0002_24_r2, ptend_q0002_25_r2,
+# ptend_q0002_26_r2 in validation (earlier ones get zeroed anyway through small
+# std check currently)
+ptend_q0002_unexpanded_y_idx = unexpanded_output_col_names.index('ptend_q0002')
+ptend_q0002_expanded_base_y_idx = ptend_q0002_unexpanded_y_idx * num_atm_levels
 
 def unscale_outputs(y, my, sy):
     """Undo normalisation to return to true values (but with submission
@@ -948,7 +953,8 @@ def unscale_outputs(y, my, sy):
         # CW: still using original threshold although now premultiplying outputs by
         # submission weightings, though does zero out those with zero weights
         # (and some others)
-        if sy[i] < min_std * 1.1:
+        if (sy[i] < min_std * 1.1) or (i >= ptend_q0002_expanded_base_y_idx and 
+                                      i <= ptend_q0002_expanded_base_y_idx + 26):
             y[:,i] = 0 # After rescaling becomes mean
             zeroed_cols.append(expanded_names_output[i])
     print(f"Zeroed-out: " + str(zeroed_cols))
