@@ -4,7 +4,7 @@
 debug = False
 do_test = True
 is_rerun = False
-do_analysis = False
+do_analysis = True
 do_train = True
 do_feature_knockout = False
 
@@ -617,7 +617,7 @@ def normalise_data(x, y, mx, sx, my, sy, has_outputs):
     x = x.astype(np.float32)
 
     if has_outputs:
-        y = (y - my) / sy
+        y = (y) / sy
         y = y.astype(np.float32)
     else:
         y = None
@@ -935,7 +935,7 @@ def unscale_outputs(y, my, sy):
     print(f"Zeroed-out: " + str(zeroed_cols))
 
     # undo y scaling
-    y = (y * sy) + my
+    y = (y * sy) # + my
 
 
 
