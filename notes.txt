@@ -25,6 +25,7 @@ o Sum greenhouse gases weighted by GWP as single feature
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
 o Scrutinise use of min_std both in normalisation and zeroing output cols
+  - get min/max stats on whole dataset at same time as mean and stdev
 o Normalisation should use avg and std across whole dataset, requiring whole set
   to be preprocessed before use. mx_sample etc should reveal how bad now.
   Maybe that's why subtracting mean of y didn't help.
