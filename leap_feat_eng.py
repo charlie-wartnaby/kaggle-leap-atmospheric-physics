@@ -187,8 +187,9 @@ if clear_batch_cache_at_start and os.path.exists(batch_cache_dir):
             shutil.rmtree(backup_cache_dir)
         print(f'Saving old cache files to {backup_cache_dir} just in case...')
         os.rename(batch_cache_dir, backup_cache_dir)
-    print('Deleting any previous batch cache files...')
-    shutil.rmtree(batch_cache_dir)
+    else:
+        print('Deleting any previous batch cache files...')
+        shutil.rmtree(batch_cache_dir)
 os.makedirs(batch_cache_dir, exist_ok=True)
 
 # Altitude levels in hPa from ClimSim-main\grid_info\ClimSim_low-res_grid-info.nc
