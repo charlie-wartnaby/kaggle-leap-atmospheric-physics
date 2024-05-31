@@ -3,7 +3,7 @@
 # This block will be different in Kaggle notebook:
 debug = False
 do_test = True
-is_rerun = True
+is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
@@ -35,7 +35,7 @@ batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
-clear_batch_cache_at_start = True # Currently not saving scalings to unscale test data    debug or do_feature_knockout
+clear_batch_cache_at_start = not is_rerun
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
@@ -536,10 +536,12 @@ def vectorise_data(pl_df):
 # Cache normalisation data needed for any rerun later
 scaling_cache_filename = 'scaling_normalisation.pkl'
 scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
+have_cached_scalings = False
 if os.path.exists(scaling_cache_path):
     print("Opening previous scalings...")
     with open(scaling_cache_path, 'rb') as fd:
-        (mx_sample, sx_sample, my_sample, sy_sample) = pickle.load(fd)
+        (mx, sx, my, sy, xlim, ylim) = pickle.load(fd)
+    have_cached_scalings = True
 else:
     print("No previous scalings so starting afresh")
     mx_sample = [] # Each element vector of means of input columns, from one holo batch
@@ -558,6 +560,13 @@ def mean_vector_across_samples(sample_list):
     # Get mean down each column to get new row vector across input columns
     mean_vector = all_samples.mean(axis=0)
     return mean_vector
+
+def minmax_vector_across_samples(sample_tuple_list):
+    all_mins = np.stack(sample_tuple_list[0])
+    global_min = np.min(all_mins, axis=0)
+    all_maxs = np.stack(sample_tuple_list[1])
+    global_max = np.max(all_maxs, axis=0)
+    return (global_min, global_max)
 
 def preprocess_data(pl_df, has_outputs):
     vector_dict = vectorise_data(pl_df)
@@ -590,6 +599,12 @@ def preprocess_data(pl_df, has_outputs):
         mx = mx.reshape(1, len(unexpanded_input_col_names), 1)
         mx_sample.append(mx)
 
+        x_min = np.min(x, axis=(0,2))
+        x_min = x_min.reshape(1, len(unexpanded_input_col_names), 1)
+        x_max = np.max(x, axis=(0,2))
+        x_max = x_max.reshape(1, len(unexpanded_input_col_names), 1)
+        xlim_sample.append((x_min,x_max))
+
         # Scaling outputs by weights that wil be used anyway for submission, so we get
         # rid of very tiny values that will give very small variances, and will make
         # them suitable hopefully for conversion to float32
@@ -597,6 +612,9 @@ def preprocess_data(pl_df, has_outputs):
 
         my = y.mean(axis=0)
         my_sample.append(my)
+        y_min = np.min(y, axis=0)
+        y_max = np.max(y, axis=0)
+        ylim_sample.append((y_min,y_max))
 
     del pl_df
 
@@ -611,94 +629,103 @@ def normalise_data(x, y, mx, sx, my, sy, has_outputs):
     x = x.astype(np.float32)
 
     if has_outputs:
-        y = (y - my) / sy
+        y = y / sy # Again experimenting with not using mean offset in y: (y - my) / sy
         y = y.astype(np.float32)
     else:
         y = None
 
     return x, y
 
+if have_cached_scalings:
+    # Everything should already be cached
+    pass
+else:
+    # Preprocess entire dataset, gathering statistics for subsequent normalisation along the way
 
+    # Single row of weights for outputs
+    submission_weights = sample_submission_df[expanded_names_output].to_numpy().astype(np.float64)
 
-# Preprocess entire dataset, gathering statistics for subsequent normalisation along the way
+    for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
+                        # Process slice of large dataframe corresponding to batch
+        prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
+        prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
+        postnorm_cache_filename = f'{true_file_index}.pkl'
+        postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
 
-# Single row of weights for outputs
-submission_weights = sample_submission_df[expanded_names_output].to_numpy().astype(np.float64)
+        if not os.path.exists(postnorm_cache_path) and not os.path.exists(prenorm_cache_path):
+            print(f"Building {prenorm_cache_path}...")
+            pl_slice_df = train_hf.get_slice(true_file_index, true_file_index + max_batch_size)
+            cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True)
+            if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
+            start_time = time.time()
+            with open(prenorm_cache_path, 'wb') as fd:
+                pickle.dump((cache_np_x, cache_np_y), fd)
 
-for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
-                    # Process slice of large dataframe corresponding to batch
-    prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
-    prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
-    postnorm_cache_filename = f'{true_file_index}.pkl'
-    postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
+    # Mean of means gives us overall mean for each quantity (whole vectors for inputs,
+    # individual columns for outputs with their differing submission weightings)
+    mx = mean_vector_across_samples(mx_sample)
+    my = mean_vector_across_samples(my_sample)
 
-    if not os.path.exists(postnorm_cache_path) and not os.path.exists(prenorm_cache_path):
-        print(f"Building {prenorm_cache_path}...")
-        pl_slice_df = train_hf.get_slice(true_file_index, true_file_index + max_batch_size)
-        cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True)
-        if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
-        start_time = time.time()
-        with open(prenorm_cache_path, 'wb') as fd:
-            pickle.dump((cache_np_x, cache_np_y), fd)
+    # Range limits just out of interest so far:
+    xlim = minmax_vector_across_samples(xlim_sample)
+    ylim = minmax_vector_across_samples(ylim_sample)
 
-# Mean of means gives us overall mean for each quantity (whole vectors for inputs,
-# individual columns for outputs with their differing submission weightings)
+    # Do another pass to get standard deviation stats across whole dataset, which we
+    # needed means across whole dataset for
+    x_sumsq_sample = []
+    y_sumsq_sample = []
+    for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
+        prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
+        prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
+        postnorm_cache_filename = f'{true_file_index}.pkl'
+        postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
 
-mx = mean_vector_across_samples(mx_sample)
-my = mean_vector_across_samples(my_sample)
+        if not os.path.exists(postnorm_cache_path):
+            print(f"Getting variances from {prenorm_cache_path}...")
+            with open(prenorm_cache_path, 'rb') as fd:
+                (x_prenorm, y_prenorm) = pickle.load(fd)
+            x_diffs_sqd = (x_prenorm - mx) ** 2
+            x_sum_sqs = x_diffs_sqd.sum(axis=0)
+            x_sumsq_sample.append(x_sum_sqs)
+            y_diffs_sqd = (y_prenorm - my) ** 2
+            y_sum_sqs = y_diffs_sqd.sum(axis=0)
+            y_sumsq_sample.append(y_sum_sqs)
 
-# Do another pass to get standard deviation stats across whole dataset, which we
-# needed means across whole dataset for
-x_sumsq_sample = []
-y_sumsq_sample = []
-for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
-    prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
-    prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
-    postnorm_cache_filename = f'{true_file_index}.pkl'
-    postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
+    # Now normalise whole dataset using statistics gathered during preprocessing
+    # Using scaling found in training data; though could use test data if big enough?
 
-    if not os.path.exists(postnorm_cache_path):
-        print(f"Getting variances from {prenorm_cache_path}...")
-        with open(prenorm_cache_path, 'rb') as fd:
-            (x_prenorm, y_prenorm) = pickle.load(fd)
-        x_diffs_sqd = (x_prenorm - mx) ** 2
-        x_sum_sqs = x_diffs_sqd.sum(axis=0)
-        x_sumsq_sample.append(x_sum_sqs)
-        y_diffs_sqd = (y_prenorm - my) ** 2
-        y_sum_sqs = y_diffs_sqd.sum(axis=0)
-        y_sumsq_sample.append(y_sum_sqs)
+    x_sumsq_avg = mean_vector_across_samples(x_sumsq_sample) / max_batch_size
+    y_sumsq_avg = mean_vector_across_samples(y_sumsq_sample) / max_batch_size
+    sx = np.sqrt(x_sumsq_avg)
+    # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
+    # gives loss value like competition criterion but I see no training advantage:
+    # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
+    sy = np.maximum(np.sqrt(y_sumsq_avg), min_std)
 
-# Now normalise whole dataset using statistics gathered during preprocessing
-# Using scaling found in training data; though could use test data if big enough?
+    for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
+                        # Process slice of large dataframe corresponding to batch
+        prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
+        postnorm_cache_filename = f'{true_file_index}.pkl'
+        
+        prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
+        postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
 
-x_sumsq_avg = mean_vector_across_samples(x_sumsq_sample) / max_batch_size
-y_sumsq_avg = mean_vector_across_samples(y_sumsq_sample) / max_batch_size
-sx = np.sqrt(x_sumsq_avg)
-# Donor notebook used RMS instead of stdev here, discussion thread suggesting that
-# gives loss value like competition criterion but I see no training advantage:
-# https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
-sy = np.maximum(np.sqrt(y_sumsq_avg), min_std)
+        if not os.path.exists(postnorm_cache_path):
+            print(f"Building {postnorm_cache_path}...")
+            with open(prenorm_cache_path, 'rb') as fd:
+                (x_prenorm, y_prenorm) = pickle.load(fd)
 
-for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
-                    # Process slice of large dataframe corresponding to batch
-    prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
-    postnorm_cache_filename = f'{true_file_index}.pkl'
-    
-    prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
-    postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
+            x_postnorm, y_postnorm = normalise_data(x_prenorm, y_prenorm, mx, sx, my, sy, True)
+            if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
+            start_time = time.time()
+            with open(postnorm_cache_path, 'wb') as fd:
+                pickle.dump((x_postnorm, y_postnorm), fd)
+            os.remove(prenorm_cache_path)
 
-    if not os.path.exists(postnorm_cache_path):
-        print(f"Building {postnorm_cache_path}...")
-        with open(prenorm_cache_path, 'rb') as fd:
-            (x_prenorm, y_prenorm) = pickle.load(fd)
-
-        x_postnorm, y_postnorm = normalise_data(x_prenorm, y_prenorm, mx, sx, my, sy, True)
-        if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
-        start_time = time.time()
-        with open(postnorm_cache_path, 'wb') as fd:
-            pickle.dump((x_postnorm, y_postnorm), fd)
-        os.remove(prenorm_cache_path)
-
+# Save scalings, need them to process test data if do a rerun
+with open(scaling_cache_path, 'wb') as fd:
+    pickle.dump((mx, sx, my, sy, xlim, ylim), fd)
+    print("Saved scalings for next time")
 
 # Now very loosely based on public notebook but with the new features and model:
 # https://www.kaggle.com/code/airazusta014/pytorch-nn/notebook
@@ -948,10 +975,10 @@ output_size = len(expanded_names_output)
 #    ptend_u in [17, 19] (<12 officially zero) but good scores [12, 16]!
 bad_col_names = []
 bad_col_names.extend([f'ptend_q0001_{i}' for i in range(12)]) # official
-bad_col_names.extend([f'ptend_q0002_{i}' for i in range(27)]) # officially to 15
-bad_col_names.extend([f'ptend_q0003_{i}' for i in range(15)]) # officially to 12
+bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15)]) # officially to 15 was doing 27
+bad_col_names.extend([f'ptend_q0003_{i}' for i in range(12)]) # officially to 12 was doing 15
 bad_col_names.extend([f'ptend_u_{i}' for i in range(12)]) # official
-bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
+#bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
 bad_col_names.extend([f'ptend_v_{i}' for i in range(12)]) # official
 bad_col_names_set = set()
 for name in bad_col_names:
@@ -968,12 +995,12 @@ def unscale_outputs(y, my, sy):
         # (and some others)
         col_name = expanded_names_output[i]
         if (sy[i] < min_std * 1.1) or col_name in bad_col_names_set:
-            y[:,i] = 0 # After rescaling becomes mean
+            y[:,i] = my[i] # 0 # After rescaling becomes mean
             zeroed_cols.append(expanded_names_output[i])
     print(f"Zeroed-out: " + str(zeroed_cols))
 
     # undo y scaling
-    y = (y * sy) + my
+    y = (y * sy) # Experimentint again with no mean offset: + my
 
 
 
