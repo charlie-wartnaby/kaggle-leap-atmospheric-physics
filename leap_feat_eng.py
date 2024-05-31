@@ -975,10 +975,11 @@ output_size = len(expanded_names_output)
 #    ptend_u in [17, 19] (<12 officially zero) but good scores [12, 16]!
 bad_col_names = []
 bad_col_names.extend([f'ptend_q0001_{i}' for i in range(12)]) # official
-bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15)]) # officially to 15 was doing 27
-bad_col_names.extend([f'ptend_q0003_{i}' for i in range(12)]) # officially to 12 was doing 15
+bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15)]) # official
+bad_col_names.extend([f'ptend_q0002_{i}' for i in range(24, 26)]) # oddly bad ones for me
+bad_col_names.extend([f'ptend_q0003_{i}' for i in range(15)]) # officially to 12 was doing 15
 bad_col_names.extend([f'ptend_u_{i}' for i in range(12)]) # official
-#bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
+bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
 bad_col_names.extend([f'ptend_v_{i}' for i in range(12)]) # official
 bad_col_names_set = set()
 for name in bad_col_names:
