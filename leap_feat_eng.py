@@ -37,7 +37,7 @@ initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
 clear_batch_cache_at_start = True # temporarily because scheme changed    not is_rerun
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
-max_analysis_output_rows = 10000
+max_analysis_output_rows = 100000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 min_std = 1e-8 # TODO suspicious needs investigating
 
