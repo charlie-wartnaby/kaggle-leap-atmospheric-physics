@@ -3,7 +3,7 @@
 # This block will be different in Kaggle notebook:
 debug = False
 do_test = True
-is_rerun = False
+is_rerun = True
 do_analysis = True
 do_train = True
 do_feature_knockout = False
@@ -11,12 +11,12 @@ do_feature_knockout = False
 #
 
 if debug:
-    max_train_rows = 10000
+    max_train_rows = 1000
     max_test_rows  = 100
-    max_batch_size = 1000
+    max_batch_size = 100
     patience = 4
     train_proportion = 0.8
-    max_epochs = 3
+    max_epochs = 1
 else:
     # Use very large numbers for 'all'
     max_train_rows = 10000000
@@ -941,8 +941,21 @@ output_size = len(expanded_names_output)
 # Currently have problem with large R2 for ptend_q0002_24_r2, ptend_q0002_25_r2,
 # ptend_q0002_26_r2 in validation (earlier ones get zeroed anyway through small
 # std check currently)
-ptend_q0002_unexpanded_y_idx = unexpanded_output_col_names.index('ptend_q0002')
-ptend_q0002_expanded_base_y_idx = ptend_q0002_unexpanded_y_idx * num_atm_levels
+# Also in big run ptend_q0003_14_r2, ptend_u_17_r2 to ptend_u_19_r2
+# So overall:
+#    ptend_q0002 <= 26 (<15 officially zero)
+#    ptend_q0003 = 14 (<12 officially zero)
+#    ptend_u in [17, 19] (<12 officially zero) but good scores [12, 16]!
+bad_col_names = []
+bad_col_names.extend([f'ptend_q0001_{i}' for i in range(12)]) # official
+bad_col_names.extend([f'ptend_q0002_{i}' for i in range(27)]) # officially to 15
+bad_col_names.extend([f'ptend_q0003_{i}' for i in range(15)]) # officially to 12
+bad_col_names.extend([f'ptend_u_{i}' for i in range(12)]) # official
+bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
+bad_col_names.extend([f'ptend_v_{i}' for i in range(12)]) # official
+bad_col_names_set = set()
+for name in bad_col_names:
+    bad_col_names_set.add(name)
 
 def unscale_outputs(y, my, sy):
     """Undo normalisation to return to true values (but with submission
@@ -953,8 +966,8 @@ def unscale_outputs(y, my, sy):
         # CW: still using original threshold although now premultiplying outputs by
         # submission weightings, though does zero out those with zero weights
         # (and some others)
-        if (sy[i] < min_std * 1.1) or (i >= ptend_q0002_expanded_base_y_idx and 
-                                      i <= ptend_q0002_expanded_base_y_idx + 26):
+        col_name = expanded_names_output[i]
+        if (sy[i] < min_std * 1.1) or col_name in bad_col_names_set:
             y[:,i] = 0 # After rescaling becomes mean
             zeroed_cols.append(expanded_names_output[i])
     print(f"Zeroed-out: " + str(zeroed_cols))
