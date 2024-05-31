@@ -2,11 +2,11 @@
 
 # This block will be different in Kaggle notebook:
 debug = False
-do_test = True
+do_test = False
 is_rerun = True
-do_analysis = True
+do_analysis = False
 do_train = True
-do_feature_knockout = False
+do_feature_knockout = True
 
 #
 
@@ -19,14 +19,14 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 10000000
+    max_train_rows = 3000000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.9
-    max_epochs = 50
+    train_proportion = 0.8
+    max_epochs = 6
 
-subset_base_row = 0
+subset_base_row = 7000000
 
 multitrain_params = {}
 
@@ -35,7 +35,7 @@ batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
-clear_batch_cache_at_start = True # temporarily because scheme changed    not is_rerun
+clear_batch_cache_at_start = not is_rerun or do_feature_knockout
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 max_analysis_output_rows = 100000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
@@ -104,6 +104,7 @@ else:
     base_path = '/kaggle/input/leap-atmospheric-physics-ai-climsim'
     offsets_path = '/kaggle/input/leap-atmospheric-physics-file-row-offsets'
 
+save_backup_cache = (machine == 'greta')
 train_path = os.path.join(base_path, train_root + '.csv')
 train_offsets_path = os.path.join(offsets_path, train_root + '.pkl')
 test_path = os.path.join(base_path, test_root + '.csv')
@@ -180,6 +181,12 @@ print('Loading submission weights...')
 sample_submission_df = pl.read_csv(submission_template_path, n_rows=1)
 
 if clear_batch_cache_at_start and os.path.exists(batch_cache_dir):
+    if save_backup_cache:
+        backup_cache_dir = batch_cache_dir + '_bak'
+        if os.path.exists(backup_cache_dir):
+            shutil.rmtree(backup_cache_dir)
+        print(f'Saving old cache files to {backup_cache_dir} just in case...')
+        os.rename(batch_cache_dir, backup_cache_dir)
     print('Deleting any previous batch cache files...')
     shutil.rmtree(batch_cache_dir)
 os.makedirs(batch_cache_dir, exist_ok=True)
@@ -753,7 +760,7 @@ DEBUGGING = not do_test
 #
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
+    def __init__(self, gen_conv_width=7, gen_conv_depth=11, init_1x1=False, 
                  norm_type="layer", activation_type="silu"):
         super().__init__()
         
