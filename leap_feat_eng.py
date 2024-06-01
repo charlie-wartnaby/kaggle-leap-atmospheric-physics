@@ -3,7 +3,7 @@
 # This block will be different in Kaggle notebook:
 debug = False
 do_test = True
-is_rerun = False
+is_rerun = True
 do_analysis = True
 do_train = True
 do_feature_knockout = False
@@ -273,7 +273,7 @@ unexpanded_col_list.append(ColumnInfo(True, 'recip_density',        'reciprocal 
 unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',           'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
 unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',           'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
 unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',         'relative humidity (proportion)',      60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity',   'reciprocal lative humidity',          60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity',   'reciprocal relative humidity',        60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'buoyancy',             'Beucler buoyancy metric',             60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'up_integ_tot_cloud',   'ground-up integral of total cloud',   60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'down_integ_tot_cloud', 'sky-down integral of total cloud',    60               ))
