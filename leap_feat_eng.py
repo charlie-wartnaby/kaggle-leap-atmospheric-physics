@@ -19,7 +19,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000000
+    max_train_rows = 10000000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
@@ -35,7 +35,7 @@ batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
-clear_batch_cache_at_start = not is_rerun or do_feature_knockout
+clear_batch_cache_at_start = True # temporarily because scheme changed    not is_rerun
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 max_analysis_output_rows = 100000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
@@ -765,7 +765,7 @@ DEBUGGING = not do_test
 #
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self, gen_conv_width=7, gen_conv_depth=11, init_1x1=False, 
+    def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
                  norm_type="layer", activation_type="silu"):
         super().__init__()
         
