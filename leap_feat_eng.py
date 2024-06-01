@@ -668,6 +668,7 @@ else:
             start_time = time.time()
             with open(prenorm_cache_path, 'wb') as fd:
                 pickle.dump((cache_np_x, cache_np_y), fd)
+            gc.collect()
 
     # Mean of means gives us overall mean for each quantity (whole vectors for inputs,
     # individual columns for outputs with their differing submission weightings)
@@ -698,6 +699,7 @@ else:
             y_diffs_sqd = (y_prenorm - my) ** 2
             y_sum_sqs = y_diffs_sqd.sum(axis=0)
             y_sumsq_sample.append(y_sum_sqs)
+            gc.collect() # Had a couple of spontaneous Ubuntu reboots here previously
 
     # Now normalise whole dataset using statistics gathered during preprocessing
     # Using scaling found in training data; though could use test data if big enough?
@@ -730,6 +732,7 @@ else:
             with open(postnorm_cache_path, 'wb') as fd:
                 pickle.dump((x_postnorm, y_postnorm), fd)
             os.remove(prenorm_cache_path)
+            gc.collect()
 
 # Save scalings, need them to process test data if do a rerun
 with open(scaling_cache_path, 'wb') as fd:
@@ -1200,7 +1203,9 @@ for param_permutation in param_permutations:
         else:
             patience_count += 1
             print(f"No improvement in validation loss for {patience_count} epochs.")
-            
+
+        gc.collect()
+
         if patience_count >= patience:
             print("Stopping early due to no improvement in validation loss.")
             break
@@ -1259,6 +1264,8 @@ if do_test:
             submission_df = pl.concat([submission_df, submission_subset_df])
         else:
             submission_df = submission_subset_df
+
+        gc.collect()
 
     print("submission_df:", submission_df.describe())
 
