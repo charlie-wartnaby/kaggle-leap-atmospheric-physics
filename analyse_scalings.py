@@ -10,15 +10,10 @@ scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
 if os.path.exists(scaling_cache_path):
     print("Opening previous scalings...")
     with open(scaling_cache_path, 'rb') as fd:
-        (mx_sample, sx_sample, sy_sample) = pickle.load(fd)
+        (mx, sx, my, sy, xlim, ylim) = pickle.load(fd)
+    xmin, xmax = xlim
+    ymin, ymax = ylim
 
-max_train_rows = 3000000
-max_batch_size = 5000
-num_batches = int(max_train_rows / max_batch_size)
-assert(len(mx_sample) == num_batches)
-mx_sample_np = np.array(mx_sample) # now array shape (num batches, 1, unexpanded features, 1)
-sx_sample_np = np.array(sx_sample) # ..
-sy_sample_np = np.array(sy_sample) ## array (num batches, expanded features)
 
 # Duplicating current col info processing to get names
 
@@ -139,16 +134,26 @@ num_pure_vector_outputs = len(unexpanded_output_vector_col_names)
 num_scalar_outputs = len(unexpanded_output_scalar_col_names)
 num_total_expanded_outputs = len(expanded_names_output)
 
+mx = mx.reshape((1,len(unexpanded_input_col_names)))
+df_mx = pl.DataFrame(mx, schema=unexpanded_input_col_names)
+sx = sx.reshape((1,len(unexpanded_input_col_names)))
+df_sx = pl.DataFrame(sx, schema=unexpanded_input_col_names)
+my = my.reshape((1,num_total_expanded_outputs))
+df_my = pl.DataFrame(my, schema=expanded_names_output)
+sy = sy.reshape((1,num_total_expanded_outputs))
+df_sy = pl.DataFrame(sy, schema=expanded_names_output)
+xrange = xmax - xmin
+xrange = xrange.reshape((1,len(unexpanded_input_col_names)))
+df_xrange = pl.DataFrame(xrange, schema=unexpanded_input_col_names)
+yrange = ymax - ymin
+yrange = yrange.reshape((1,num_total_expanded_outputs))
+df_yrange = pl.DataFrame(yrange, schema=expanded_names_output)
 
-mx_sample_np = mx_sample_np.reshape((num_batches, len(unexpanded_input_col_names)))
-sx_sample_np = sx_sample_np.reshape((num_batches, len(unexpanded_input_col_names)))
-
-df_mx = pl.DataFrame(mx_sample_np, schema=unexpanded_input_col_names)
-df_sx = pl.DataFrame(sx_sample_np, schema=unexpanded_input_col_names)
-df_sy = pl.DataFrame(sx_sample_np, schema=unexpanded_input_col_names)
-
-df_mx.write_csv('batch_mx.csv')
+df_mx.write_csv('overall_mx.csv')
 df_sx.write_csv('batch_sx.csv')
-df_sy.write_csv('batch_sy.csv')
+df_my.write_csv('overall_my.csv')
+df_sy.write_csv('overall_sy.csv')
+df_xrange.write_csv('overall_xrange.csv')
+df_yrange.write_csv('overall_yrange.csv')
 
 pass

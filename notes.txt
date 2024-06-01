@@ -24,6 +24,8 @@ o Would I do better by just zeroing/averaging some output columns with poor R2?
 o Sum greenhouse gases weighted by GWP as single feature
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
+o Have twice had spontaneous reboots after all prenorm but no norm caches built
+  -- maybe need garbage collection during trawl for variances?
 o Scrutinise use of min_std both in normalisation and zeroing output cols
 o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?

@@ -985,7 +985,7 @@ output_size = len(expanded_names_output)
 bad_col_names = []
 bad_col_names.extend([f'ptend_q0001_{i}' for i in range(12)]) # official
 bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15)]) # official
-bad_col_names.extend([f'ptend_q0002_{i}' for i in range(24, 26)]) # oddly bad ones for me
+bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15, 26)]) # training value ranges zero or tiny up to 25
 bad_col_names.extend([f'ptend_q0003_{i}' for i in range(15)]) # officially to 12 was doing 15
 bad_col_names.extend([f'ptend_u_{i}' for i in range(12)]) # official
 bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
@@ -1004,10 +1004,13 @@ def unscale_outputs(y, my, sy):
         # submission weightings, though does zero out those with zero weights
         # (and some others)
         col_name = expanded_names_output[i]
-        if (sy[i] < min_std * 1.1) or col_name in bad_col_names_set:
+        tiny_scaling = (sy[i] < min_std * 1.1)
+        bad_col = col_name in bad_col_names_set
+        if tiny_scaling or bad_col:
             y[:,i] = my[i] # 0 # After rescaling becomes mean
+        if tiny_scaling and not bad_col:
             zeroed_cols.append(expanded_names_output[i])
-    print(f"Zeroed-out: " + str(zeroed_cols))
+    print(f"Zeroed-out due to scaling not blacklist: " + str(zeroed_cols))
 
     # undo y scaling
     y = (y * sy) # Experimentint again with no mean offset: + my
