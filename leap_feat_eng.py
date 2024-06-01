@@ -73,6 +73,7 @@ if is_rerun and len(param_permutations) > 1:
     sys.exit(1)
 
 import copy
+import gc
 import numpy as np
 import os
 import pickle
