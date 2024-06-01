@@ -2,11 +2,11 @@
 
 # This block will be different in Kaggle notebook:
 debug = False
-do_test = False
-is_rerun = True
-do_analysis = False
+do_test = True
+is_rerun = False
+do_analysis = True
 do_train = True
-do_feature_knockout = True
+do_feature_knockout = False
 
 #
 
@@ -19,14 +19,14 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 3000000
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.8
-    max_epochs = 6
+    train_proportion = 0.9
+    max_epochs = 50
 
-subset_base_row = 7000000
+subset_base_row = 0
 
 multitrain_params = {}
 
@@ -693,7 +693,7 @@ else:
             with open(prenorm_cache_path, 'rb') as fd:
                 (x_prenorm, y_prenorm) = pickle.load(fd)
             x_diffs_sqd = (x_prenorm - mx) ** 2
-            x_sum_sqs = x_diffs_sqd.sum(axis=0)
+            x_sum_sqs = x_diffs_sqd.sum(axis=(0,2)) # sum over batch rows and over atm layers to leave num vector features
             x_sumsq_sample.append(x_sum_sqs)
             y_diffs_sqd = (y_prenorm - my) ** 2
             y_sum_sqs = y_diffs_sqd.sum(axis=0)
@@ -702,9 +702,10 @@ else:
     # Now normalise whole dataset using statistics gathered during preprocessing
     # Using scaling found in training data; though could use test data if big enough?
 
-    x_sumsq_avg = mean_vector_across_samples(x_sumsq_sample) / max_batch_size
+    x_sumsq_avg = mean_vector_across_samples(x_sumsq_sample) / (max_batch_size * num_atm_levels)
     y_sumsq_avg = mean_vector_across_samples(y_sumsq_sample) / max_batch_size
     sx = np.sqrt(x_sumsq_avg)
+    sx = sx.reshape((1,len(unexpanded_input_col_names),1))
     # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
     # gives loss value like competition criterion but I see no training advantage:
     # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
