@@ -21,12 +21,12 @@ if debug:
     max_epochs = 2
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.8
-    max_epochs = 10
+    train_proportion = 0.9
+    max_epochs = 50
 
 subset_base_row = 4000000
 
@@ -258,13 +258,7 @@ unexpanded_col_list = [
 if do_feature_knockout:
     current_normal_knockout_features = []
 else:
-    current_normal_knockout_features = ['state_u',
-                                        'state_v',
-                                        'pbuf_COSZRS',
-                                        'pbuf_SOLIN',
-                                        'pbuf_TAUX',
-                                        'pbuf_TAUY',
-                                        'pbuf_COSZRS',
+    current_normal_knockout_features = ['pbuf_COSZRS',
                                         'cam_in_ALDIF',
                                         'cam_in_ALDIR',
                                         'cam_in_ASDIF',
