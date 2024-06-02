@@ -486,7 +486,7 @@ def add_vector_features(vector_dict):
     # m/V = p/RT = density, with *100 for hPa -> Pa conversion
     density_np = pressure_np / (R_air * temperature_np)
     vector_dict['density'] = density_np
-    recip_density_np = 1.0 / density_np
+    recip_density_np = np.maximum(1.0 / density_np, 100.0) # Density gets v small so avoid dependent features blowing up
     vector_dict['recip_density'] = recip_density_np
 
     # Momentum per unit vol just density * velocity
@@ -527,10 +527,10 @@ def add_vector_features(vector_dict):
     latent_heat_flux_np = vector_dict['pbuf_LHFLX']
     longwave_surface_flux_np = vector_dict['cam_in_LWUP']
     # Assuming heating effect in K/s inversely proportional to heat capacity, i.e. density
-    vector_dict['sensible_flux_gwp_prod'] = total_gwp_np * sensible_heat_flux_np / density_np
-    vector_dict['up_lw_flux_gwp_prod'] = total_gwp_np * longwave_surface_flux_np / density_np
-    vector_dict['lat_heat_div_density'] = latent_heat_flux_np / density_np
-    vector_dict['sen_heat_div_density'] = sensible_heat_flux_np / density_np
+    vector_dict['sensible_flux_gwp_prod'] = total_gwp_np * sensible_heat_flux_np * recip_density_np
+    vector_dict['up_lw_flux_gwp_prod'] = total_gwp_np * longwave_surface_flux_np * recip_density_np
+    vector_dict['lat_heat_div_density'] = latent_heat_flux_np * recip_density_np
+    vector_dict['sen_heat_div_density'] = sensible_heat_flux_np * recip_density_np
 
     # Single-value new features
 

@@ -10,7 +10,7 @@ Ideas to progress
 -----------------
 
 o Bug if test only currently does validation loops
-o Try starting with single layer, then 3, wider, wider, narrower...?
+o Get large normalised values at extremes of ranges, try using range instead of stdev for scaling?
 o Analyse which columns contributing most to error metric:
    - ptend_q0001 moistening tendency low indices >=12, then higher ~45
    - ptend_q0002 cloud liquid/ice mixing ratios and ptend_q0002 ice mixing ratios

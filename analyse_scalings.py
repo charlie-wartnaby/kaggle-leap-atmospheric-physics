@@ -154,26 +154,35 @@ num_pure_vector_outputs = len(unexpanded_output_vector_col_names)
 num_scalar_outputs = len(unexpanded_output_scalar_col_names)
 num_total_expanded_outputs = len(expanded_names_output)
 
-mx = mx.reshape((1,len(unexpanded_input_col_names)))
-df_mx = pl.DataFrame(mx, schema=unexpanded_input_col_names)
-sx = sx.reshape((1,len(unexpanded_input_col_names)))
-df_sx = pl.DataFrame(sx, schema=unexpanded_input_col_names)
-my = my.reshape((1,num_total_expanded_outputs))
-df_my = pl.DataFrame(my, schema=expanded_names_output)
-sy = sy.reshape((1,num_total_expanded_outputs))
-df_sy = pl.DataFrame(sy, schema=expanded_names_output)
-xrange = xmax - xmin
-xrange = xrange.reshape((1,len(unexpanded_input_col_names)))
-df_xrange = pl.DataFrame(xrange, schema=unexpanded_input_col_names)
-yrange = ymax - ymin
-yrange = yrange.reshape((1,num_total_expanded_outputs))
-df_yrange = pl.DataFrame(yrange, schema=expanded_names_output)
+def add_x_col(df, x_array, label):
+    x_array = x_array.reshape((len(unexpanded_input_col_names)))
+    return df.with_columns(pl.from_numpy(x_array, [label]))
 
-df_mx.write_csv('overall_mx.csv')
-df_sx.write_csv('overall_sx.csv')
-df_my.write_csv('overall_my.csv')
-df_sy.write_csv('overall_sy.csv')
-df_xrange.write_csv('overall_xrange.csv')
-df_yrange.write_csv('overall_yrange.csv')
+df_x = pl.DataFrame()
+df_x = df_x.with_columns(pl.Series('var', unexpanded_input_col_names))
+mx = mx.reshape((len(unexpanded_input_col_names)))
+df_x = add_x_col(df_x, mx, 'mx')
+df_x = add_x_col(df_x, sx, 'sx')
+df_x = add_x_col(df_x, xmin, 'xmin')
+df_x = add_x_col(df_x, xmax, 'xmax')
+xrange = xmax - xmin
+df_x = add_x_col(df_x, xrange, 'xrange')
+xrange_by_sx = xrange / sx
+df_x = add_x_col(df_x, xrange_by_sx, 'xrange/sx')
+
+df_x.write_csv('x_analysis.csv')
+
+df_y = pl.DataFrame()
+df_y = df_y.with_columns(pl.Series('var', expanded_names_output))
+df_y = df_y.with_columns(pl.from_numpy(my, ['my']))
+df_y = df_y.with_columns(pl.from_numpy(sy, ['sy']))
+df_y = df_y.with_columns(pl.from_numpy(ymin, ['ymin']))
+df_y = df_y.with_columns(pl.from_numpy(ymax, ['ymax']))
+yrange = ymax - ymin
+df_y = df_y.with_columns(pl.from_numpy(yrange, ['yrange']))
+yrange_by_sy = yrange / np.maximum(sy, 1e-8)
+df_y = df_y.with_columns(pl.from_numpy(yrange_by_sy, ['yrange_by_sy']))
+
+df_y.write_csv('y_analysis.csv')
 
 pass
