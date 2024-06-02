@@ -17,7 +17,7 @@ if os.path.exists(scaling_cache_path):
 
 # Duplicating current col info processing to get names
 
-do_feature_knockout = True # to get complete col list
+do_feature_knockout = False # to get complete col list
 
 class ColumnInfo():
     def __init__(self, is_input, name, description, dimension, units='', first_useful_idx=0):
@@ -75,8 +75,17 @@ unexpanded_col_list = [
 if do_feature_knockout:
     current_normal_knockout_features = []
 else:
-    current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
-                                    'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
+    #current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
+    #                                'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
+    # Experiment: bottom 30 in recent feature knockout
+    current_normal_knockout_features = ['pbuf_COSZRS',
+                                        'cam_in_ALDIF',
+                                        'cam_in_ALDIR',
+                                        'cam_in_ASDIF',
+                                        'cam_in_ASDIR',
+                                        'pbuf_ozone',
+                                        'pbuf_CH4',
+                                        'pbuf_N2O']
 
 for feature in current_normal_knockout_features:
     # Slow but trivial one-off
@@ -89,13 +98,24 @@ for feature in current_normal_knockout_features:
 unexpanded_col_list.append(ColumnInfo(True, 'pressure',             'air pressure',                        60, 'N/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'density',              'air density',                         60, 'kg/m3'      ))
 unexpanded_col_list.append(ColumnInfo(True, 'recip_density',        'reciprocal air density',              60, 'm3/kg'      ))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',           'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',           'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'recip_ice_cloud',      'reciprocal ice cloud',                60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'recip_water_cloud',    'reciprocal water cloud',              60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'wind_rh_prod',         'wind-rel humidity product',           60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'wind_cloud_prod',      'wind-total cloud product',            60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'total_cloud',          'total ice + liquid cloud',            60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'total_gwp',            'total global warming potential',      60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'sensible_flux_gwp_prod','total GWP - sensible heat flux prod',60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'up_lw_flux_gwp_prod',  'total GWP - upward longwave flux prod',60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'abs_wind',             'abs wind magnitude',                  60, 'm/s'        ))
+unexpanded_col_list.append(ColumnInfo(True, 'abs_momentum',         'abs momentum per unit volume',        60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'abs_stress',           'abs stress magnitude',                60, 'N/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',         'relative humidity (proportion)',      60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity',   'reciprocal lative humidity',          60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity',   'reciprocal relative humidity',        60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'buoyancy',             'Beucler buoyancy metric',             60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'up_integ_tot_cloud',   'ground-up integral of total cloud',   60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'down_integ_tot_cloud', 'sky-down integral of total cloud',    60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'lat_heat_div_density', 'latent heat flux divided by density', 60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'sen_heat_div_density', 'sensible heat flux divided by density', 60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'vert_insolation',      'zenith-adjusted insolation',           1, 'W/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'direct_sw_absorb',     'direct shortwave absorbance',          1, 'W/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'diffuse_sw_absorb',    'diffuse shortwave absorbance',         1, 'W/m2'       ))
@@ -150,7 +170,7 @@ yrange = yrange.reshape((1,num_total_expanded_outputs))
 df_yrange = pl.DataFrame(yrange, schema=expanded_names_output)
 
 df_mx.write_csv('overall_mx.csv')
-df_sx.write_csv('batch_sx.csv')
+df_sx.write_csv('overall_sx.csv')
 df_my.write_csv('overall_my.csv')
 df_sy.write_csv('overall_sy.csv')
 df_xrange.write_csv('overall_xrange.csv')
