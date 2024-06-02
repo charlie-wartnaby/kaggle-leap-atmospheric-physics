@@ -7,7 +7,7 @@ is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = False
+clear_batch_cache_at_start = True
 
 #
 
@@ -280,7 +280,6 @@ else:
                                         'cam_in_ASDIF',
                                         'vert_insolation',
                                         'cam_in_SNOWHLAND']
-]
 
 for feature in current_normal_knockout_features:
     # Slow but trivial one-off
