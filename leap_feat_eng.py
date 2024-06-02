@@ -286,6 +286,7 @@ unexpanded_col_list.append(ColumnInfo(True, 'wind_rh_prod',         'wind-rel hu
 unexpanded_col_list.append(ColumnInfo(True, 'wind_cloud_prod',      'wind-total cloud product',            60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'total_cloud',          'total ice + liquid cloud',            60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'total_gwp',            'total global warming potential',      60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'sensible_flux_gwp_prod','total GWP - sensible heat flux prod',60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'abs_wind',             'abs wind magnitude',                  60, 'm/s'        ))
 unexpanded_col_list.append(ColumnInfo(True, 'abs_momentum',         'abs momentum per unit volume',        60, '(kg.m/s)/m3'))
 unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',         'relative humidity (proportion)',      60               ))
@@ -515,6 +516,8 @@ def add_vector_features(vector_dict):
     # Some guesses here hard to find instantaneous values:
     total_gwp_np = vector_dict['pbuf_ozone'] * 1000.0 + vector_dict['pbuf_CH4'] * 200.0 + vector_dict['pbuf_N2O'] * 273.0
     vector_dict['total_gwp'] = total_gwp_np
+    vector_dict['sensible_flux_gwp_prod'] = total_gwp_np * vector_dict['pbuf_SHFLX']
+
     # Single-value new features
 
     # Solar insolation adjusted for zenith angle (angle to vertical)
