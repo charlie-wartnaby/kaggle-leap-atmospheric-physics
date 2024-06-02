@@ -260,19 +260,11 @@ else:
     #current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
     #                                'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
     # Experiment: bottom 30 in recent feature knockout
-    current_normal_knockout_features = ['state_u',
-                                        'state_v',
-                                        'pbuf_SOLIN',
-                                        'pbuf_LHFLX',
-                                        'pbuf_SHFLX',
-                                        'pbuf_TAUX',
-                                        'pbuf_TAUY',
-                                        'pbuf_COSZRS',
+    current_normal_knockout_features = ['pbuf_COSZRS',
                                         'cam_in_ALDIF',
                                         'cam_in_ALDIR',
                                         'cam_in_ASDIF',
                                         'cam_in_ASDIR',
-                                        'cam_in_LWUP',
                                         'pbuf_ozone',
                                         'pbuf_CH4',
                                         'pbuf_N2O']
