@@ -1,7 +1,7 @@
 # LEAP competition with feature engineering
 
 # This block will be different in Kaggle notebook:
-debug = True
+debug = False
 do_test = False
 is_rerun = False
 do_analysis = True
