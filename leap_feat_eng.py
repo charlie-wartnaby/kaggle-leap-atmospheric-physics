@@ -28,7 +28,7 @@ else:
     train_proportion = 0.9
     max_epochs = 50
 
-subset_base_row = 4000000
+subset_base_row = 0
 
 multitrain_params = {}
 
