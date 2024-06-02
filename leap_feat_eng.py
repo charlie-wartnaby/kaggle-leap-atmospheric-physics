@@ -1,7 +1,7 @@
 # LEAP competition with feature engineering
 
 # This block will be different in Kaggle notebook:
-debug = False
+debug = True
 do_test = False
 is_rerun = False
 do_analysis = True
@@ -260,11 +260,19 @@ else:
     #current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
     #                                'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
     # Experiment: bottom 30 in recent feature knockout
-    current_normal_knockout_features = ['pbuf_COSZRS',
+    current_normal_knockout_features = ['state_u',
+                                        'state_v',
+                                        'pbuf_SOLIN',
+                                        'pbuf_LHFLX',
+                                        'pbuf_SHFLX',
+                                        'pbuf_TAUX',
+                                        'pbuf_TAUY',
+                                        'pbuf_COSZRS',
                                         'cam_in_ALDIF',
                                         'cam_in_ALDIR',
                                         'cam_in_ASDIF',
                                         'cam_in_ASDIR',
+                                        'cam_in_LWUP',
                                         'pbuf_ozone',
                                         'pbuf_CH4',
                                         'pbuf_N2O']
@@ -287,13 +295,17 @@ unexpanded_col_list.append(ColumnInfo(True, 'wind_cloud_prod',      'wind-total 
 unexpanded_col_list.append(ColumnInfo(True, 'total_cloud',          'total ice + liquid cloud',            60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'total_gwp',            'total global warming potential',      60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'sensible_flux_gwp_prod','total GWP - sensible heat flux prod',60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'up_lw_flux_gwp_prod',  'total GWP - upward longwave flux prod',60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'abs_wind',             'abs wind magnitude',                  60, 'm/s'        ))
 unexpanded_col_list.append(ColumnInfo(True, 'abs_momentum',         'abs momentum per unit volume',        60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'abs_stress',           'abs stress magnitude',                60, 'N/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',         'relative humidity (proportion)',      60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity',   'reciprocal relative humidity',        60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'buoyancy',             'Beucler buoyancy metric',             60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'up_integ_tot_cloud',   'ground-up integral of total cloud',   60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'down_integ_tot_cloud', 'sky-down integral of total cloud',    60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'lat_heat_div_density', 'latent heat flux divided by density', 60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'sen_heat_div_density', 'sensible heat flux divided by density', 60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'vert_insolation',      'zenith-adjusted insolation',           1, 'W/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'direct_sw_absorb',     'direct shortwave absorbance',          1, 'W/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'diffuse_sw_absorb',    'diffuse shortwave absorbance',         1, 'W/m2'       ))
@@ -492,6 +504,9 @@ def add_vector_features(vector_dict):
     vector_dict['abs_wind'] = abs_wind_np
     abs_momentum_np = density_np * abs_wind_np
     vector_dict['abs_momentum'] = abs_momentum_np
+    zonal_stress_np = vector_dict['pbuf_TAUX']
+    meridional_stress_np = vector_dict['pbuf_TAUY']
+    vector_dict['abs_stress'] = np.sqrt((zonal_stress_np ** 2) + (meridional_stress_np ** 2))
     specific_humidity_np = vector_dict['state_q0001']
     rel_humidity_np = RH_from_climate(specific_humidity_np, temperature_np, pressure_np)
     vector_dict['rel_humidity'] = rel_humidity_np
@@ -516,7 +531,14 @@ def add_vector_features(vector_dict):
     # Some guesses here hard to find instantaneous values:
     total_gwp_np = vector_dict['pbuf_ozone'] * 1000.0 + vector_dict['pbuf_CH4'] * 200.0 + vector_dict['pbuf_N2O'] * 273.0
     vector_dict['total_gwp'] = total_gwp_np
-    vector_dict['sensible_flux_gwp_prod'] = total_gwp_np * vector_dict['pbuf_SHFLX']
+    sensible_heat_flux_np = vector_dict['pbuf_SHFLX']
+    latent_heat_flux_np = vector_dict['pbuf_LHFLX']
+    longwave_surface_flux_np = vector_dict['cam_in_LWUP']
+    # Assuming heating effect in K/s inversely proportional to heat capacity, i.e. density
+    vector_dict['sensible_flux_gwp_prod'] = total_gwp_np * sensible_heat_flux_np / density_np
+    vector_dict['up_lw_flux_gwp_prod'] = total_gwp_np * longwave_surface_flux_np / density_np
+    vector_dict['lat_heat_div_density'] = latent_heat_flux_np / density_np
+    vector_dict['sen_heat_div_density'] = sensible_heat_flux_np / density_np
 
     # Single-value new features
 
