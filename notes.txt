@@ -9,6 +9,7 @@ level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.252923296945341
 Ideas to progress
 -----------------
 
+o Bug if test only currently does validation loops
 o Try starting with single layer, then 3, wider, wider, narrower...?
 o Analyse which columns contributing most to error metric:
    - ptend_q0001 moistening tendency low indices >=12, then higher ~45
@@ -73,6 +74,14 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 
 Submission Results
 ------------------
+
+submission.csv
+Complete · 4m ago · Commit 72fb1b5 continued now with uniform scaling across atmospheric levels
+0.67054
+
+submission.csv
+Complete · 1d ago · Commit d0733e88 no y norm offset, a few cols now nixed
+0.66888
 
 submission.csv
 Complete · 6m ago · Commit 77a04229 with integral cloud features

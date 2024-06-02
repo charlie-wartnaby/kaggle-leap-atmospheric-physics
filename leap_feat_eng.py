@@ -3,10 +3,11 @@
 # This block will be different in Kaggle notebook:
 debug = False
 do_test = True
-is_rerun = True
+is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
+clear_batch_cache_at_start = False
 
 #
 
@@ -35,7 +36,6 @@ batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
-clear_batch_cache_at_start = True # temporarily because scheme changed    not is_rerun
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
 max_analysis_output_rows = 100000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
@@ -257,8 +257,30 @@ unexpanded_col_list = [
 if do_feature_knockout:
     current_normal_knockout_features = []
 else:
-    current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
-                                    'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
+    #current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
+    #                                'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
+    # Experiment: bottom 20 in recent feature knockout
+    current_normal_knockout_features = ['pbuf_COSZRS',
+                                        'density',
+                                        'pbuf_SOLIN',
+                                        'cam_in_ALDIF',
+                                        'pbuf_TAUX',
+                                        'recip_density',
+                                        'state_u',
+                                        'pbuf_SHFLX',
+                                        'momentum_v',
+                                        'cam_in_LWUP',
+                                        'pbuf_TAUY',
+                                        'pbuf_N2O',
+                                        'direct_lw_absorb',
+                                        'diffuse_sw_absorb',
+                                        'down_integ_tot_cloud',
+                                        'cam_in_ASDIR',
+                                        'pbuf_ozone',
+                                        'cam_in_ASDIF',
+                                        'vert_insolation',
+                                        'cam_in_SNOWHLAND']
+]
 
 for feature in current_normal_knockout_features:
     # Slow but trivial one-off

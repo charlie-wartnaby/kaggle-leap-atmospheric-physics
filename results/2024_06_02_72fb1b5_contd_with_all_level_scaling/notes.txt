@@ -1,0 +1,6 @@
+Started with:
+
+results/2024_05_31_d0733e88_no_y_offset_a_few_nixed_cols/model.pt
+
+Manually deleted cache as new scalings reqd but wanted to start with old pretrained model nonetheless
+
