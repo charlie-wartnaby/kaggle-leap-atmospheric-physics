@@ -8,16 +8,17 @@ do_analysis = True
 do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = True
+scale_using_range_limits = False
 
 #
 
 if debug:
-    max_train_rows = 1000
+    max_train_rows = 10000
     max_test_rows  = 100
-    max_batch_size = 100
+    max_batch_size = 2000
     patience = 4
     train_proportion = 0.8
-    max_epochs = 1
+    max_epochs = 2
 else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000
@@ -285,6 +286,7 @@ unexpanded_col_list.append(ColumnInfo(True, 'recip_water_cloud',    'reciprocal 
 unexpanded_col_list.append(ColumnInfo(True, 'wind_rh_prod',         'wind-rel humidity product',           60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'wind_cloud_prod',      'wind-total cloud product',            60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'total_cloud',          'total ice + liquid cloud',            60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'total_cloud_density',  'total cloud density product',         60, 'kg/m3'      ))
 unexpanded_col_list.append(ColumnInfo(True, 'total_gwp',            'total global warming potential',      60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'sensible_flux_gwp_prod','total GWP - sensible heat flux prod',60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'up_lw_flux_gwp_prod',  'total GWP - upward longwave flux prod',60               ))
@@ -512,12 +514,14 @@ def add_vector_features(vector_dict):
     ice_cloud_np = vector_dict['state_q0003']
     tot_cloud_np = water_cloud_np + ice_cloud_np
     vector_dict['total_cloud'] = tot_cloud_np
+    tot_cloud_density_np = tot_cloud_np * density_np
+    vector_dict['total_cloud_density'] = tot_cloud_density_np
     vector_dict['recip_water_cloud'] = 1.0 / np.maximum(water_cloud_np, 1e-7)
     vector_dict['recip_ice_cloud'] = 1.0 / np.maximum(ice_cloud_np, 1e-7)
     wind_cloud_prod_np = tot_cloud_np * abs_wind_np
     vector_dict['wind_cloud_prod'] = wind_cloud_prod_np
-    down_integ_tot_cloud_np = np.cumsum(tot_cloud_np) # lower indices higher altitude
-    up_integ_tot_cloud_np = np.cumsum(tot_cloud_np[::-1])[::-1] # reverse before sum, then re-reverse
+    down_integ_tot_cloud_np = np.cumsum(tot_cloud_density_np) # lower indices higher altitude
+    up_integ_tot_cloud_np = np.cumsum(tot_cloud_density_np[::-1])[::-1] # reverse before sum, then re-reverse
     vector_dict['down_integ_tot_cloud'] = down_integ_tot_cloud_np
     vector_dict['up_integ_tot_cloud'] = up_integ_tot_cloud_np
     # Some guesses here hard to find instantaneous values:
@@ -526,9 +530,11 @@ def add_vector_features(vector_dict):
     sensible_heat_flux_np = vector_dict['pbuf_SHFLX']
     latent_heat_flux_np = vector_dict['pbuf_LHFLX']
     longwave_surface_flux_np = vector_dict['cam_in_LWUP']
+    # IR-absorbing gases are mixing ratio so density already factored in
+    # (low density --> low GWP heat deposition --> same temperature rise as if dense)
+    vector_dict['sensible_flux_gwp_prod'] = total_gwp_np * sensible_heat_flux_np
+    vector_dict['up_lw_flux_gwp_prod'] = total_gwp_np * longwave_surface_flux_np
     # Assuming heating effect in K/s inversely proportional to heat capacity, i.e. density
-    vector_dict['sensible_flux_gwp_prod'] = total_gwp_np * sensible_heat_flux_np * recip_density_np
-    vector_dict['up_lw_flux_gwp_prod'] = total_gwp_np * longwave_surface_flux_np * recip_density_np
     vector_dict['lat_heat_div_density'] = latent_heat_flux_np * recip_density_np
     vector_dict['sen_heat_div_density'] = sensible_heat_flux_np * recip_density_np
 
@@ -720,43 +726,48 @@ else:
     mx = mean_vector_across_samples(mx_sample)
     my = mean_vector_across_samples(my_sample)
 
-    # Range limits just out of interest so far:
+    # Range limits:
     xlim = minmax_vector_across_samples(xlim_sample)
     ylim = minmax_vector_across_samples(ylim_sample)
 
-    # Do another pass to get standard deviation stats across whole dataset, which we
-    # needed means across whole dataset for
-    x_sumsq_sample = []
-    y_sumsq_sample = []
-    for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
-        prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
-        prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
-        postnorm_cache_filename = f'{true_file_index}.pkl'
-        postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
+    if scale_using_range_limits:
+        sx = 2.0 / (xlim[1] - xlim[0]) # aiming for [-1, 1] normalised range
+        bigger_y_lim = np.maximum(np.abs(ylim[0]), np.abs(ylim[1])) # as not centring with mean
+        sy = 1.0 / np.maximum(bigger_y_lim, min_std)
+    else:
+        # Do another pass to get standard deviation stats across whole dataset, which we
+        # needed means across whole dataset for
+        x_sumsq_sample = []
+        y_sumsq_sample = []
+        for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
+            prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
+            prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
+            postnorm_cache_filename = f'{true_file_index}.pkl'
+            postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
 
-        if not os.path.exists(postnorm_cache_path):
-            print(f"Getting variances from {prenorm_cache_path}...")
-            with open(prenorm_cache_path, 'rb') as fd:
-                (x_prenorm, y_prenorm) = pickle.load(fd)
-            x_diffs_sqd = (x_prenorm - mx) ** 2
-            x_sum_sqs = x_diffs_sqd.sum(axis=(0,2)) # sum over batch rows and over atm layers to leave num vector features
-            x_sumsq_sample.append(x_sum_sqs)
-            y_diffs_sqd = (y_prenorm - my) ** 2
-            y_sum_sqs = y_diffs_sqd.sum(axis=0)
-            y_sumsq_sample.append(y_sum_sqs)
-            gc.collect() # Had a couple of spontaneous Ubuntu reboots here previously
+            if not os.path.exists(postnorm_cache_path):
+                print(f"Getting variances from {prenorm_cache_path}...")
+                with open(prenorm_cache_path, 'rb') as fd:
+                    (x_prenorm, y_prenorm) = pickle.load(fd)
+                x_diffs_sqd = (x_prenorm - mx) ** 2
+                x_sum_sqs = x_diffs_sqd.sum(axis=(0,2)) # sum over batch rows and over atm layers to leave num vector features
+                x_sumsq_sample.append(x_sum_sqs)
+                y_diffs_sqd = (y_prenorm - my) ** 2
+                y_sum_sqs = y_diffs_sqd.sum(axis=0)
+                y_sumsq_sample.append(y_sum_sqs)
+                gc.collect() # Had a couple of spontaneous Ubuntu reboots here previously
 
-    # Now normalise whole dataset using statistics gathered during preprocessing
-    # Using scaling found in training data; though could use test data if big enough?
+        # Now normalise whole dataset using statistics gathered during preprocessing
+        # Using scaling found in training data; though could use test data if big enough?
 
-    x_sumsq_avg = mean_vector_across_samples(x_sumsq_sample) / (max_batch_size * num_atm_levels)
-    y_sumsq_avg = mean_vector_across_samples(y_sumsq_sample) / max_batch_size
-    sx = np.sqrt(x_sumsq_avg)
-    sx = sx.reshape((1,len(unexpanded_input_col_names),1))
-    # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
-    # gives loss value like competition criterion but I see no training advantage:
-    # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
-    sy = np.maximum(np.sqrt(y_sumsq_avg), min_std)
+        x_sumsq_avg = mean_vector_across_samples(x_sumsq_sample) / (max_batch_size * num_atm_levels)
+        y_sumsq_avg = mean_vector_across_samples(y_sumsq_sample) / max_batch_size
+        sx = np.sqrt(x_sumsq_avg)
+        sx = sx.reshape((1,len(unexpanded_input_col_names),1))
+        # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
+        # gives loss value like competition criterion but I see no training advantage:
+        # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
+        sy = np.maximum(np.sqrt(y_sumsq_avg), min_std)
 
     for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
                         # Process slice of large dataframe corresponding to batch
