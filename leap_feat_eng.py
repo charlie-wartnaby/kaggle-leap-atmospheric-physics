@@ -260,37 +260,14 @@ else:
     #current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
     #                                'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
     # Experiment: bottom 30 in recent feature knockout
-    current_normal_knockout_features = [
-                                        'up_integ_tot_cloud',
-                                        'cam_in_ALDIR',
-                                        'recip_rel_humidity',
-                                        'state_q0001',
-                                        'cam_in_OCNFRAC',
-                                        'pbuf_LHFLX',
-                                        'pbuf_CH4',
-                                        'state_ps',
-                                        'cam_in_ICEFRAC',
-                                        'pressure',
-                                        'pbuf_COSZRS',
-                                        'density',
-                                        'pbuf_SOLIN',
+    current_normal_knockout_features = ['pbuf_COSZRS',
                                         'cam_in_ALDIF',
-                                        'pbuf_TAUX',
-                                        'recip_density',
-                                        'state_u',
-                                        'pbuf_SHFLX',
-                                        'momentum_v',
-                                        'cam_in_LWUP',
-                                        'pbuf_TAUY',
-                                        'pbuf_N2O',
-                                        'direct_lw_absorb',
-                                        'diffuse_sw_absorb',
-                                        'down_integ_tot_cloud',
+                                        'cam_in_ALDIR',
+                                        'cam_in_ASDIF',
                                         'cam_in_ASDIR',
                                         'pbuf_ozone',
-                                        'cam_in_ASDIF',
-                                        'vert_insolation',
-                                        'cam_in_SNOWHLAND']
+                                        'pbuf_CH4',
+                                        'pbuf_N2O']
 
 for feature in current_normal_knockout_features:
     # Slow but trivial one-off
@@ -303,8 +280,14 @@ for feature in current_normal_knockout_features:
 unexpanded_col_list.append(ColumnInfo(True, 'pressure',             'air pressure',                        60, 'N/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'density',              'air density',                         60, 'kg/m3'      ))
 unexpanded_col_list.append(ColumnInfo(True, 'recip_density',        'reciprocal air density',              60, 'm3/kg'      ))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_u',           'zonal momentum per unit volume',      60, '(kg.m/s)/m3'))
-unexpanded_col_list.append(ColumnInfo(True, 'momentum_v',           'meridional momentum per unit volume', 60, '(kg.m/s)/m3'))
+unexpanded_col_list.append(ColumnInfo(True, 'recip_ice_cloud',      'reciprocal ice cloud',                60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'recip_water_cloud',    'reciprocal water cloud',              60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'wind_rh_prod',         'wind-rel humidity product',           60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'wind_cloud_prod',      'wind-total cloud product',            60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'total_cloud',          'total ice + liquid cloud',            60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'total_gwp',            'total global warming potential',      60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'abs_wind',             'abs wind magnitude',                  60, 'm/s'        ))
+unexpanded_col_list.append(ColumnInfo(True, 'abs_momentum',         'abs momentum per unit volume',        60, '(kg.m/s)/m3'))
 unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',         'relative humidity (proportion)',      60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity',   'reciprocal relative humidity',        60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'buoyancy',             'Beucler buoyancy metric',             60               ))
@@ -500,26 +483,38 @@ def add_vector_features(vector_dict):
     vector_dict['density'] = density_np
     recip_density_np = 1.0 / density_np
     vector_dict['recip_density'] = recip_density_np
+
     # Momentum per unit vol just density * velocity
     vel_zonal_np = vector_dict['state_u']
-    momentum_u_np = density_np * vel_zonal_np
-    vector_dict['momentum_u'] = momentum_u_np
     vel_meridional_np = vector_dict['state_v']
-    momentum_v_np = density_np * vel_meridional_np
-    vector_dict['momentum_v'] = momentum_v_np
+    abs_wind_np = np.sqrt((vel_zonal_np ** 2) + (vel_meridional_np ** 2))
+    vector_dict['abs_wind'] = abs_wind_np
+    abs_momentum_np = density_np * abs_wind_np
+    vector_dict['abs_momentum'] = abs_momentum_np
     specific_humidity_np = vector_dict['state_q0001']
     rel_humidity_np = RH_from_climate(specific_humidity_np, temperature_np, pressure_np)
     vector_dict['rel_humidity'] = rel_humidity_np
-    recip_rel_humidity_np = 1.0 / np.maximum(rel_humidity_np, 0.01)
+    wind_rh_prod_np = rel_humidity_np * abs_wind_np
+    vector_dict['wind_rh_prod'] = wind_rh_prod_np
+    recip_rel_humidity_np = 1.0 / np.maximum(rel_humidity_np, 0.1)
     vector_dict['recip_rel_humidity'] = recip_rel_humidity_np
     buoyancy_np = bmse_calc(temperature_np, specific_humidity_np, pressure_np)
     vector_dict['buoyancy'] = buoyancy_np
-    tot_cloud_np = vector_dict['state_q0002'] + vector_dict['state_q0003']
+    water_cloud_np = vector_dict['state_q0002']
+    ice_cloud_np = vector_dict['state_q0003']
+    tot_cloud_np = water_cloud_np + ice_cloud_np
+    vector_dict['total_cloud'] = tot_cloud_np
+    vector_dict['recip_water_cloud'] = 1.0 / np.maximum(water_cloud_np, 1e-7)
+    vector_dict['recip_ice_cloud'] = 1.0 / np.maximum(ice_cloud_np, 1e-7)
+    wind_cloud_prod_np = tot_cloud_np * abs_wind_np
+    vector_dict['wind_cloud_prod'] = wind_cloud_prod_np
     down_integ_tot_cloud_np = np.cumsum(tot_cloud_np) # lower indices higher altitude
     up_integ_tot_cloud_np = np.cumsum(tot_cloud_np[::-1])[::-1] # reverse before sum, then re-reverse
     vector_dict['down_integ_tot_cloud'] = down_integ_tot_cloud_np
     vector_dict['up_integ_tot_cloud'] = up_integ_tot_cloud_np
-
+    # Some guesses here hard to find instantaneous values:
+    total_gwp_np = vector_dict['pbuf_ozone'] * 1000.0 + vector_dict['pbuf_CH4'] * 200.0 + vector_dict['pbuf_N2O'] * 273.0
+    vector_dict['total_gwp'] = total_gwp_np
     # Single-value new features
 
     # Solar insolation adjusted for zenith angle (angle to vertical)
