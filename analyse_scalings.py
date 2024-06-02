@@ -103,6 +103,7 @@ unexpanded_col_list.append(ColumnInfo(True, 'recip_water_cloud',    'reciprocal 
 unexpanded_col_list.append(ColumnInfo(True, 'wind_rh_prod',         'wind-rel humidity product',           60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'wind_cloud_prod',      'wind-total cloud product',            60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'total_cloud',          'total ice + liquid cloud',            60               ))
+unexpanded_col_list.append(ColumnInfo(True, 'total_cloud_density',  'total cloud density product',         60, 'kg/m3'      ))
 unexpanded_col_list.append(ColumnInfo(True, 'total_gwp',            'total global warming potential',      60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'sensible_flux_gwp_prod','total GWP - sensible heat flux prod',60               ))
 unexpanded_col_list.append(ColumnInfo(True, 'up_lw_flux_gwp_prod',  'total GWP - upward longwave flux prod',60               ))
@@ -184,5 +185,7 @@ yrange_by_sy = yrange / np.maximum(sy, 1e-8)
 df_y = df_y.with_columns(pl.from_numpy(yrange_by_sy, ['yrange_by_sy']))
 
 df_y.write_csv('y_analysis.csv')
+
+print("Analysis dataframes written to CSV")
 
 pass

@@ -2,7 +2,7 @@
 
 # This block will be different in Kaggle notebook:
 debug = False
-do_test = False
+do_test = True
 is_rerun = False
 do_analysis = True
 do_train = True
@@ -258,10 +258,13 @@ unexpanded_col_list = [
 if do_feature_knockout:
     current_normal_knockout_features = []
 else:
-    #current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
-    #                                'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
-    # Experiment: bottom 30 in recent feature knockout
-    current_normal_knockout_features = ['pbuf_COSZRS',
+    current_normal_knockout_features = ['state_u',
+                                        'state_v',
+                                        'pbuf_COSZRS',
+                                        'pbuf_SOLIN',
+                                        'pbuf_TAUX',
+                                        'pbuf_TAUY',
+                                        'pbuf_COSZRS',
                                         'cam_in_ALDIF',
                                         'cam_in_ALDIR',
                                         'cam_in_ASDIF',
@@ -731,9 +734,10 @@ else:
     ylim = minmax_vector_across_samples(ylim_sample)
 
     if scale_using_range_limits:
-        sx = 2.0 / (xlim[1] - xlim[0]) # aiming for [-1, 1] normalised range
+        sx = (xlim[1] - xlim[0]) / 2.0 # aiming for [-1, 1] normalised range
+        sx = np.maximum(sx, min_std)
         bigger_y_lim = np.maximum(np.abs(ylim[0]), np.abs(ylim[1])) # as not centring with mean
-        sy = 1.0 / np.maximum(bigger_y_lim, min_std)
+        sy = np.maximum(bigger_y_lim, min_std)
     else:
         # Do another pass to get standard deviation stats across whole dataset, which we
         # needed means across whole dataset for
