@@ -259,8 +259,19 @@ if do_feature_knockout:
 else:
     #current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
     #                                'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
-    # Experiment: bottom 20 in recent feature knockout
-    current_normal_knockout_features = ['pbuf_COSZRS',
+    # Experiment: bottom 30 in recent feature knockout
+    current_normal_knockout_features = [
+                                        'up_integ_tot_cloud',
+                                        'cam_in_ALDIR',
+                                        'recip_rel_humidity',
+                                        'state_q0001',
+                                        'cam_in_OCNFRAC',
+                                        'pbuf_LHFLX',
+                                        'pbuf_CH4',
+                                        'state_ps',
+                                        'cam_in_ICEFRAC',
+                                        'pressure',
+                                        'pbuf_COSZRS',
                                         'density',
                                         'pbuf_SOLIN',
                                         'cam_in_ALDIF',
@@ -280,7 +291,6 @@ else:
                                         'cam_in_ASDIF',
                                         'vert_insolation',
                                         'cam_in_SNOWHLAND']
-    current_normal_knockout_features = [] # trying all as baseline
 
 for feature in current_normal_knockout_features:
     # Slow but trivial one-off
