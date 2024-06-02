@@ -2,7 +2,7 @@
 
 # This block will be different in Kaggle notebook:
 debug = False
-do_test = True
+do_test = False
 is_rerun = False
 do_analysis = True
 do_train = True
@@ -280,6 +280,7 @@ else:
                                         'cam_in_ASDIF',
                                         'vert_insolation',
                                         'cam_in_SNOWHLAND']
+    current_normal_knockout_features = [] # trying all as baseline
 
 for feature in current_normal_knockout_features:
     # Slow but trivial one-off
