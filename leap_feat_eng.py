@@ -7,7 +7,7 @@ is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = True
+clear_batch_cache_at_start = False
 scale_using_range_limits = False
 
 #
@@ -176,6 +176,10 @@ class HoloFrame:
 # Read in training data
 print('Loading training HoloFrame...')
 train_hf = HoloFrame(train_path, train_offsets_path)
+
+num_train_rows = min(len(train_hf), max_train_rows)
+assert(subset_base_row + num_train_rows <= len(train_hf))
+
 
 # First row is all we need from submissions, to get col weightings. 
 # sample_id column labels are identical to test.csv (checked first rows at least)
@@ -701,7 +705,7 @@ else:
     # Single row of weights for outputs
     submission_weights = sample_submission_df[expanded_names_output].to_numpy().astype(np.float64)
 
-    for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
+    for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, max_batch_size):
                         # Process slice of large dataframe corresponding to batch
         prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
         prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
@@ -737,7 +741,7 @@ else:
         # needed means across whole dataset for
         x_sumsq_sample = []
         y_sumsq_sample = []
-        for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
+        for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, max_batch_size):
             prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
             prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
             postnorm_cache_filename = f'{true_file_index}.pkl'
@@ -767,7 +771,7 @@ else:
         # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
         sy = np.maximum(np.sqrt(y_sumsq_avg), min_std)
 
-    for true_file_index in range(subset_base_row, subset_base_row + max_train_rows, max_batch_size):
+    for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, max_batch_size):
                         # Process slice of large dataframe corresponding to batch
         prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
         postnorm_cache_filename = f'{true_file_index}.pkl'
@@ -987,7 +991,6 @@ class HoloDataset(Dataset):
 #
 
 dataset = HoloDataset(train_hf, holo_cache_rows)
-num_train_rows = min(len(dataset), max_train_rows)
 
 # Access data in blocks that we can cache efficiently, but on a macro scale access those
 # randomly for training and validation

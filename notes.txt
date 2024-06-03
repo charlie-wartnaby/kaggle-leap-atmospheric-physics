@@ -11,6 +11,8 @@ Ideas to progress
 
 o Bug if test only currently does validation loops
 o Get large normalised values at extremes of ranges, try using range instead of stdev for scaling?
+o Or logarithmic scaling so that reasonable values near 1, extremes not so extreme
+o Went badly deleting hopefully redundant features at b32db7d49, so what is so crucial?
 o Analyse which columns contributing most to error metric:
    - ptend_q0001 moistening tendency low indices >=12, then higher ~45
    - ptend_q0002 cloud liquid/ice mixing ratios and ptend_q0002 ice mixing ratios
