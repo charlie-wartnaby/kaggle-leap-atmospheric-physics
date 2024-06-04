@@ -13,22 +13,22 @@ scale_using_range_limits = False
 #
 
 if debug:
-    max_train_rows = 10000
+    max_train_rows = 100
     max_test_rows  = 100
-    max_batch_size = 1000
+    max_batch_size = 10
     patience = 4
     train_proportion = 0.8
     max_epochs = 3
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
-    max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 2500  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.8
-    max_epochs = 10
+    train_proportion = 0.9
+    max_epochs = 50
 
-subset_base_row = 4000000
+subset_base_row = 0
 
 multitrain_params = {}
 
@@ -893,18 +893,18 @@ class AtmLayerCNN(nn.Module):
         # though
         # https://pytorch.org/tutorials/beginner/examples_nn/polynomial_module.html
         # Cubic probably a bit ambitious?
-        self.vector_a = self.create_param_tensor(0, 0.1,   (num_pure_vector_outputs,1))
-        self.vector_b = self.create_param_tensor(1, 0.1,   (num_pure_vector_outputs,1))
-        self.vector_c = self.create_param_tensor(0, 0.05,  (num_pure_vector_outputs,1))
-        self.vector_d = self.create_param_tensor(0, 0.005, (num_pure_vector_outputs,1))
-        self.scalar_a = self.create_param_tensor(0, 0.1,   (num_scalar_outputs))
-        self.scalar_b = self.create_param_tensor(1, 0.1,   (num_scalar_outputs))
-        self.scalar_c = self.create_param_tensor(0, 0.05,  (num_scalar_outputs))
-        self.scalar_d = self.create_param_tensor(0, 0.005, (num_scalar_outputs))
+        self.vector_a = self.create_param_tensor(0, 1.0, (num_pure_vector_outputs,1))
+        self.vector_b = self.create_param_tensor(0, 1.0, (num_pure_vector_outputs,1))
+        self.vector_c = self.create_param_tensor(0, 1.0, (num_pure_vector_outputs,1))
+        self.vector_d = self.create_param_tensor(0, 1.0, (num_pure_vector_outputs,1))
+        self.scalar_a = self.create_param_tensor(0, 1.0, (num_scalar_outputs))
+        self.scalar_b = self.create_param_tensor(0, 1.0, (num_scalar_outputs))
+        self.scalar_c = self.create_param_tensor(0, 1.0, (num_scalar_outputs))
+        self.scalar_d = self.create_param_tensor(0, 1.0, (num_scalar_outputs))
 
 
     def create_param_tensor(self, centre_value, rand_width, vector_shape):
-        zero_centred_unit_variance = torch.randn(vector_shape, dtype=torch.float32)
+        zero_centred_unit_variance = torch.nn.Parameter(torch.randn(vector_shape, dtype=torch.float32, device='cuda'))
         scaled = zero_centred_unit_variance * rand_width
         offset = scaled + centre_value
         return offset
@@ -956,12 +956,12 @@ class AtmLayerCNN(nn.Module):
         scalar_harvest = self.linear_scalar_harvest(scalars_flattened)
         vector_harvest = self.conv_vector_harvest(vector_subset)
         # Polynomial output an attempt to deal with wide-ranging outlier values
-        scalars_polynomial = (self.scalar_a + self.scalar_b * scalar_harvest
-                              + self.scalar_c * scalar_harvest ** 2
-                              + self.scalar_d * scalar_harvest ** 3)
-        vectors_polynomial = (self.vector_a + self.vector_b * vector_harvest
-                              + self.vector_c * vector_harvest ** 2
-                              + self.vector_d * vector_harvest ** 3)
+        scalars_polynomial = (0.1 * self.scalar_a + (1.0 + 0.1 * self.scalar_b) * scalar_harvest
+                              + 0.05 * self.scalar_c * scalar_harvest ** 2
+                              + 0.005 * self.scalar_d * scalar_harvest ** 3)
+        vectors_polynomial = (0.1 * self.vector_a + (1.0 + 0.1 * self.vector_b) * vector_harvest
+                              + 0.05 * self.vector_c * vector_harvest ** 2
+                              + 0.005 * self.vector_d * vector_harvest ** 3)
         vectors_flattened = self.vector_flatten(vectors_polynomial)
         expanded_outputs = torch.cat((vectors_flattened, scalars_polynomial), dim=1)
         return expanded_outputs
@@ -1223,7 +1223,7 @@ for param_permutation in param_permutations:
                 optimizer.zero_grad()
                 outputs_pred = model(inputs)
                 loss = criterion(outputs_pred, outputs_true)
-                loss.backward() # Calculates gradients by backpropagation (chain rule)
+                loss.backward(retain_graph=True) # Calculates gradients by backpropagation (chain rule)
                 optimizer.step()
 
                 total_loss += loss.item()
