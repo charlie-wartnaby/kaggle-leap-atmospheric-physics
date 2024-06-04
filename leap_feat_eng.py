@@ -1,13 +1,13 @@
 # LEAP competition with feature engineering
 
 # This block will be different in Kaggle notebook:
-debug = False
+debug = True
 do_test = True
-is_rerun = True
+is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = False
+clear_batch_cache_at_start = True
 scale_using_range_limits = False
 
 #
@@ -15,10 +15,10 @@ scale_using_range_limits = False
 if debug:
     max_train_rows = 10000
     max_test_rows  = 100
-    max_batch_size = 2000
+    max_batch_size = 1000
     patience = 4
     train_proportion = 0.8
-    max_epochs = 2
+    max_epochs = 3
 else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000000
@@ -888,6 +888,26 @@ class AtmLayerCNN(nn.Module):
         self.scalar_flatten = nn.Flatten()
         self.linear_scalar_harvest = nn.Linear(num_scalar_outputs * gen_conv_depth, num_scalar_outputs)
 
+        # Polynomial on top of that to hopefully cope better with wide dynamic
+        # range of some outputs, initialising close to straight-through linear
+        # though
+        # https://pytorch.org/tutorials/beginner/examples_nn/polynomial_module.html
+        # Cubic probably a bit ambitious?
+        self.vector_a = self.create_param_tensor(0, 0.1,   (num_pure_vector_outputs,1))
+        self.vector_b = self.create_param_tensor(1, 0.1,   (num_pure_vector_outputs,1))
+        self.vector_c = self.create_param_tensor(0, 0.05,  (num_pure_vector_outputs,1))
+        self.vector_d = self.create_param_tensor(0, 0.005, (num_pure_vector_outputs,1))
+        self.scalar_a = self.create_param_tensor(0, 0.1,   (num_scalar_outputs))
+        self.scalar_b = self.create_param_tensor(1, 0.1,   (num_scalar_outputs))
+        self.scalar_c = self.create_param_tensor(0, 0.05,  (num_scalar_outputs))
+        self.scalar_d = self.create_param_tensor(0, 0.005, (num_scalar_outputs))
+
+
+    def create_param_tensor(self, centre_value, rand_width, vector_shape):
+        zero_centred_unit_variance = torch.randn(vector_shape, dtype=torch.float32)
+        scaled = zero_centred_unit_variance * rand_width
+        offset = scaled + centre_value
+        return offset
 
     def norm_layer(self, num_features, num_chans):
             match self.norm_type:
@@ -935,8 +955,15 @@ class AtmLayerCNN(nn.Module):
         scalars_flattened = self.scalar_flatten(scalars_pooled)
         scalar_harvest = self.linear_scalar_harvest(scalars_flattened)
         vector_harvest = self.conv_vector_harvest(vector_subset)
-        vectors_flattened = self.vector_flatten(vector_harvest)
-        expanded_outputs = torch.cat((vectors_flattened, scalar_harvest), dim=1)
+        # Polynomial output an attempt to deal with wide-ranging outlier values
+        scalars_polynomial = (self.scalar_a + self.scalar_b * scalar_harvest
+                              + self.scalar_c * scalar_harvest ** 2
+                              + self.scalar_d * scalar_harvest ** 3)
+        vectors_polynomial = (self.vector_a + self.vector_b * vector_harvest
+                              + self.vector_c * vector_harvest ** 2
+                              + self.vector_d * vector_harvest ** 3)
+        vectors_flattened = self.vector_flatten(vectors_polynomial)
+        expanded_outputs = torch.cat((vectors_flattened, scalars_polynomial), dim=1)
         return expanded_outputs
 #
 
