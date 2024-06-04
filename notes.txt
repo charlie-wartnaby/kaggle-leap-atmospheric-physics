@@ -72,6 +72,11 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 Submission Results
 ------------------
 
+Better validation loss here, but no better in competition:
+submission.csv
+Complete · 2m ago · Commit d138788 with cloud mass and rethought GWP features 26 epochs final val loss ~0.275
+0.66457
+
 submission.csv
 Complete · 4m ago · Commit 72fb1b5 continued now with uniform scaling across atmospheric levels
 0.67054
