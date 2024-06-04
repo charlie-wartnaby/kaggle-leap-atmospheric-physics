@@ -3,7 +3,7 @@
 # This block will be different in Kaggle notebook:
 debug = False
 do_test = True
-is_rerun = False
+is_rerun = True
 do_analysis = True
 do_train = True
 do_feature_knockout = False
