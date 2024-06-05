@@ -13,22 +13,22 @@ scale_using_range_limits = False
 #
 
 if debug:
-    max_train_rows = 100
+    max_train_rows = 1000
     max_test_rows  = 100
-    max_batch_size = 10
+    max_batch_size = 100
     patience = 4
     train_proportion = 0.8
     max_epochs = 3
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000000
+    max_train_rows = 1000000
     max_test_rows  = 1000000000
-    max_batch_size = 2500  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.9
-    max_epochs = 50
+    train_proportion = 0.8
+    max_epochs = 10
 
-subset_base_row = 0
+subset_base_row = 4000000
 
 multitrain_params = {}
 
@@ -824,12 +824,13 @@ DEBUGGING = not do_test
 
 class AtmLayerCNN(nn.Module):
     def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
-                 norm_type="layer", activation_type="silu"):
+                 norm_type="layer", activation_type="silu", poly_degree=3):
         super().__init__()
         
         self.init_1x1 = init_1x1
         self.norm_type = norm_type
         self.activation_type = activation_type
+        self.poly_degree = poly_degree
 
         num_input_feature_chans = len(unexpanded_input_col_names)
         if do_feature_knockout:
@@ -893,21 +894,16 @@ class AtmLayerCNN(nn.Module):
         # though
         # https://pytorch.org/tutorials/beginner/examples_nn/polynomial_module.html
         # Cubic probably a bit ambitious?
-        self.vector_a = self.create_param_tensor(0, 1.0, (num_pure_vector_outputs,1))
-        self.vector_b = self.create_param_tensor(0, 1.0, (num_pure_vector_outputs,1))
-        self.vector_c = self.create_param_tensor(0, 1.0, (num_pure_vector_outputs,1))
-        self.vector_d = self.create_param_tensor(0, 1.0, (num_pure_vector_outputs,1))
-        self.scalar_a = self.create_param_tensor(0, 1.0, (num_scalar_outputs))
-        self.scalar_b = self.create_param_tensor(0, 1.0, (num_scalar_outputs))
-        self.scalar_c = self.create_param_tensor(0, 1.0, (num_scalar_outputs))
-        self.scalar_d = self.create_param_tensor(0, 1.0, (num_scalar_outputs))
+        # No 'a' offset because last layer will have own learnt bias
+        self.vector_poly_coeffs = self.create_coeff_param_list((num_pure_vector_outputs,1))
+        self.scalar_poly_coeffs = self.create_coeff_param_list((num_scalar_outputs))
 
-
-    def create_param_tensor(self, centre_value, rand_width, vector_shape):
-        zero_centred_unit_variance = torch.nn.Parameter(torch.randn(vector_shape, dtype=torch.float32, device='cuda'))
-        scaled = zero_centred_unit_variance * rand_width
-        offset = scaled + centre_value
-        return offset
+    def create_coeff_param_list(self, vector_shape):
+        coeffs = []
+        for i in range(2, self.poly_degree + 1):
+            coeffs_this_degree = nn.Parameter(torch.randn(vector_shape, dtype=torch.float32))
+            coeffs.append(coeffs_this_degree)
+        return nn.ParameterList(coeffs) # to register properly as parameters
 
     def norm_layer(self, num_features, num_chans):
             match self.norm_type:
@@ -956,12 +952,23 @@ class AtmLayerCNN(nn.Module):
         scalar_harvest = self.linear_scalar_harvest(scalars_flattened)
         vector_harvest = self.conv_vector_harvest(vector_subset)
         # Polynomial output an attempt to deal with wide-ranging outlier values
-        scalars_polynomial = (0.1 * self.scalar_a + (1.0 + 0.1 * self.scalar_b) * scalar_harvest
-                              + 0.05 * self.scalar_c * scalar_harvest ** 2
-                              + 0.005 * self.scalar_d * scalar_harvest ** 3)
-        vectors_polynomial = (0.1 * self.vector_a + (1.0 + 0.1 * self.vector_b) * vector_harvest
-                              + 0.05 * self.vector_c * vector_harvest ** 2
-                              + 0.005 * self.vector_d * vector_harvest ** 3)
+        if (self.poly_degree < 2):
+            scalars_polynomial = scalar_harvest
+            vectors_polynomial = vector_harvest
+        elif (self.poly_degree == 2):
+            scalars_polynomial = (scalar_harvest + 
+                                  (self.scalar_poly_coeffs[0] * 0.05) * scalar_harvest ** 2)
+            vectors_polynomial = (vector_harvest + 
+                                  (self.vector_poly_coeffs[0] * 0.05) * vector_harvest ** 2)
+        elif (self.poly_degree == 3):
+            scalars_polynomial = (scalar_harvest + 
+                                  (self.scalar_poly_coeffs[0] * 0.05 ) * scalar_harvest ** 2 +
+                                  (self.scalar_poly_coeffs[1] * 0.005) * scalar_harvest ** 3)
+            vectors_polynomial = (vector_harvest + 
+                                  (self.vector_poly_coeffs[0] * 0.05 ) * vector_harvest ** 2 +
+                                  (self.vector_poly_coeffs[1] * 0.005) * vector_harvest ** 3)
+        else:
+            sys.exit(1)
         vectors_flattened = self.vector_flatten(vectors_polynomial)
         expanded_outputs = torch.cat((vectors_flattened, scalars_polynomial), dim=1)
         return expanded_outputs
@@ -1213,6 +1220,7 @@ for param_permutation in param_permutations:
     if len(param_permutations) > 1:
         tot_epochs = 0
 
+    torch.autograd.set_detect_anomaly(debug)
     for epoch in range(max_epochs):
         if do_train:
             model.train()
@@ -1223,7 +1231,7 @@ for param_permutation in param_permutations:
                 optimizer.zero_grad()
                 outputs_pred = model(inputs)
                 loss = criterion(outputs_pred, outputs_true)
-                loss.backward(retain_graph=True) # Calculates gradients by backpropagation (chain rule)
+                loss.backward() # Calculates gradients by backpropagation (chain rule)
                 optimizer.step()
 
                 total_loss += loss.item()
