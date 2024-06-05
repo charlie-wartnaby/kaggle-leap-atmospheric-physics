@@ -72,6 +72,10 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 Submission Results
 ------------------
 
+submission.csv
+Complete · 7m ago · Commit 18298fd polynomial output to try and reach outlier values but didn't converge as well as in smaller run
+0.55093
+
 Better validation loss here, but no better in competition:
 submission.csv
 Complete · 2m ago · Commit d138788 with cloud mass and rethought GWP features 26 epochs final val loss ~0.275
