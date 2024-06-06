@@ -30,8 +30,7 @@ else:
 
 subset_base_row = 0
 
-multitrain_params = {'gen_conv_width':[5], 'gen_conv_depth':[11], 'init_1x1':[False], 
-                 'poly_degree':[2]}
+multitrain_params = {'gen_conv_width':[5], 'gen_conv_depth':[11], 'init_1x1':[False]}
 
 show_timings = False # debug
 batch_report_interval = 10
