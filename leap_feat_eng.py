@@ -21,16 +21,17 @@ if debug:
     max_epochs = 3
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.8
+    train_proportion = 0.9
     max_epochs = 50
 
 subset_base_row = 0
 
-multitrain_params = {}
+multitrain_params = {'gen_conv_width':[5], 'gen_conv_depth':[11], 'init_1x1':[False], 
+                 'poly_degree':[2]}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -38,7 +39,7 @@ dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
 clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
-max_analysis_output_rows = 100000
+max_analysis_output_rows = 10000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 min_std = 1e-8 # TODO suspicious needs investigating
 
@@ -263,13 +264,26 @@ if do_feature_knockout:
     current_normal_knockout_features = []
 else:
     current_normal_knockout_features = ['pbuf_COSZRS',
+                                        'density',
+                                        'pbuf_SOLIN',
                                         'cam_in_ALDIF',
-                                        'cam_in_ALDIR',
-                                        'cam_in_ASDIF',
+                                        'pbuf_TAUX',
+                                        'recip_density',
+                                        'state_u',
+                                        'pbuf_SHFLX',
+                                        'momentum_v',
+                                        'cam_in_LWUP',
+                                        'pbuf_TAUY',
+                                        'pbuf_N2O',
+                                        'direct_lw_absorb',
+                                        'diffuse_sw_absorb',
+                                        'down_integ_tot_cloud',
                                         'cam_in_ASDIR',
                                         'pbuf_ozone',
-                                        'pbuf_CH4',
-                                        'pbuf_N2O']
+                                        'cam_in_ASDIF',
+                                        'vert_insolation',
+                                        'cam_in_SNOWHLAND'
+                                                         ]
 
 for feature in current_normal_knockout_features:
     # Slow but trivial one-off

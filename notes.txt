@@ -74,6 +74,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 2h ago · Commit f432f9e poly output again but poor val loss
+0.62373 (better than I expected)
+
+submission.csv
 Complete · 7m ago · Commit 18298fd polynomial output to try and reach outlier values but didn't converge as well as in smaller run
 0.55093
 
