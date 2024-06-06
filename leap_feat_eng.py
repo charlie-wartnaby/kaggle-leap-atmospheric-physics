@@ -9,6 +9,7 @@ do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = True
 scale_using_range_limits = False
+use_float64 = True
 
 #
 
@@ -18,19 +19,19 @@ if debug:
     max_batch_size = 100
     patience = 4
     train_proportion = 0.8
-    max_epochs = 3
+    max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000000
+    max_train_rows = 1000000
     max_test_rows  = 1000000000
     max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 50
 
-subset_base_row = 0
+subset_base_row = 8000000
 
-multitrain_params = {'gen_conv_width':[5], 'gen_conv_depth':[11], 'init_1x1':[False]}
+multitrain_params = {}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -262,27 +263,8 @@ unexpanded_col_list = [
 if do_feature_knockout:
     current_normal_knockout_features = []
 else:
-    current_normal_knockout_features = ['pbuf_COSZRS',
-                                        'density',
-                                        'pbuf_SOLIN',
-                                        'cam_in_ALDIF',
-                                        'pbuf_TAUX',
-                                        'recip_density',
-                                        'state_u',
-                                        'pbuf_SHFLX',
-                                        'momentum_v',
-                                        'cam_in_LWUP',
-                                        'pbuf_TAUY',
-                                        'pbuf_N2O',
-                                        'direct_lw_absorb',
-                                        'diffuse_sw_absorb',
-                                        'down_integ_tot_cloud',
-                                        'cam_in_ASDIR',
-                                        'pbuf_ozone',
-                                        'cam_in_ASDIF',
-                                        'vert_insolation',
-                                        'cam_in_SNOWHLAND'
-                                                         ]
+    current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
+                                    'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
 
 for feature in current_normal_knockout_features:
     # Slow but trivial one-off
@@ -699,11 +681,11 @@ def normalise_data(x, y, mx, sx, my, sy, has_outputs):
     # Original had mx.reshape(1,-1) to go from 1D row vector to 2D array with
     # one row but seems unnecessary
     x = (x - mx) / sx
-    x = x.astype(np.float32)
+    if not use_float64: x = x.astype(np.float32)
 
     if has_outputs:
         y = y / sy # Again experimenting with not using mean offset in y: (y - my) / sy
-        y = y.astype(np.float32)
+        if not use_float64: y = y.astype(np.float32)
     else:
         y = None
 
@@ -837,9 +819,14 @@ DEBUGGING = not do_test
 
 class AtmLayerCNN(nn.Module):
     def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
-                 norm_type="layer", activation_type="silu", poly_degree=3):
+                 norm_type="layer", activation_type="silu", poly_degree=0):
         super().__init__()
         
+        if use_float64:
+            dtype = torch.float64
+        else:
+            dtype = torch.float32
+
         self.init_1x1 = init_1x1
         self.norm_type = norm_type
         self.activation_type = activation_type
@@ -859,9 +846,9 @@ class AtmLayerCNN(nn.Module):
             # Could generalise to multiple if works
             output_size = num_input_feature_chans * gen_conv_depth
             self.conv_layer_1x1 = nn.Conv1d(input_size, output_size, 1,
-                                    padding='same')
-            self.layernorm_1x1 = self.norm_layer(output_size, num_atm_levels)
-            self.activation_layer_1x1 = self.activation_layer()
+                                    padding='same', dtype=dtype)
+            self.layernorm_1x1 = self.norm_layer(output_size, num_atm_levels, dtype=dtype)
+            self.activation_layer_1x1 = self.activation_layer(dtype=dtype)
             self.dropout_layer_1x1 = nn.Dropout(p=dropout_p)
         else:
             # No initial unit width layer
@@ -870,37 +857,38 @@ class AtmLayerCNN(nn.Module):
         input_size = output_size
         output_size = num_input_feature_chans * gen_conv_depth
         self.conv_layer_0 = nn.Conv1d(input_size, output_size, gen_conv_width,
-                                padding='same')
-        self.layernorm_0 = self.norm_layer(output_size, num_atm_levels)
-        self.activation_layer_0 = self.activation_layer()
+                                padding='same', dtype=dtype)
+        self.layernorm_0 = self.norm_layer(output_size, num_atm_levels, dtype=dtype)
+        self.activation_layer_0 = self.activation_layer(dtype=dtype)
         self.dropout_layer_0 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
         output_size = num_input_feature_chans * gen_conv_depth
         self.conv_layer_1 = nn.Conv1d(input_size, output_size, gen_conv_width,
-                                padding='same')
-        self.layernorm_1 = self.norm_layer(output_size, num_atm_levels)
-        self.activation_layer_1 = self.activation_layer()
+                                padding='same', dtype=dtype)
+        self.layernorm_1 = self.norm_layer(output_size, num_atm_levels, dtype=dtype)
+        self.activation_layer_1 = self.activation_layer(dtype=dtype)
         self.dropout_layer_1 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
         self.last_conv_depth = gen_conv_depth
         output_size = num_all_outputs_as_vectors * self.last_conv_depth
         self.conv_layer_2 = nn.Conv1d(input_size, output_size, gen_conv_width,
-                                padding='same')
-        self.layernorm_2 = self.norm_layer(output_size, num_atm_levels)
-        self.activation_layer_2 = self.activation_layer()
+                                padding='same', dtype=dtype)
+        self.layernorm_2 = self.norm_layer(output_size, num_atm_levels, dtype=dtype)
+        self.activation_layer_2 = self.activation_layer(dtype=dtype)
         self.dropout_layer_2 = nn.Dropout(p=dropout_p)
 
         # Output layer - no dropout, no activation function
         # Data is structured such that all vector columns come first, then scalars
         input_size = output_size
         self.conv_vector_harvest = nn.Conv1d(num_pure_vector_outputs * gen_conv_depth,
-                                         num_pure_vector_outputs, 1, padding='same')
+                                         num_pure_vector_outputs, 1, padding='same', dtype=dtype)
         self.vector_flatten = nn.Flatten()
         self.pre_scalar_pool = nn.AvgPool1d(num_atm_levels)
         self.scalar_flatten = nn.Flatten()
-        self.linear_scalar_harvest = nn.Linear(num_scalar_outputs * gen_conv_depth, num_scalar_outputs)
+        self.linear_scalar_harvest = nn.Linear(num_scalar_outputs * gen_conv_depth, 
+                                               num_scalar_outputs, dtype=dtype)
 
         # Polynomial on top of that to hopefully cope better with wide dynamic
         # range of some outputs, initialising close to straight-through linear
@@ -918,17 +906,17 @@ class AtmLayerCNN(nn.Module):
             coeffs.append(coeffs_this_degree)
         return nn.ParameterList(coeffs) # to register properly as parameters
 
-    def norm_layer(self, num_features, num_chans):
+    def norm_layer(self, num_features, num_chans, dtype=torch.float32):
             match self.norm_type:
                 case "layer":
-                    return nn.LayerNorm([num_features, num_chans])
+                    return nn.LayerNorm([num_features, num_chans], dtype=dtype)
                 case "batch":
-                    return nn.BatchNorm1d(num_features)
+                    return nn.BatchNorm1d(num_features, dtype=dtype)
                 case _:
                     print(f"Unexpected norm_type={self.norm_type}")
                     sys.exit(1)
 
-    def activation_layer(self):
+    def activation_layer(self, dtype=torch.float32):
             match self.activation_type:
                 case "silu":
                     return nn.SiLU() # Now skipping inplace=True
@@ -1032,8 +1020,8 @@ class HoloDataset(Dataset):
         if do_feature_knockout:
             # Doing this post-processing so cached data can be used unchanged throughout
             x_np = np.delete(x_np, feature_knockout_idx, axis=0)
-        return torch.from_numpy(x_np).float().to(device), \
-               torch.from_numpy(y_np).float().to(device)
+        return torch.from_numpy(x_np).to(device), \
+               torch.from_numpy(y_np).to(device)
     
 #
 
@@ -1348,7 +1336,7 @@ if do_test:
         xt, _         = normalise_data(xt_prenorm, None, mx, sx, my, sy, False)
 
         # Convert the current slice of xt to a PyTorch tensor
-        inputs = torch.from_numpy(xt).float().to(device)
+        inputs = torch.from_numpy(xt).to(device)
 
         # No need to track gradients for inference
         with torch.no_grad():
