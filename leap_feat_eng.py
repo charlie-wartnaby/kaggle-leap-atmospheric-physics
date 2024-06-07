@@ -1,7 +1,7 @@
 # LEAP competition with feature engineering
 
 # This block will be different in Kaggle notebook:
-debug = False
+debug = True
 do_test = True
 is_rerun = False
 do_analysis = True
@@ -9,7 +9,7 @@ do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = True
 scale_using_range_limits = False
-use_float64 = True
+use_float64 = False
 
 #
 
@@ -24,7 +24,7 @@ else:
     # Use very large numbers for 'all'
     max_train_rows = 1000000
     max_test_rows  = 1000000000
-    max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 2500  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 50

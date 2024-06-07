@@ -1,0 +1,369 @@
+Var name,R2,Description
+ptend_q0002_26_r2,-7770173906.426161,cloud liquid mixing ratio change over time
+ptend_q0002_27_r2,-1046.6233771621064,cloud liquid mixing ratio change over time
+ptend_v_26_r2,-4.01268033106664,meridional wind acceleration
+ptend_q0002_28_r2,-3.7396459667784505,cloud liquid mixing ratio change over time
+ptend_v_25_r2,-2.5165121773904304,meridional wind acceleration
+ptend_v_29_r2,-2.412161831073882,meridional wind acceleration
+ptend_q0001_14_r2,-2.2772207351034526,moistening tendency
+ptend_v_28_r2,-2.071630932787589,meridional wind acceleration
+ptend_v_30_r2,-2.041762858437136,meridional wind acceleration
+ptend_v_31_r2,-1.5902391258565463,meridional wind acceleration
+ptend_v_24_r2,-1.576874216456921,meridional wind acceleration
+ptend_v_27_r2,-1.4615991597622393,meridional wind acceleration
+ptend_v_34_r2,-1.1956495298178693,meridional wind acceleration
+ptend_v_32_r2,-1.0801735111752524,meridional wind acceleration
+ptend_v_33_r2,-1.0531617767469743,meridional wind acceleration
+ptend_u_26_r2,-1.0499013408101596,zonal wind acceleration
+ptend_v_35_r2,-0.9303188916429712,meridional wind acceleration
+ptend_u_29_r2,-0.6711619140583078,zonal wind acceleration
+ptend_u_25_r2,-0.6678724205965983,zonal wind acceleration
+ptend_u_24_r2,-0.6553101100508657,zonal wind acceleration
+ptend_u_30_r2,-0.6519435250824561,zonal wind acceleration
+ptend_v_36_r2,-0.6423187063928002,meridional wind acceleration
+ptend_v_21_r2,-0.5826531431564314,meridional wind acceleration
+ptend_u_28_r2,-0.5640406746172827,zonal wind acceleration
+ptend_v_23_r2,-0.5358135767163195,meridional wind acceleration
+ptend_v_37_r2,-0.510843503216838,meridional wind acceleration
+ptend_v_22_r2,-0.4346725000045688,meridional wind acceleration
+ptend_v_16_r2,-0.41445733517839817,meridional wind acceleration
+ptend_u_27_r2,-0.3400619082503907,zonal wind acceleration
+ptend_v_13_r2,-0.3164113505221213,meridional wind acceleration
+ptend_q0001_16_r2,-0.24740746954765433,moistening tendency
+ptend_v_17_r2,-0.24359433180017978,meridional wind acceleration
+ptend_v_18_r2,-0.23363833805192374,meridional wind acceleration
+ptend_v_14_r2,-0.21621559901945875,meridional wind acceleration
+ptend_v_38_r2,-0.16818938595450725,meridional wind acceleration
+ptend_v_12_r2,-0.12827264336648359,meridional wind acceleration
+ptend_v_44_r2,-0.08004790550911756,meridional wind acceleration
+ptend_q0002_29_r2,-0.07382241842072963,cloud liquid mixing ratio change over time
+ptend_v_39_r2,-0.07296970008719914,meridional wind acceleration
+ptend_v_43_r2,-0.021914229837195893,meridional wind acceleration
+ptend_v_19_r2,-0.006139655155643902,meridional wind acceleration
+ptend_v_45_r2,-0.00043050470003955465,meridional wind acceleration
+ptend_v_15_r2,0.022385658747538627,meridional wind acceleration
+ptend_v_46_r2,0.025852112423077233,meridional wind acceleration
+ptend_q0002_32_r2,0.02842063798374984,cloud liquid mixing ratio change over time
+ptend_q0001_22_r2,0.03621714473378056,moistening tendency
+ptend_u_22_r2,0.047565929241423964,zonal wind acceleration
+ptend_v_40_r2,0.0652888810663568,meridional wind acceleration
+ptend_u_15_r2,0.0690664281025712,zonal wind acceleration
+ptend_v_42_r2,0.07645654451379241,meridional wind acceleration
+ptend_q0003_15_r2,0.0893834474009574,cloud ice mixing ratio change over time
+ptend_u_36_r2,0.09867576047461635,zonal wind acceleration
+ptend_u_23_r2,0.12373632288137283,zonal wind acceleration
+ptend_q0002_34_r2,0.1253305452433829,cloud liquid mixing ratio change over time
+ptend_u_42_r2,0.1261905143435467,zonal wind acceleration
+ptend_u_21_r2,0.1285756350636298,zonal wind acceleration
+ptend_v_41_r2,0.1358440845458731,meridional wind acceleration
+ptend_u_31_r2,0.1435312055302208,zonal wind acceleration
+ptend_v_47_r2,0.14628553382276546,meridional wind acceleration
+ptend_q0002_36_r2,0.14871123925379642,cloud liquid mixing ratio change over time
+ptend_q0002_31_r2,0.1583998085497499,cloud liquid mixing ratio change over time
+ptend_u_35_r2,0.16150084409810245,zonal wind acceleration
+ptend_u_40_r2,0.16482332676855932,zonal wind acceleration
+ptend_v_20_r2,0.16861433914468055,meridional wind acceleration
+ptend_u_41_r2,0.18520481260729135,zonal wind acceleration
+ptend_u_44_r2,0.18632859697040013,zonal wind acceleration
+ptend_q0002_37_r2,0.18961895558812517,cloud liquid mixing ratio change over time
+ptend_u_39_r2,0.19548517389626546,zonal wind acceleration
+ptend_u_43_r2,0.19636759834592463,zonal wind acceleration
+ptend_v_48_r2,0.19731205537379215,meridional wind acceleration
+ptend_u_37_r2,0.21900855536311484,zonal wind acceleration
+ptend_q0002_33_r2,0.2199381235098413,cloud liquid mixing ratio change over time
+ptend_u_47_r2,0.22383421400963235,zonal wind acceleration
+ptend_q0002_54_r2,0.2279096128093574,cloud liquid mixing ratio change over time
+ptend_q0002_35_r2,0.2305270822570573,cloud liquid mixing ratio change over time
+ptend_u_46_r2,0.23655100684648142,zonal wind acceleration
+ptend_q0003_27_r2,0.23764471516813027,cloud ice mixing ratio change over time
+ptend_u_14_r2,0.24737895771313523,zonal wind acceleration
+ptend_v_49_r2,0.24799380180197036,meridional wind acceleration
+ptend_v_50_r2,0.250226724463603,meridional wind acceleration
+ptend_u_45_r2,0.2534865246353509,zonal wind acceleration
+ptend_q0001_50_r2,0.25374614985385785,moistening tendency
+ptend_q0001_51_r2,0.2544403725846649,moistening tendency
+ptend_u_49_r2,0.2556103237436977,zonal wind acceleration
+ptend_q0002_52_r2,0.255654436948799,cloud liquid mixing ratio change over time
+ptend_q0002_45_r2,0.25579576196989523,cloud liquid mixing ratio change over time
+ptend_q0003_26_r2,0.2563717988894521,cloud ice mixing ratio change over time
+ptend_q0002_51_r2,0.2622902390575837,cloud liquid mixing ratio change over time
+ptend_u_48_r2,0.26270774666207797,zonal wind acceleration
+ptend_q0001_45_r2,0.26509772920783864,moistening tendency
+ptend_q0001_52_r2,0.26577137560827524,moistening tendency
+ptend_u_33_r2,0.26719542232606025,zonal wind acceleration
+ptend_v_51_r2,0.26800298404043404,meridional wind acceleration
+ptend_u_34_r2,0.27147921308921513,zonal wind acceleration
+ptend_q0001_49_r2,0.2746919993452818,moistening tendency
+ptend_q0002_53_r2,0.2773501605718232,cloud liquid mixing ratio change over time
+ptend_q0002_49_r2,0.27904609657078855,cloud liquid mixing ratio change over time
+ptend_q0002_46_r2,0.2795544106606302,cloud liquid mixing ratio change over time
+ptend_q0002_50_r2,0.28186945071296965,cloud liquid mixing ratio change over time
+ptend_q0003_24_r2,0.2822264317575552,cloud ice mixing ratio change over time
+ptend_q0001_48_r2,0.2853217171224137,moistening tendency
+ptend_q0001_47_r2,0.28792583976368885,moistening tendency
+ptend_q0002_47_r2,0.2903252180377838,cloud liquid mixing ratio change over time
+ptend_q0001_46_r2,0.29221811192516245,moistening tendency
+ptend_u_38_r2,0.29754488867457085,zonal wind acceleration
+ptend_q0001_21_r2,0.29948574289412416,moistening tendency
+ptend_q0002_44_r2,0.30099909460476254,cloud liquid mixing ratio change over time
+ptend_q0001_44_r2,0.3027120476494799,moistening tendency
+ptend_q0003_23_r2,0.30395964243663487,cloud ice mixing ratio change over time
+ptend_q0001_53_r2,0.3074194813153332,moistening tendency
+ptend_q0002_48_r2,0.31237062975304714,cloud liquid mixing ratio change over time
+ptend_q0001_54_r2,0.3175388562313692,moistening tendency
+ptend_q0003_25_r2,0.3179015985107136,cloud ice mixing ratio change over time
+ptend_u_32_r2,0.32484356395976677,zonal wind acceleration
+ptend_q0002_38_r2,0.32527634653903514,cloud liquid mixing ratio change over time
+ptend_u_50_r2,0.32964286617418287,zonal wind acceleration
+ptend_q0002_39_r2,0.3312037048311904,cloud liquid mixing ratio change over time
+ptend_v_52_r2,0.3313114694754673,meridional wind acceleration
+ptend_q0001_42_r2,0.33159593647433866,moistening tendency
+ptend_q0002_55_r2,0.3343671558614133,cloud liquid mixing ratio change over time
+ptend_q0001_23_r2,0.33460697313500104,moistening tendency
+ptend_q0002_43_r2,0.3372823390957496,cloud liquid mixing ratio change over time
+ptend_q0001_40_r2,0.3377702753250309,moistening tendency
+ptend_q0001_41_r2,0.3377810218270518,moistening tendency
+ptend_u_13_r2,0.338852828338203,zonal wind acceleration
+ptend_q0001_38_r2,0.33897982235758434,moistening tendency
+ptend_q0001_43_r2,0.3393265871155497,moistening tendency
+ptend_q0001_55_r2,0.34200879866846406,moistening tendency
+ptend_q0002_40_r2,0.34556357577646085,cloud liquid mixing ratio change over time
+ptend_u_16_r2,0.346791285125282,zonal wind acceleration
+ptend_q0003_28_r2,0.3496711109022006,cloud ice mixing ratio change over time
+ptend_t_53_r2,0.35533830944180106,heating tendency
+ptend_t_49_r2,0.3555829045143374,heating tendency
+ptend_t_50_r2,0.35744416728473266,heating tendency
+ptend_q0002_41_r2,0.3582074810114744,cloud liquid mixing ratio change over time
+ptend_q0002_42_r2,0.35821555126492505,cloud liquid mixing ratio change over time
+ptend_t_51_r2,0.3599415963910051,heating tendency
+ptend_t_52_r2,0.3619984174278133,heating tendency
+ptend_t_54_r2,0.3632474926737758,heating tendency
+ptend_t_55_r2,0.37459704168144237,heating tendency
+ptend_q0001_56_r2,0.385020925107419,moistening tendency
+ptend_q0002_30_r2,0.38585823631286703,cloud liquid mixing ratio change over time
+ptend_t_56_r2,0.38649104776878945,heating tendency
+ptend_q0001_37_r2,0.38673560432969234,moistening tendency
+ptend_q0001_39_r2,0.3993873365252278,moistening tendency
+ptend_t_58_r2,0.40242765563302285,heating tendency
+ptend_t_48_r2,0.4026405206095944,heating tendency
+ptend_v_53_r2,0.4075247373129916,meridional wind acceleration
+ptend_t_57_r2,0.4127117959037725,heating tendency
+ptend_t_47_r2,0.4138889287247059,heating tendency
+ptend_q0001_36_r2,0.4172502729319888,moistening tendency
+ptend_q0003_44_r2,0.4258188337395795,cloud ice mixing ratio change over time
+ptend_q0003_34_r2,0.43264576091402124,cloud ice mixing ratio change over time
+ptend_q0003_30_r2,0.4384696542184531,cloud ice mixing ratio change over time
+ptend_q0003_29_r2,0.4433264474774538,cloud ice mixing ratio change over time
+ptend_t_46_r2,0.4434352832869787,heating tendency
+ptend_q0001_35_r2,0.4543752904040123,moistening tendency
+ptend_v_54_r2,0.4579418523392225,meridional wind acceleration
+ptend_t_18_r2,0.46093824716289317,heating tendency
+ptend_u_51_r2,0.4622587384466824,zonal wind acceleration
+ptend_q0003_45_r2,0.46495594094370063,cloud ice mixing ratio change over time
+ptend_q0003_33_r2,0.46844440896303785,cloud ice mixing ratio change over time
+ptend_q0003_43_r2,0.4734799185062009,cloud ice mixing ratio change over time
+ptend_q0001_57_r2,0.47684650859006045,moistening tendency
+ptend_v_55_r2,0.477318123509823,meridional wind acceleration
+ptend_q0003_46_r2,0.47740426312044754,cloud ice mixing ratio change over time
+ptend_t_45_r2,0.47833616321429273,heating tendency
+ptend_q0001_59_r2,0.4819793391485071,moistening tendency
+ptend_u_12_r2,0.484184313773731,zonal wind acceleration
+ptend_q0002_56_r2,0.48988009752356027,cloud liquid mixing ratio change over time
+ptend_q0003_47_r2,0.4920712196947632,cloud ice mixing ratio change over time
+ptend_v_56_r2,0.49349956192682887,meridional wind acceleration
+ptend_v_57_r2,0.4959487807821178,meridional wind acceleration
+ptend_q0003_35_r2,0.5008794974768658,cloud ice mixing ratio change over time
+ptend_u_20_r2,0.504512249008673,zonal wind acceleration
+ptend_q0001_20_r2,0.5072406092195575,moistening tendency
+ptend_q0001_24_r2,0.511580730050646,moistening tendency
+ptend_u_56_r2,0.511687335275215,zonal wind acceleration
+ptend_q0003_31_r2,0.5149085068962639,cloud ice mixing ratio change over time
+ptend_t_44_r2,0.5170634184424655,heating tendency
+ptend_q0003_32_r2,0.5177541939807601,cloud ice mixing ratio change over time
+ptend_q0003_49_r2,0.5216717238489299,cloud ice mixing ratio change over time
+ptend_v_58_r2,0.5238958902185216,meridional wind acceleration
+ptend_q0003_48_r2,0.5249305175473007,cloud ice mixing ratio change over time
+ptend_q0003_50_r2,0.534524768790745,cloud ice mixing ratio change over time
+ptend_q0003_51_r2,0.5373188971953458,cloud ice mixing ratio change over time
+ptend_q0001_58_r2,0.5401477640308874,moistening tendency
+ptend_t_23_r2,0.5412907557100504,heating tendency
+ptend_q0003_42_r2,0.5417942228546774,cloud ice mixing ratio change over time
+ptend_t_43_r2,0.5433501324480994,heating tendency
+ptend_q0003_39_r2,0.5497929068354976,cloud ice mixing ratio change over time
+ptend_q0003_38_r2,0.5499414890383824,cloud ice mixing ratio change over time
+ptend_q0003_37_r2,0.5551518688066104,cloud ice mixing ratio change over time
+ptend_u_55_r2,0.5648683335923446,zonal wind acceleration
+ptend_q0001_34_r2,0.5655705123769658,moistening tendency
+ptend_u_52_r2,0.5694464135183197,zonal wind acceleration
+ptend_q0003_36_r2,0.5700556358731637,cloud ice mixing ratio change over time
+ptend_q0003_41_r2,0.5707671441457791,cloud ice mixing ratio change over time
+ptend_q0001_13_r2,0.5710123555943868,moistening tendency
+ptend_q0003_40_r2,0.5823749351296891,cloud ice mixing ratio change over time
+ptend_t_42_r2,0.5863506530530259,heating tendency
+ptend_t_41_r2,0.5865344053208019,heating tendency
+ptend_t_22_r2,0.5875711798289387,heating tendency
+ptend_t_19_r2,0.5967865829080407,heating tendency
+ptend_t_59_r2,0.6016424355967437,heating tendency
+ptend_u_54_r2,0.6023680508139035,zonal wind acceleration
+ptend_q0003_52_r2,0.6047260212350614,cloud ice mixing ratio change over time
+ptend_t_40_r2,0.6083170717449963,heating tendency
+ptend_t_21_r2,0.6087476972187391,heating tendency
+ptend_u_53_r2,0.6138334606571819,zonal wind acceleration
+ptend_u_57_r2,0.6148499100724223,zonal wind acceleration
+ptend_t_20_r2,0.6212447162650684,heating tendency
+ptend_v_59_r2,0.621660849168617,meridional wind acceleration
+ptend_q0003_53_r2,0.6241600582704413,cloud ice mixing ratio change over time
+ptend_u_58_r2,0.6274718163419706,zonal wind acceleration
+ptend_q0001_33_r2,0.6298229707224781,moistening tendency
+ptend_q0003_22_r2,0.6349315015898388,cloud ice mixing ratio change over time
+ptend_t_39_r2,0.6365625459021054,heating tendency
+ptend_q0001_19_r2,0.6396752789873431,moistening tendency
+ptend_t_38_r2,0.6579921778875387,heating tendency
+ptend_q0003_18_r2,0.6590190229906522,cloud ice mixing ratio change over time
+ptend_t_17_r2,0.6645831391847786,heating tendency
+ptend_q0003_54_r2,0.6649957428079788,cloud ice mixing ratio change over time
+ptend_q0001_25_r2,0.6789320400373052,moistening tendency
+ptend_t_37_r2,0.6791006342256715,heating tendency
+ptend_q0003_16_r2,0.6796047566665695,cloud ice mixing ratio change over time
+ptend_q0003_55_r2,0.689461011860633,cloud ice mixing ratio change over time
+ptend_q0002_57_r2,0.7012663328557149,cloud liquid mixing ratio change over time
+ptend_t_25_r2,0.705342765143024,heating tendency
+ptend_q0001_32_r2,0.7127299236190642,moistening tendency
+ptend_t_24_r2,0.7166077444938442,heating tendency
+ptend_t_36_r2,0.7308208088931575,heating tendency
+ptend_q0003_56_r2,0.7371201329185624,cloud ice mixing ratio change over time
+ptend_q0002_59_r2,0.7380196310392075,cloud liquid mixing ratio change over time
+ptend_t_26_r2,0.7439395291746673,heating tendency
+ptend_q0001_26_r2,0.7493636453264144,moistening tendency
+ptend_q0002_58_r2,0.7537553287096324,cloud liquid mixing ratio change over time
+ptend_t_35_r2,0.7588180366508585,heating tendency
+ptend_q0001_31_r2,0.7714843117589408,moistening tendency
+ptend_q0003_57_r2,0.7807582087826076,cloud ice mixing ratio change over time
+ptend_q0003_58_r2,0.7860418961035395,cloud ice mixing ratio change over time
+ptend_q0003_21_r2,0.7896292646111047,cloud ice mixing ratio change over time
+cam_out_PRECC_r2,0.791767741600774,rain rate
+ptend_u_59_r2,0.7932587030662548,zonal wind acceleration
+ptend_q0003_59_r2,0.8051363616020997,cloud ice mixing ratio change over time
+ptend_q0001_29_r2,0.80647563488611,moistening tendency
+ptend_q0001_30_r2,0.8082930745607773,moistening tendency
+ptend_t_34_r2,0.809109782521469,heating tendency
+ptend_q0001_27_r2,0.8126994280765757,moistening tendency
+ptend_t_33_r2,0.8131693809944524,heating tendency
+ptend_q0001_18_r2,0.8162165511076608,moistening tendency
+ptend_t_0_r2,0.8174579190532252,heating tendency
+ptend_q0001_28_r2,0.8199130653665838,moistening tendency
+ptend_t_27_r2,0.8224947007266639,heating tendency
+ptend_t_32_r2,0.8231709307719499,heating tendency
+ptend_q0001_17_r2,0.8285766772123672,moistening tendency
+ptend_t_28_r2,0.8378309126611477,heating tendency
+ptend_q0001_12_r2,0.8458585395356473,moistening tendency
+cam_out_SOLLD_r2,0.8627948387493045,downward diffuse near-infrared solar flux to surface
+ptend_t_29_r2,0.8630500926932245,heating tendency
+ptend_t_31_r2,0.8658221623489554,heating tendency
+ptend_q0003_20_r2,0.870952726370879,cloud ice mixing ratio change over time
+cam_out_PRECSC_r2,0.8713491471968893,snow rate (liquid water equivalent)
+ptend_q0003_19_r2,0.8719361084995934,cloud ice mixing ratio change over time
+ptend_q0003_17_r2,0.8749636703764516,cloud ice mixing ratio change over time
+ptend_t_30_r2,0.8793631498909462,heating tendency
+ptend_t_16_r2,0.8817021727272273,heating tendency
+ptend_q0001_15_r2,0.8987324129437464,moistening tendency
+ptend_t_1_r2,0.9419517162068017,heating tendency
+cam_out_SOLSD_r2,0.9423011942842684,downward diffuse solar flux to surface
+ptend_t_15_r2,0.9482617046677139,heating tendency
+cam_out_SOLL_r2,0.9550041706873337,downward near-infrared direct solar flux to surface
+ptend_t_2_r2,0.9584078889810218,heating tendency
+cam_out_FLWDS_r2,0.9591724372152174,ownward longwave flux at surface
+cam_out_SOLS_r2,0.9650047133002765,downward visible direct solar flux to surface
+ptend_t_14_r2,0.9651946326959633,heating tendency
+ptend_t_3_r2,0.9680844155290627,heating tendency
+ptend_t_13_r2,0.9697108646007484,heating tendency
+ptend_t_12_r2,0.9748917555784453,heating tendency
+ptend_t_4_r2,0.9799030596759251,heating tendency
+cam_out_NETSW_r2,0.9799032182413628,net shortwave flux at surface
+ptend_t_11_r2,0.9799743650980316,heating tendency
+ptend_t_10_r2,0.983646372822323,heating tendency
+ptend_t_9_r2,0.9864906478680127,heating tendency
+ptend_t_8_r2,0.988266083197292,heating tendency
+ptend_t_5_r2,0.988649948851535,heating tendency
+ptend_t_7_r2,0.9889747215887928,heating tendency
+ptend_t_6_r2,0.9904570783385869,heating tendency
+ptend_q0001_0_r2,1.0,moistening tendency
+ptend_q0001_1_r2,1.0,moistening tendency
+ptend_q0001_2_r2,1.0,moistening tendency
+ptend_q0001_3_r2,1.0,moistening tendency
+ptend_q0001_4_r2,1.0,moistening tendency
+ptend_q0001_5_r2,1.0,moistening tendency
+ptend_q0001_6_r2,1.0,moistening tendency
+ptend_q0001_7_r2,1.0,moistening tendency
+ptend_q0001_8_r2,1.0,moistening tendency
+ptend_q0001_9_r2,1.0,moistening tendency
+ptend_q0001_10_r2,1.0,moistening tendency
+ptend_q0001_11_r2,1.0,moistening tendency
+ptend_q0002_0_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_1_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_2_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_3_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_4_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_5_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_6_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_7_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_8_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_9_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_10_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_11_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_12_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_13_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_14_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_15_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_16_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_17_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_18_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_19_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_20_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_21_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_22_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_23_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_24_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0002_25_r2,1.0,cloud liquid mixing ratio change over time
+ptend_q0003_0_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_1_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_2_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_3_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_4_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_5_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_6_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_7_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_8_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_9_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_10_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_11_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_12_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_13_r2,1.0,cloud ice mixing ratio change over time
+ptend_q0003_14_r2,1.0,cloud ice mixing ratio change over time
+ptend_u_0_r2,1.0,zonal wind acceleration
+ptend_u_1_r2,1.0,zonal wind acceleration
+ptend_u_2_r2,1.0,zonal wind acceleration
+ptend_u_3_r2,1.0,zonal wind acceleration
+ptend_u_4_r2,1.0,zonal wind acceleration
+ptend_u_5_r2,1.0,zonal wind acceleration
+ptend_u_6_r2,1.0,zonal wind acceleration
+ptend_u_7_r2,1.0,zonal wind acceleration
+ptend_u_8_r2,1.0,zonal wind acceleration
+ptend_u_9_r2,1.0,zonal wind acceleration
+ptend_u_10_r2,1.0,zonal wind acceleration
+ptend_u_11_r2,1.0,zonal wind acceleration
+ptend_u_17_r2,1.0,zonal wind acceleration
+ptend_u_18_r2,1.0,zonal wind acceleration
+ptend_u_19_r2,1.0,zonal wind acceleration
+ptend_v_0_r2,1.0,meridional wind acceleration
+ptend_v_1_r2,1.0,meridional wind acceleration
+ptend_v_2_r2,1.0,meridional wind acceleration
+ptend_v_3_r2,1.0,meridional wind acceleration
+ptend_v_4_r2,1.0,meridional wind acceleration
+ptend_v_5_r2,1.0,meridional wind acceleration
+ptend_v_6_r2,1.0,meridional wind acceleration
+ptend_v_7_r2,1.0,meridional wind acceleration
+ptend_v_8_r2,1.0,meridional wind acceleration
+ptend_v_9_r2,1.0,meridional wind acceleration
+ptend_v_10_r2,1.0,meridional wind acceleration
+ptend_v_11_r2,1.0,meridional wind acceleration

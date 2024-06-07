@@ -10,8 +10,7 @@ Ideas to progress
 -----------------
 
 o Bug if test only currently does validation loops
-o Get large normalised values at extremes of ranges, try using range instead of stdev for scaling?
-o Or logarithmic scaling so that reasonable values near 1, extremes not so extreme
+o Logarithmic scaling so that reasonable values near 1, extremes not so extreme
 o Went badly deleting hopefully redundant features at b32db7d49, so what is so crucial?
 o Analyse which columns contributing most to error metric:
    - ptend_q0001 moistening tendency low indices >=12, then higher ~45
@@ -25,7 +24,7 @@ o Would I do better by just zeroing/averaging some output columns with poor R2?
   - But existing R2 analysis had all R2 > 0, whereas mean would only score 0.
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
-o Try F64 evaluation?
+o Tried float64 on 1M samples, very slow and convergence oddly seemed worse
 o Scrutinise use of min_std both in normalisation and zeroing output cols
 o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
