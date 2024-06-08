@@ -30,6 +30,10 @@ o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
 o Deeper/alternative network structures
 o Try other ML techniques apart from NN
+ - catboost in batches using sum_model, guess train vector and scalars separately
+ - e.g. notebook https://www.kaggle.com/code/lonnieqin/leap-catboost-baseline
+ - multiregression mode seems to allow fit of multiple target columns simultaneously
+   https://catboost.ai/en/docs/concepts/python-reference_catboostregressor_fit
 o Ensemble method combining independent technique(s) and NN
 o Would it help to remove more old feature columns? Could automate experiment
   - brief expt removed temperature, bit worse

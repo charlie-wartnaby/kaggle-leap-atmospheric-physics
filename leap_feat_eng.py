@@ -4,19 +4,19 @@
 debug = True
 do_test = True
 is_rerun = False
-do_analysis = True
+do_analysis = False
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = True
+clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
-
+model_type = "catboost"
 #
 
 if debug:
-    max_train_rows = 1000
+    max_train_rows = 100
     max_test_rows  = 100
-    max_batch_size = 100
+    max_batch_size = 10
     patience = 4
     train_proportion = 0.8
     max_epochs = 1
@@ -29,7 +29,7 @@ else:
     train_proportion = 0.9
     max_epochs = 50
 
-subset_base_row = 8000000
+subset_base_row = 0
 
 multitrain_params = {}
 
@@ -794,7 +794,11 @@ with open(scaling_cache_path, 'wb') as fd:
 
 # Now very loosely based on public notebook but with the new features and model:
 # https://www.kaggle.com/code/airazusta014/pytorch-nn/notebook
+# Catboost examples:
+# https://www.kaggle.com/code/lonnieqin/leap-catboost-baseline
+# https://www.kaggle.com/code/gogo827jz/multiregression-catboost-1-model-for-206-targets
 
+import catboost
 import random, gc, warnings
 import numpy as np
 #import pandas as pd
@@ -992,13 +996,10 @@ class HoloDataset(Dataset):
         """
         return len(self.holo_df)
 
-    def __getitem__(self, index):
-        """
-        Generate one sample of data.
-        """
+    def ensure_block_loaded(self, index):
         if not (self.cache_base_idx >= 0 and 
                 index >= self.cache_base_idx and index < self.cache_base_idx + self.cache_rows):
-            # We don't already have this converted and processed in RAM
+            # We don't already have this in RAM
             start_time = time.time()
             self.cache_base_idx = index
             true_file_idx = self.cache_base_idx + subset_base_row
@@ -1013,6 +1014,11 @@ class HoloDataset(Dataset):
                 print(f"ERROR: cached data not found at row {index}")
                 sys.exit(1)
 
+    def __getitem__(self, index):
+        """
+        Generate one sample of data.
+        """
+        self.ensure_block_loaded(index)
         # Convert the RAM numpy data to tensors when requested
         cache_idx = index - self.cache_base_idx
         x_np = self.cache_np_x[cache_idx]
@@ -1023,6 +1029,9 @@ class HoloDataset(Dataset):
         return torch.from_numpy(x_np).to(device), \
                torch.from_numpy(y_np).to(device)
     
+    def get_np_block_slice(self, block_base_idx):
+        self.ensure_block_loaded(block_base_idx)
+        return self.cache_np_x, self.cache_np_y
 #
 
 dataset = HoloDataset(train_hf, holo_cache_rows)
@@ -1061,10 +1070,11 @@ def form_row_range_from_block_range(block_indices):
 train_row_idx = form_row_range_from_block_range(train_block_idx)
 val_row_idx = form_row_range_from_block_range(val_block_idx)
 
-train_dataset = torch.utils.data.Subset(dataset, train_row_idx)
-val_dataset = torch.utils.data.Subset(dataset, val_row_idx)
-train_loader = DataLoader(train_dataset, batch_size=max_batch_size, shuffle=False)
-val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
+if model_type == "cnn":
+    train_dataset = torch.utils.data.Subset(dataset, train_row_idx)
+    val_dataset = torch.utils.data.Subset(dataset, val_row_idx)
+    train_loader = DataLoader(train_dataset, batch_size=max_batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
 
 input_size = len(expanded_names_input) # number of input features/columns
 output_size = len(expanded_names_output)
@@ -1162,16 +1172,6 @@ def calc_output_r2_ranking(analysis_df):
     ranking_df.write_csv(r2_ranking_path)
 
 
-if is_rerun and os.path.exists(epoch_counter_path):
-    try:
-        with open(epoch_counter_path) as fd:
-            epochs_str = fd.readline()
-            tot_epochs = int(epochs_str)
-    except:
-        print(f"Failed to open/parse {epoch_counter_path}, zeroing counter")
-        tot_epochs = 0
-else:
-    tot_epochs = 0
 
 # Training loop
 stop_requested = False
@@ -1180,53 +1180,42 @@ overall_best_model_state = None
 overall_best_model_name = ""
 overall_best_val_loss = float('inf')
 
-for param_permutation in param_permutations:
-    if stop_requested:
-        break
+def do_cnn_training():
+    global stop_requested
+    global overall_best_model, overall_best_model_state, overall_best_model_name
+    global overall_best_val_loss
 
-    print("Starting training loop...")
-    if do_feature_knockout:
-        # permutation is just index of feature to knock out
-        model_params = {}
-        feature_knockout_idx = param_permutation
-        feature_knockout_name = unexpanded_input_col_names[feature_knockout_idx]
-        feature_knockout_col = unexpanded_cols_by_name[feature_knockout_name]
-        feature_knockout_description = feature_knockout_col.description
-        print(f"... knocking out feature {feature_knockout_idx}: {feature_knockout_name} - {feature_knockout_description}")
-        suffix = f"_knockout_{feature_knockout_idx}_{feature_knockout_name}"
+    if is_rerun and os.path.exists(epoch_counter_path):
+        try:
+            with open(epoch_counter_path) as fd:
+                epochs_str = fd.readline()
+                tot_epochs = int(epochs_str)
+        except:
+            print(f"Failed to open/parse {epoch_counter_path}, zeroing counter")
+            tot_epochs = 0
     else:
-        model_params = param_permutation
-        suffix = ""
-        for key in param_permutation.keys():
-            print(f"... {key}={param_permutation[key]}")
-            suffix += f"_{key}_{param_permutation[key]}"
-    model_save_path = model_root_path + suffix + ".pt"
-    with open(loss_log_path, 'a') as fd:
-        fd.write(f'{model_save_path}\n')
+        tot_epochs = 0
 
     model = AtmLayerCNN(**model_params).to(device)
-
     if try_reload_model and os.path.exists(model_save_path):
         print('Attempting to reload model from disk...')
         model.load_state_dict(torch.load(model_save_path))
 
+    best_val_loss = float('inf')  # Set initial best as infinity
     criterion = nn.MSELoss()  # Using MSE for regression
     optimizer = optim.AdamW(model.parameters(), lr=initial_learning_rate, weight_decay=0.01)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
-
-    best_val_loss = float('inf')  # Set initial best as infinity
+    torch.autograd.set_detect_anomaly(debug)
     best_model_state = None       # To store the best model's state
     patience_count = 0
 
     if len(param_permutations) > 1:
         tot_epochs = 0
 
-    torch.autograd.set_detect_anomaly(debug)
     for epoch in range(max_epochs):
         if do_train:
             model.train()
             total_loss = 0
-            steps = 0
             for batch_idx, (inputs, outputs_true) in enumerate(train_loader):
                 start_time = time.time()
                 optimizer.zero_grad()
@@ -1236,7 +1225,6 @@ for param_permutation in param_permutations:
                 optimizer.step()
 
                 total_loss += loss.item()
-                steps += 1
 
                 if show_timings: print(f'Training batch of {max_batch_size} took {time.time() - start_time} s')
 
@@ -1244,7 +1232,6 @@ for param_permutation in param_permutations:
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Epoch {tot_epochs + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / steps:.4f}')
                     total_loss = 0  # Reset the loss for the next n steps
-                    steps = 0  # Reset step count
         
         # Validation step
         if do_analysis:
@@ -1308,6 +1295,59 @@ for param_permutation in param_permutations:
             os.remove(stopfile_path)
             stop_requested = True
             break
+
+
+def do_catboost_training():
+    # Catboost, mutually exclusive to start with
+
+    cat_params = {
+                    'iterations': 2000, 
+                    'depth': 8, 
+                    'task_type' : "GPU",
+                    'use_best_model': True,
+                    'eval_metric': 'R2',
+                    'early_stopping_rounds': 200,
+                    'learning_rate': 0.05,
+                    'border_count': 32,
+                    'l2_leaf_reg': 3,
+                    "verbose": 500
+                }
+    model = catboost.CatBoostRegressor(**cat_params)
+
+    for block_idx in train_block_idx:
+        block_base_row_idx = block_idx * max_batch_size
+        train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
+
+        model.fit(train_x, train_y)
+
+for param_permutation in param_permutations:
+    if stop_requested:
+        break
+
+    print("Starting training loop...")
+    if do_feature_knockout:
+        # permutation is just index of feature to knock out
+        model_params = {}
+        feature_knockout_idx = param_permutation
+        feature_knockout_name = unexpanded_input_col_names[feature_knockout_idx]
+        feature_knockout_col = unexpanded_cols_by_name[feature_knockout_name]
+        feature_knockout_description = feature_knockout_col.description
+        print(f"... knocking out feature {feature_knockout_idx}: {feature_knockout_name} - {feature_knockout_description}")
+        suffix = f"_knockout_{feature_knockout_idx}_{feature_knockout_name}"
+    else:
+        model_params = param_permutation
+        suffix = ""
+        for key in param_permutation.keys():
+            print(f"... {key}={param_permutation[key]}")
+            suffix += f"_{key}_{param_permutation[key]}"
+    model_save_path = model_root_path + suffix + ".pt"
+    with open(loss_log_path, 'a') as fd:
+        fd.write(f'{model_save_path}\n')
+
+    if model_type == "cnn":
+        do_cnn_training()
+    else:
+        do_catboost_training()
 
     if do_feature_knockout:
         with open(feature_knockout_path, 'a') as fd:
