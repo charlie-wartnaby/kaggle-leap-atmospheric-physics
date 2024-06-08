@@ -34,6 +34,8 @@ o Try other ML techniques apart from NN
  - e.g. notebook https://www.kaggle.com/code/lonnieqin/leap-catboost-baseline
  - multiregression mode seems to allow fit of multiple target columns simultaneously
    https://catboost.ai/en/docs/concepts/python-reference_catboostregressor_fit
+ - could fit one atmospheric layer at a time using same model, blend in
+   neighbouring ones CNN-like as refinement
 o Ensemble method combining independent technique(s) and NN
 o Would it help to remove more old feature columns? Could automate experiment
   - brief expt removed temperature, bit worse

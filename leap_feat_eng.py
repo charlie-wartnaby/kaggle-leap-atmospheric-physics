@@ -7,16 +7,16 @@ is_rerun = False
 do_analysis = False
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = False
+clear_batch_cache_at_start = True
 scale_using_range_limits = False
 use_float64 = False
 model_type = "catboost"
 #
 
 if debug:
-    max_train_rows = 100
+    max_train_rows = 1000
     max_test_rows  = 100
-    max_batch_size = 10
+    max_batch_size = 100
     patience = 4
     train_proportion = 0.8
     max_epochs = 1
@@ -1315,20 +1315,25 @@ def do_catboost_training():
                 }
     model = catboost.CatBoostRegressor(**cat_params)
 
+    random_generator = np.random.default_rng()
     for block_idx in train_block_idx:
         block_base_row_idx = block_idx * max_batch_size
         train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
-        train_x = train_x.reshape((max_batch_size,-1))
-        train_y = train_y.reshape((max_batch_size,-1))
-        # train_rows_per_slice = int(train_proportion * max_batch_size)
-        # eval_x = train_x[train_rows_per_slice : ]
-        # eval_y = train_y[train_rows_per_slice : ]
-        # train_x = train_x[: train_rows_per_slice]
-        # train_y = train_y[: train_rows_per_slice]
-        # Debug dummy data
-        train_x = np.array([[0.1, 0.2, 0.3],[0.4, 0.2, 0.3]])
-        train_y = np.array([[1.3, 1.7],[1.0, 1.1]])
-        model.fit(train_x, train_y)
+        # Trying to fit same model to each useful atmopheric slice and its corresponding
+        # test outputs, plus same scalar outputs at every level
+        for atm_slice_idx in range(15, num_atm_levels):
+            layer_x = train_x[:,:,atm_slice_idx] # try one atmospheric slice
+            #train_x = train_x[:,:10] # smaller subset of features
+            first_scalar_idx = num_pure_vector_outputs*num_atm_levels
+            layer_vector_outputs_y = train_y[:,:first_scalar_idx:num_atm_levels]
+            scalar_outputs_y = train_y[:, first_scalar_idx:]
+            train_y = np.concatenate((layer_vector_outputs_y, scalar_outputs_y),axis=1)
+            # Avoiding error about all test values being equal where some cols all zero
+            small_random_col = random_generator.random(max_batch_size).reshape((max_batch_size,1))
+            small_random_col *= 1e-20
+            train_y=np.where(train_y[:,]==0.0,small_random_col,train_y)
+
+            model.fit(layer_x, train_y)
 
 for param_permutation in param_permutations:
     if stop_requested:
