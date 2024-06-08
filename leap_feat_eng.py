@@ -14,9 +14,9 @@ model_type = "catboost"
 #
 
 if debug:
-    max_train_rows = 1000
+    max_train_rows = 100
     max_test_rows  = 100
-    max_batch_size = 100
+    max_batch_size = 10
     patience = 4
     train_proportion = 0.8
     max_epochs = 1
@@ -1301,7 +1301,7 @@ def do_catboost_training():
     # Catboost, mutually exclusive to start with
 
     cat_params = {
-                    'iterations': 2000, 
+                    'iterations': 10, 
                     'depth': 8, 
                     'task_type' : "CPU" if machine == "narg" else "GPU",
                     'use_best_model': False, # requires validation data
@@ -1313,14 +1313,15 @@ def do_catboost_training():
                     'l2_leaf_reg': 3,
                     "verbose": 500 # iterations per output
                 }
-    model = catboost.CatBoostRegressor(**cat_params)
 
     random_generator = np.random.default_rng()
+    block_models = []
     for block_idx in train_block_idx:
         block_base_row_idx = block_idx * max_batch_size
         train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
         # Trying to fit same model to each useful atmopheric slice and its corresponding
         # test outputs, plus same scalar outputs at every level
+        slice_models = []
         for atm_slice_idx in range(15, num_atm_levels):
             layer_x = train_x[:,:,atm_slice_idx] # try one atmospheric slice
             #train_x = train_x[:,:10] # smaller subset of features
@@ -1333,7 +1334,17 @@ def do_catboost_training():
             small_random_col *= 1e-20
             train_y=np.where(train_y[:,]==0.0,small_random_col,train_y)
 
+            model = catboost.CatBoostRegressor(**cat_params)
             model.fit(layer_x, train_y)
+            slice_models.append(model)
+        # For some reason complains about models having different dimensions,
+        # when checks num outputs of last in the list against the others.
+        # I don't know why last one doesn't have proper set of outputs.
+        del slice_models[:-1]
+        block_model = catboost.sum_models(slice_models, weights=[1.0/len(slice_models)] * len(slice_models))
+        block_models.append(block_model)
+    overall_model = catboost.sum_models(block_models, weights=[1.0/len(block_models)] * len(block_models))
+    pass
 
 for param_permutation in param_permutations:
     if stop_requested:
