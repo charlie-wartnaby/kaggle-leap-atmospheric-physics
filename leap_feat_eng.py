@@ -1303,21 +1303,31 @@ def do_catboost_training():
     cat_params = {
                     'iterations': 2000, 
                     'depth': 8, 
-                    'task_type' : "GPU",
-                    'use_best_model': True,
-                    'eval_metric': 'R2',
+                    'task_type' : "CPU" if machine == "narg" else "GPU",
+                    'use_best_model': False, # requires validation data
+                    #'eval_metric': 'R2',
+                    'loss_function': 'MultiRMSE',
                     'early_stopping_rounds': 200,
                     'learning_rate': 0.05,
                     'border_count': 32,
                     'l2_leaf_reg': 3,
-                    "verbose": 500
+                    "verbose": 500 # iterations per output
                 }
     model = catboost.CatBoostRegressor(**cat_params)
 
     for block_idx in train_block_idx:
         block_base_row_idx = block_idx * max_batch_size
         train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
-
+        train_x = train_x.reshape((max_batch_size,-1))
+        train_y = train_y.reshape((max_batch_size,-1))
+        # train_rows_per_slice = int(train_proportion * max_batch_size)
+        # eval_x = train_x[train_rows_per_slice : ]
+        # eval_y = train_y[train_rows_per_slice : ]
+        # train_x = train_x[: train_rows_per_slice]
+        # train_y = train_y[: train_rows_per_slice]
+        # Debug dummy data
+        train_x = np.array([[0.1, 0.2, 0.3],[0.4, 0.2, 0.3]])
+        train_y = np.array([[1.3, 1.7],[1.0, 1.1]])
         model.fit(train_x, train_y)
 
 for param_permutation in param_permutations:
