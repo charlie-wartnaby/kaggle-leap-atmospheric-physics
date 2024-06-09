@@ -1319,35 +1319,19 @@ def do_catboost_training():
     for block_idx in range(num_train_rows // max_batch_size):
         block_base_row_idx = block_idx * max_batch_size
         train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
-        # Trying to fit same model to each useful atmopheric slice and its corresponding
-        # test outputs, plus same scalar outputs at every level
-        slice_models = []
-        for atm_slice_idx in range(15, num_atm_levels):
-            layer_x = train_x[:,:,atm_slice_idx] # try one atmospheric slice
-            #train_x = train_x[:,:10] # smaller subset of features
-            first_scalar_idx = num_pure_vector_outputs*num_atm_levels
-            layer_vector_outputs_y = train_y[:,:first_scalar_idx:num_atm_levels]
-            scalar_outputs_y = train_y[:, first_scalar_idx:]
-            layer_y = np.concatenate((layer_vector_outputs_y, scalar_outputs_y),axis=1)
-            # Avoiding error about all test values being equal where some cols all zero
-            small_random_col = random_generator.random(max_batch_size).reshape((max_batch_size,1))
-            small_random_col *= 1e-20
-            layer_y=np.where(layer_y[:,]==0.0, small_random_col, layer_y)
-            # Take validation data as last part of this batch; not good because
-            # do doubt highly correlated with training data, but to get things working...
-            num_train_rows_per_block = int(max_batch_size * train_proportion)
-            validation_x = layer_x[num_train_rows_per_block:,:]
-            validation_y = layer_y[num_train_rows_per_block:,:]
-            layer_x = layer_x[:num_train_rows_per_block,:]
-            layer_y = layer_y[:num_train_rows_per_block,:]
-            model = catboost.CatBoostRegressor(**cat_params)
-            model.fit(layer_x, layer_y, eval_set=(validation_x,validation_y))
-            slice_models.append(model)
-        # For some reason complains about models having different dimensions,
-        # when checks num outputs of last in the list against the others.
-        # I don't know why last one doesn't have proper set of outputs.
-        del slice_models[:-1]
-        block_model = catboost.sum_models(slice_models, weights=[1.0/len(slice_models)] * len(slice_models))
+        train_x = train_x.reshape((max_batch_size,-1)) # Leaving layer duplicates of scalars for now
+        small_random_col = random_generator.random(max_batch_size).reshape((max_batch_size,1))
+        small_random_col *= 1e-20
+        train_y=np.where(train_y[:,]==0.0, small_random_col, train_y)
+        # Take validation data as last part of this batch; not good because
+        # do doubt highly correlated with training data, but to get things working...
+        num_train_rows_per_block = int(max_batch_size * train_proportion)
+        validation_x = train_x[num_train_rows_per_block:,:]
+        validation_y = train_y[num_train_rows_per_block:,:]
+        train_x = train_x[:num_train_rows_per_block,:]
+        train_y = train_y[:num_train_rows_per_block,:]
+        block_model = catboost.CatBoostRegressor(**cat_params)
+        block_model.fit(train_x, train_y, eval_set=(validation_x,validation_y))
         block_models.append(block_model)
     overall_model = catboost.sum_models(block_models, weights=[1.0/len(block_models)] * len(block_models))
     pass
