@@ -1,13 +1,13 @@
 # LEAP competition with feature engineering
 
 # This block will be different in Kaggle notebook:
-debug = True
+debug = False
 do_test = True
 is_rerun = False
 do_analysis = False
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = False
+clear_batch_cache_at_start = True
 scale_using_range_limits = False
 use_float64 = False
 model_type = "catboost"
@@ -22,9 +22,9 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000
+    max_train_rows = 10000
     max_test_rows  = 1000000000
-    max_batch_size = 2500  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 50  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 50
@@ -1304,22 +1304,25 @@ def do_catboost_training():
     global overall_best_val_loss
 
     cat_params = {
-                    'iterations': 10, 
-                    'depth': 8, 
+                    'iterations': 5, 
+                    'depth': 4, 
                     'task_type' : "CPU" if machine == "narg" else "GPU",
                     'use_best_model': False, # requires validation data
                     #'eval_metric': 'R2',
                     'loss_function': 'MultiRMSE',
                     'early_stopping_rounds': 200,
                     'learning_rate': 0.05,
-                    'border_count': 32,
+                    'border_count': 16,
                     'l2_leaf_reg': 3,
                     "verbose": 500 # iterations per output
                 }
 
     random_generator = np.random.default_rng()
-    block_models = []
-    for block_idx in range(num_train_rows // max_batch_size):
+    overall_model = None
+    num_models = 0
+    num_batches = num_train_rows // max_batch_size
+    for batch_idx, block_idx in enumerate(range(num_batches)):
+        print(f"Catboost batch {batch_idx} of {num_batches}")
         block_base_row_idx = block_idx * max_batch_size
         train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
         train_x = train_x.reshape((max_batch_size,-1)) # Leaving layer duplicates of scalars for now
@@ -1335,8 +1338,22 @@ def do_catboost_training():
         train_y = train_y[:num_train_rows_per_block,:]
         block_model = catboost.CatBoostRegressor(**cat_params)
         block_model.fit(train_x, train_y, eval_set=(validation_x,validation_y))
-        block_models.append(block_model)
-    overall_model = catboost.sum_models(block_models, weights=[1.0/len(block_models)] * len(block_models))
+        num_models += 1
+        if not overall_model:
+            overall_model = block_model
+        else:
+            new_propn = 1.0 / num_models
+            old_propn = 1.0 - new_propn
+            overall_model = catboost.sum_models((overall_model, block_model), 
+                                                weights=(old_propn, new_propn))
+        del block_model
+        gc.collect()
+        if os.path.exists(stopfile_path):
+            print("Stop file detected, deleting it and stopping now")
+            os.remove(stopfile_path)
+            stop_requested = True
+            break
+
     with open(model_save_path, "wb") as fd:
         pickle.dump(overall_model, fd)
     overall_best_model_name = model_save_path # not measuring goodness yet
