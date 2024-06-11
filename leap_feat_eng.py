@@ -1299,6 +1299,9 @@ def do_cnn_training():
 
 def do_catboost_training():
     # Catboost, mutually exclusive to start with
+    global stop_requested
+    global overall_best_model, overall_best_model_state, overall_best_model_name
+    global overall_best_val_loss
 
     cat_params = {
                     'iterations': 10, 
@@ -1334,7 +1337,12 @@ def do_catboost_training():
         block_model.fit(train_x, train_y, eval_set=(validation_x,validation_y))
         block_models.append(block_model)
     overall_model = catboost.sum_models(block_models, weights=[1.0/len(block_models)] * len(block_models))
-    pass
+    with open(model_save_path, "wb") as fd:
+        pickle.dump(overall_model, fd)
+    overall_best_model_name = model_save_path # not measuring goodness yet
+    overall_best_model = overall_model
+    return overall_model
+
 
 for param_permutation in param_permutations:
     if stop_requested:
@@ -1356,9 +1364,13 @@ for param_permutation in param_permutations:
         for key in param_permutation.keys():
             print(f"... {key}={param_permutation[key]}")
             suffix += f"_{key}_{param_permutation[key]}"
-    model_save_path = model_root_path + suffix + ".pt"
-    with open(loss_log_path, 'a') as fd:
-        fd.write(f'{model_save_path}\n')
+    model_save_path = model_root_path + suffix
+    if model_type == "cnn":
+        model_save_path += ".pt"
+        with open(loss_log_path, 'a') as fd:
+            fd.write(f'{model_save_path}\n')
+    else:
+        model_save_path += ".pkl"
 
     if model_type == "cnn":
         do_cnn_training()
@@ -1377,8 +1389,9 @@ if do_test:
     submission_df = None
 
     print(f'Using model {overall_best_model_name} for test run and submission')
-    overall_best_model.load_state_dict(overall_best_model_state)
-    overall_best_model.eval()
+    if model_type == "cnn":
+        overall_best_model.load_state_dict(overall_best_model_state)
+        overall_best_model.eval()
  
     base_row_idx = 0
     num_test_rows = min(max_test_rows, len(test_hf))
@@ -1391,13 +1404,17 @@ if do_test:
         xt_prenorm, _ = preprocess_data(subset_df, False)
         xt, _         = normalise_data(xt_prenorm, None, mx, sx, my, sy, False)
 
-        # Convert the current slice of xt to a PyTorch tensor
-        inputs = torch.from_numpy(xt).to(device)
+        if model_type == "cnn":
+            # Convert the current slice of xt to a PyTorch tensor
+            inputs = torch.from_numpy(xt).to(device)
 
-        # No need to track gradients for inference
-        with torch.no_grad():
-            outputs_pred = overall_best_model(inputs)
-            y_predictions = outputs_pred.cpu().numpy()
+            # No need to track gradients for inference
+            with torch.no_grad():
+                outputs_pred = overall_best_model(inputs)
+                y_predictions = outputs_pred.cpu().numpy()
+        else:
+            xt = xt.reshape((max_batch_size,-1)) # Leaving layer duplicates of scalars for now
+            y_predictions = overall_best_model.predict(xt)
 
         unscale_outputs(y_predictions, my, sy)
 
