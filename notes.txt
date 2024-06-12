@@ -17,6 +17,7 @@ o Analyse which columns contributing most to error metric:
    - ptend_q0002 cloud liquid/ice mixing ratios and ptend_q0002 ice mixing ratios
    -- both to do with condensation/evaporation
    -- mass mixing ratio is m(ice/water) / m(dry air) 
+o Prev expts where knocked out half featurs etc bogus because before new ones added
 o Would I do better by just zeroing/averaging some output columns with poor R2?
   - Should be able to analyse without retraining on best model, extending R2
     analysis to all validation set and checking if substitute with avg of training
