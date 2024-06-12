@@ -79,6 +79,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 6m ago · Commit 0b349a25 first catboost test with only 10000 rows
+0.17413
+
+submission.csv
 Complete · 3m ago · Commit 20fe5c45b trying a simpler feature set and model on a hunch in case converged better, still with poly output layer, but val loss doesn't look good
 0.59769
 

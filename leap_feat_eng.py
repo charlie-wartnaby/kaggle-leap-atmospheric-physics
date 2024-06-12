@@ -22,9 +22,9 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 10000
+    max_train_rows = 100000
     max_test_rows  = 1000000000
-    max_batch_size = 50  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 50
@@ -260,19 +260,6 @@ unexpanded_col_list = [
     ColumnInfo(False, 'cam_out_SOLLD',    'downward diffuse near-infrared solar flux to surface', 1, 'W/m2'   ),
 ]
 
-if do_feature_knockout:
-    current_normal_knockout_features = []
-else:
-    current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
-                                    'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
-
-for feature in current_normal_knockout_features:
-    # Slow but trivial one-off
-    for i in range(len(unexpanded_col_list)):
-        if unexpanded_col_list[i].name == feature:
-            del unexpanded_col_list[i]
-            break
-
 # Add columns for new features
 unexpanded_col_list.append(ColumnInfo(True, 'pressure',             'air pressure',                        60, 'N/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'density',              'air density',                         60, 'kg/m3'      ))
@@ -301,6 +288,27 @@ unexpanded_col_list.append(ColumnInfo(True, 'direct_sw_absorb',     'direct shor
 unexpanded_col_list.append(ColumnInfo(True, 'diffuse_sw_absorb',    'diffuse shortwave absorbance',         1, 'W/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'direct_lw_absorb',     'direct longwave absorbance',           1, 'W/m2'       ))
 unexpanded_col_list.append(ColumnInfo(True, 'diffuse_lw_absorb',    'diffuse longwave absorbance',          1, 'W/m2'       ))
+
+
+if do_feature_knockout:
+    current_normal_knockout_features = []
+else:
+    if model_type == "cnn":
+        current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
+                                        'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
+    else:
+        # Experimental tiny subset of only key features to see if catboost can work
+        # fast enough to cover more training set
+        key_features = set(['state_q0002', 'state_q0003', 'rel_humidity'])
+        current_normal_knockout_features = [feat.name for feat in unexpanded_col_list if feat.is_input and feat.name not in key_features]
+
+for feature in current_normal_knockout_features:
+    # Slow but trivial one-off
+    for i in range(len(unexpanded_col_list)):
+        if unexpanded_col_list[i].name == feature:
+            del unexpanded_col_list[i]
+            break
+
 
 unexpanded_col_names = [col.name for col in unexpanded_col_list]
 unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
@@ -1304,15 +1312,15 @@ def do_catboost_training():
     global overall_best_val_loss
 
     cat_params = {
-                    'iterations': 5, 
-                    'depth': 4, 
+                    'iterations': 10, 
+                    'depth': 8, 
                     'task_type' : "CPU" if machine == "narg" else "GPU",
                     'use_best_model': False, # requires validation data
                     #'eval_metric': 'R2',
                     'loss_function': 'MultiRMSE',
                     'early_stopping_rounds': 200,
                     'learning_rate': 0.05,
-                    'border_count': 16,
+                    'border_count': 32,
                     'l2_leaf_reg': 3,
                     "verbose": 500 # iterations per output
                 }
