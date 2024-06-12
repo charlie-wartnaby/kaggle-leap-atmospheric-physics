@@ -35,6 +35,9 @@ o Try other ML techniques apart from NN
  - can't do one atm level at a time due to different y-scalings if premultiplied,
    though could without submission weightings
  - apply catboost only to poor R2 outputs of CNN, and then mix only those in?
+ - Use R2 scores from catboost and CNN to decide weighting for each output?
+ - q0001 (moistening) and q0002 (cloud liquid ratio) worst from CNN at present but 
+   all could do with some help
 o Ensemble method combining independent technique(s) and NN
 o Would it help to remove more old feature columns? Could automate experiment
   - brief expt removed temperature, bit worse

@@ -4,7 +4,7 @@
 debug = False
 do_test = True
 is_rerun = False
-do_analysis = False
+do_analysis = True
 do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = True
@@ -14,17 +14,17 @@ model_type = "catboost"
 #
 
 if debug:
-    max_train_rows = 100
+    max_train_rows = 1000
     max_test_rows  = 100
-    max_batch_size = 10
+    max_batch_size = 100
     patience = 4
     train_proportion = 0.8
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000000
+    max_train_rows = 100000
     max_test_rows  = 1000000000
-    max_batch_size = 50000  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 10000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 50
@@ -82,6 +82,7 @@ import pickle
 import polars as pl
 import re
 import shutil
+import sklearn.metrics
 import sklearn.model_selection
 import socket
 import sys
@@ -1130,13 +1131,11 @@ def unscale_outputs(y, my, sy):
 
 
 
-def analyse_batch(analysis_df, inputs, outputs_pred, outputs_true):
+def analyse_batch(analysis_df, outputs_pred_np, outputs_true_np):
     """Analyse batch of true versus predicted outputs"""
 
     # Return to original output scalings (but with submission weights
     # multiplied in) to match competition metric
-    outputs_pred_np = outputs_pred.cpu().numpy()
-    outputs_true_np = outputs_true.cpu().numpy()
     unscale_outputs(outputs_pred_np, my, sy)
     unscale_outputs(outputs_true_np, my, sy)
 
@@ -1252,7 +1251,9 @@ def do_cnn_training():
                 outputs_pred = model(inputs)
                 val_loss += criterion(outputs_pred, outputs_true).item()
                 if do_analysis and analysis_df.height < max_analysis_output_rows:
-                    analysis_df = analyse_batch(analysis_df, inputs, outputs_pred, outputs_true)
+                    outputs_pred_np = outputs_pred.cpu().numpy()
+                    outputs_true_np = outputs_true.cpu().numpy()
+                    analysis_df = analyse_batch(analysis_df, outputs_pred_np, outputs_true_np)
 
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Validation batch {batch_idx + 1}')
@@ -1328,9 +1329,8 @@ def do_catboost_training():
     random_generator = np.random.default_rng()
     overall_model = None
     num_models = 0
-    num_batches = num_train_rows // max_batch_size
-    for batch_idx, block_idx in enumerate(range(num_batches)):
-        print(f"Catboost batch {batch_idx} of {num_batches}")
+    for batch_idx, block_idx in enumerate(train_block_idx):
+        print(f"Catboost training batch {batch_idx+1} of {len(train_block_idx)}")
         block_base_row_idx = block_idx * max_batch_size
         train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
         train_x = train_x.reshape((max_batch_size,-1)) # Leaving layer duplicates of scalars for now
@@ -1339,13 +1339,8 @@ def do_catboost_training():
         train_y=np.where(train_y[:,]==0.0, small_random_col, train_y)
         # Take validation data as last part of this batch; not good because
         # do doubt highly correlated with training data, but to get things working...
-        num_train_rows_per_block = int(max_batch_size * train_proportion)
-        validation_x = train_x[num_train_rows_per_block:,:]
-        validation_y = train_y[num_train_rows_per_block:,:]
-        train_x = train_x[:num_train_rows_per_block,:]
-        train_y = train_y[:num_train_rows_per_block,:]
         block_model = catboost.CatBoostRegressor(**cat_params)
-        block_model.fit(train_x, train_y, eval_set=(validation_x,validation_y))
+        block_model.fit(train_x, train_y)
         num_models += 1
         if not overall_model:
             overall_model = block_model
@@ -1366,6 +1361,34 @@ def do_catboost_training():
         pickle.dump(overall_model, fd)
     overall_best_model_name = model_save_path # not measuring goodness yet
     overall_best_model = overall_model
+
+    if stop_requested:
+        return
+
+    # Validation step
+    if do_analysis:
+        analysis_df = pl.DataFrame()
+    
+    for batch_idx, block_idx in enumerate(val_block_idx):
+        block_base_row_idx = block_idx * max_batch_size
+        train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
+        train_x = train_x.reshape((max_batch_size,-1)) # Leaving layer duplicates of scalars for now
+        predicted_y = overall_model.predict(train_x)
+        r2_score = sklearn.metrics.r2_score(train_y, predicted_y)
+        print(f"Catboost validation batch {batch_idx+1} of {len(val_block_idx)} normalised r2={r2_score}")
+        if do_analysis and analysis_df.height < max_analysis_output_rows:
+            analysis_df = analyse_batch(analysis_df, predicted_y, train_y)
+
+        if os.path.exists(stopfile_path):
+            print("Stop file detected, deleting it and stopping now")
+            os.remove(stopfile_path)
+            stop_requested = True
+            break
+
+    if do_analysis:
+        analysis_df.head(max_analysis_output_rows).write_csv(analysis_df_path)
+        calc_output_r2_ranking(analysis_df)
+
     return overall_model
 
 
