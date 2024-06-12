@@ -7,7 +7,7 @@ is_rerun = False
 do_analysis = False
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = True
+clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
 model_type = "catboost"
@@ -22,7 +22,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
     max_batch_size = 50000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
@@ -1438,7 +1438,7 @@ if do_test:
                 outputs_pred = overall_best_model(inputs)
                 y_predictions = outputs_pred.cpu().numpy()
         else:
-            xt = xt.reshape((max_batch_size,-1)) # Leaving layer duplicates of scalars for now
+            xt = xt.reshape((num_rows,-1)) # Leaving layer duplicates of scalars for now
             y_predictions = overall_best_model.predict(xt)
 
         unscale_outputs(y_predictions, my, sy)
