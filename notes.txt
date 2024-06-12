@@ -31,11 +31,9 @@ o Does humidity have significant effect on heat capacity? And cloud/rain/snow co
 o Deeper/alternative network structures
 o Try other ML techniques apart from NN
  - catboost in batches using sum_model, guess train vector and scalars separately
- - e.g. notebook https://www.kaggle.com/code/lonnieqin/leap-catboost-baseline
- - multiregression mode seems to allow fit of multiple target columns simultaneously
-   https://catboost.ai/en/docs/concepts/python-reference_catboostregressor_fit
- - could fit one atmospheric layer at a time using same model, blend in
-   neighbouring ones CNN-like as refinement
+ - can't do one atm level at a time due to different y-scalings if premultiplied,
+   though could without submission weightings
+ - apply catboost only to poor R2 outputs of CNN, and then mix only those in?
 o Ensemble method combining independent technique(s) and NN
 o Would it help to remove more old feature columns? Could automate experiment
   - brief expt removed temperature, bit worse
