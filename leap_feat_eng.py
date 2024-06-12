@@ -14,17 +14,17 @@ model_type = "catboost"
 #
 
 if debug:
-    max_train_rows = 1000
+    max_train_rows = 10000
     max_test_rows  = 100
-    max_batch_size = 100
+    max_batch_size = 1000
     patience = 4
     train_proportion = 0.8
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 100000
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
-    max_batch_size = 10000  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 20000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 50
@@ -299,8 +299,29 @@ else:
                                         'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
     else:
         # Experimental tiny subset of only key features to see if catboost can work
-        # fast enough to cover more training set
-        key_features = set(['state_q0002', 'state_q0003', 'rel_humidity'])
+        # fast enough to cover more training set. Well, longer now
+        key_features = set(['state_q0002', 'state_q0003', 'rel_humidity',
+                            'state_v',
+                            'state_t',
+                            'cam_in_LANDFRAC',
+                            'diffuse_lw_absorb',
+                            'abs_momentum',
+                            'direct_sw_absorb',
+                            'buoyancy',
+                            'up_integ_tot_cloud',
+                            'cam_in_ALDIR',
+                            'recip_rel_humidity',
+                            'state_q0001',
+                            'cam_in_OCNFRAC',
+                            'pbuf_LHFLX',
+                            'pbuf_CH4',
+                            'state_ps',
+                            'cam_in_ICEFRAC',
+                            'pressure',
+                            'pbuf_COSZRS',
+                            'density'
+])
+        
         current_normal_knockout_features = [feat.name for feat in unexpanded_col_list if feat.is_input and feat.name not in key_features]
 
 for feature in current_normal_knockout_features:
@@ -724,6 +745,7 @@ else:
             start_time = time.time()
             with open(prenorm_cache_path, 'wb') as fd:
                 pickle.dump((cache_np_x, cache_np_y), fd)
+            del cache_np_x, cache_np_y
             gc.collect()
 
     # Mean of means gives us overall mean for each quantity (whole vectors for inputs,
@@ -761,6 +783,7 @@ else:
                 y_diffs_sqd = (y_prenorm - my) ** 2
                 y_sum_sqs = y_diffs_sqd.sum(axis=0)
                 y_sumsq_sample.append(y_sum_sqs)
+                del x_prenorm, y_prenorm, x_diffs_sqd, y_diffs_sqd
                 gc.collect() # Had a couple of spontaneous Ubuntu reboots here previously
 
         # Now normalise whole dataset using statistics gathered during preprocessing
@@ -794,6 +817,7 @@ else:
             with open(postnorm_cache_path, 'wb') as fd:
                 pickle.dump((x_postnorm, y_postnorm), fd)
             os.remove(prenorm_cache_path)
+            del x_postnorm, y_postnorm
             gc.collect()
 
 # Save scalings, need them to process test data if do a rerun
@@ -1099,14 +1123,15 @@ output_size = len(expanded_names_output)
 bad_col_names = []
 bad_col_names.extend([f'ptend_q0001_{i}' for i in range(12)]) # official
 bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15)]) # official
-bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15, 26)]) # training value ranges zero or tiny up to 25
-bad_col_names.extend([f'ptend_q0003_{i}' for i in range(15)]) # officially to 12 was doing 15
+#bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15, 26)]) # training value ranges zero or tiny up to 25
+bad_col_names.extend([f'ptend_q0003_{i}' for i in range(12)]) # officially to 12 was doing 15
 bad_col_names.extend([f'ptend_u_{i}' for i in range(12)]) # official
-bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
+#bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
 bad_col_names.extend([f'ptend_v_{i}' for i in range(12)]) # official
 bad_col_names_set = set()
 for name in bad_col_names:
     bad_col_names_set.add(name)
+
 
 def unscale_outputs(y, my, sy):
     """Undo normalisation to return to true values (but with submission
@@ -1127,7 +1152,7 @@ def unscale_outputs(y, my, sy):
     print(f"Zeroed-out due to scaling not blacklist: " + str(zeroed_cols))
 
     # undo y scaling
-    y = (y * sy) # Experimentint again with no mean offset: + my
+    y = (y * sy) # Experimenting again with no mean offset: + my
 
 
 
@@ -1178,6 +1203,8 @@ def calc_output_r2_ranking(analysis_df):
     ranking_df = pl.DataFrame(ranking_list, ["Var name", "R2", "Description"])
     ranking_df.write_csv(r2_ranking_path)
 
+    # Use list of <=0 to exclude from testing
+    return [entry[0] for entry in ranking_list if entry[1] <= 0]
 
 
 # Training loop
@@ -1273,7 +1300,7 @@ def do_cnn_training():
 
         if do_analysis:
             analysis_df.head(max_analysis_output_rows).write_csv(analysis_df_path)
-            calc_output_r2_ranking(analysis_df)
+            bad_r2_output_names = calc_output_r2_ranking(analysis_df)
 
         if avg_val_loss < overall_best_val_loss:
             overall_best_val_loss = avg_val_loss
@@ -1304,6 +1331,8 @@ def do_cnn_training():
             os.remove(stopfile_path)
             stop_requested = True
             break
+
+    return bad_r2_output_names
 
 
 def do_catboost_training():
@@ -1387,9 +1416,9 @@ def do_catboost_training():
 
     if do_analysis:
         analysis_df.head(max_analysis_output_rows).write_csv(analysis_df_path)
-        calc_output_r2_ranking(analysis_df)
+        bad_r2_output_names = calc_output_r2_ranking(analysis_df)
 
-    return overall_model
+    return  bad_r2_output_names
 
 
 for param_permutation in param_permutations:
@@ -1421,9 +1450,9 @@ for param_permutation in param_permutations:
         model_save_path += ".pkl"
 
     if model_type == "cnn":
-        do_cnn_training()
+        bad_r2_output_names = do_cnn_training()
     else:
-        do_catboost_training()
+        bad_r2_output_names = do_catboost_training()
 
     if do_feature_knockout:
         with open(feature_knockout_path, 'a') as fd:
@@ -1441,6 +1470,9 @@ if do_test:
         overall_best_model.load_state_dict(overall_best_model_state)
         overall_best_model.eval()
  
+    for name in bad_r2_output_names:
+        bad_col_names_set.add(name)
+
     base_row_idx = 0
     num_test_rows = min(max_test_rows, len(test_hf))
     while base_row_idx < num_test_rows:
