@@ -43,6 +43,8 @@ o Would it help to remove more old feature columns? Could automate experiment
   - brief expt removed temperature, bit worse
 o Would it help to group columns differently depending on technique?
 o Train/val split does appear deterministic (random seeds set)
+o Refactor so that cached data stable with all features, take any subset from that
+  when used
 
 Scoring and why predictions zeroed for low-variance cols in example
 -------------------------------------------------------------------
@@ -79,6 +81,10 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 
 Submission Results
 ------------------
+
+submission.csv
+Complete · 2m ago · Commit 0d79ad2 catboost test run with 1M rows after R2<=0 exclusion bugfix
+0.23663
 
 Oops what went wrong with this?
 submission.csv
