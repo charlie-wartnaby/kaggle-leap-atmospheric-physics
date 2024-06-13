@@ -22,11 +22,11 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000000
+    max_train_rows = 100000
     max_test_rows  = 1000000000
     max_batch_size = 20000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.9
+    train_proportion = 0.8
     max_epochs = 50
 
 subset_base_row = 0
@@ -1172,7 +1172,11 @@ def analyse_batch(analysis_df, outputs_pred_np, outputs_true_np):
     error_variance_sqd = np.square(error_residues)
     avg_error_variance_sqd = np.mean(error_variance_sqd, axis=0)
     r2_metric = 1.0 - (avg_error_variance_sqd / true_variance_sqd)
-    print(f"Batch R2={np.mean(r2_metric)}")
+    all_col_r2 = np.mean(r2_metric)
+    good_cols = r2_metric[np.where(r2_metric > 0.0)]
+    good_col_r2_sum = np.sum(good_cols)
+    avg_r2_zeroed_bad_cols = good_col_r2_sum / r2_metric.shape[0]
+    print(f"Batch all R2={all_col_r2}, bad excl R2={avg_r2_zeroed_bad_cols}")
     num_rows = outputs_true_np.shape[0]
     r2_cols = np.tile(r2_metric, (num_rows,1))
 
