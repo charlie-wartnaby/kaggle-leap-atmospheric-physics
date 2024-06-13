@@ -7,7 +7,7 @@ is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = True
+clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
 model_type = "catboost"
@@ -22,7 +22,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000000
+    max_train_rows = 1000000
     max_test_rows  = 1000000000
     max_batch_size = 20000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
@@ -1193,18 +1193,21 @@ def analyse_batch(analysis_df, outputs_pred_np, outputs_true_np):
 def calc_output_r2_ranking(analysis_df):
     """List columns in order of R2 goodness to identify worst offenders"""
 
+    bad_r2_names = []
     ranking_list = []
     for i, col_name in enumerate(expanded_names_output):
         r2_name = col_name + "_r2"
         r2_avg = analysis_df[r2_name].mean()
+        if r2_avg <= 0.0:
+            # Will use mean for this column instead as prediction worse than that
+            bad_r2_names.append(col_name)
         r2_description = expanded_cols_by_name[col_name].description
         ranking_list.append((r2_name, r2_avg, r2_description))
     ranking_list.sort(key=lambda x: x[1])
     ranking_df = pl.DataFrame(ranking_list, ["Var name", "R2", "Description"])
     ranking_df.write_csv(r2_ranking_path)
 
-    # Use list of <=0 to exclude from testing
-    return [entry[0] for entry in ranking_list if entry[1] <= 0]
+    return bad_r2_names
 
 
 # Training loop
@@ -1470,6 +1473,7 @@ if do_test:
         overall_best_model.load_state_dict(overall_best_model_state)
         overall_best_model.eval()
  
+    print("Removing poor R2 cols from those that will be predicted:", bad_r2_output_names)
     for name in bad_r2_output_names:
         bad_col_names_set.add(name)
 

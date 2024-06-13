@@ -80,6 +80,11 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 Submission Results
 ------------------
 
+Oops what went wrong with this?
+submission.csv
+Complete · 3m ago · Commit 7190f38 catboost with more features and all training rows, substituting mean where R2 <= 0
+-875470.00698
+
 submission.csv
 Complete · 6m ago · Commit 0b349a25 first catboost test with only 10000 rows
 0.17413
