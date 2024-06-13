@@ -1,7 +1,7 @@
 # LEAP competition with feature engineering
 
 # This block will be different in Kaggle notebook:
-debug = False
+debug = True
 do_test = True
 is_rerun = False
 do_analysis = True
@@ -1154,9 +1154,16 @@ def unscale_outputs(y, my, sy):
     # undo y scaling
     y = (y * sy) # Experimenting again with no mean offset: + my
 
+class AnalysisData():
+    def __init__(self):
+        self.df = pl.DataFrame()
+        self.num_rows = 0
+        self.r2_raw = 0.0
+        self.r2_clean = 0.0
+        self.r2_vec = None
 
 
-def analyse_batch(analysis_df, outputs_pred_np, outputs_true_np):
+def analyse_batch(analysis_data, outputs_pred_np, outputs_true_np):
     """Analyse batch of true versus predicted outputs"""
 
     # Return to original output scalings (but with submission weights
@@ -1170,38 +1177,47 @@ def analyse_batch(analysis_df, outputs_pred_np, outputs_true_np):
 
     error_residues = outputs_true_np - outputs_pred_np
     error_variance_sqd = np.square(error_residues)
+    num_new_rows = error_residues.shape[0]
+    new_tot_rows = analysis_data.num_rows + num_new_rows
+    factor_prev = analysis_data.num_rows / new_tot_rows
+    factor_new = 1.0 - factor_prev
     avg_error_variance_sqd = np.mean(error_variance_sqd, axis=0)
     r2_metric = 1.0 - (avg_error_variance_sqd / true_variance_sqd)
+    if analysis_data.num_rows <= 0:
+        analysis_data.r2_vec = np.zeros_like(r2_metric)
+    analysis_data.r2_vec = factor_prev * analysis_data.r2_vec + factor_new * r2_metric
     all_col_r2 = np.mean(r2_metric)
+    analysis_data.r2_raw = factor_prev * analysis_data.r2_raw + factor_new * all_col_r2
     good_cols = r2_metric[np.where(r2_metric > 0.0)]
     good_col_r2_sum = np.sum(good_cols)
     avg_r2_zeroed_bad_cols = good_col_r2_sum / r2_metric.shape[0]
+    analysis_data.r2_clean = factor_prev * analysis_data.r2_clean + factor_new * avg_r2_zeroed_bad_cols
+    analysis_data.num_rows += num_new_rows
     print(f"Batch all R2={all_col_r2}, bad excl R2={avg_r2_zeroed_bad_cols}")
-    num_rows = outputs_true_np.shape[0]
-    r2_cols = np.tile(r2_metric, (num_rows,1))
 
-    batch_df = pl.DataFrame()
-    for i, output_name in enumerate(expanded_names_output):
-        batch_df = batch_df.with_columns(pl.from_numpy(outputs_true_np[:,i], [output_name + "_true"]))
-        batch_df = batch_df.with_columns(pl.from_numpy(outputs_pred_np[:,i], [output_name + "_pred"]))
-        batch_df = batch_df.with_columns(pl.from_numpy(r2_cols[:,i], [output_name + "_r2"]))
-    for i, vector_name in enumerate(unexpanded_output_vector_col_names):
-        first_col_idx = i * num_atm_levels
-        end_col_idx = first_col_idx + num_atm_levels
-        r2_avg_for_vector = np.mean(r2_cols[:, first_col_idx:end_col_idx], axis=1)
-        batch_df = batch_df.with_columns(pl.from_numpy(r2_avg_for_vector, [vector_name + "_vecavgr2"]))
-    
-    return pl.concat([analysis_df, batch_df])
+    if do_analysis and analysis_data.df.height < max_analysis_output_rows:
+        r2_cols = np.tile(r2_metric, (num_new_rows,1))
+        batch_df = pl.DataFrame()
+        for i, output_name in enumerate(expanded_names_output):
+            batch_df = batch_df.with_columns(pl.from_numpy(outputs_true_np[:,i], [output_name + "_true"]))
+            batch_df = batch_df.with_columns(pl.from_numpy(outputs_pred_np[:,i], [output_name + "_pred"]))
+            batch_df = batch_df.with_columns(pl.from_numpy(r2_cols[:,i], [output_name + "_r2"]))
+        for i, vector_name in enumerate(unexpanded_output_vector_col_names):
+            first_col_idx = i * num_atm_levels
+            end_col_idx = first_col_idx + num_atm_levels
+            r2_avg_for_vector = np.mean(r2_cols[:, first_col_idx:end_col_idx], axis=1)
+            batch_df = batch_df.with_columns(pl.from_numpy(r2_avg_for_vector, [vector_name + "_vecavgr2"]))
+        analysis_data.df = pl.concat([analysis_data.df, batch_df])
     
 
-def calc_output_r2_ranking(analysis_df):
+def calc_output_r2_ranking(analysis_data):
     """List columns in order of R2 goodness to identify worst offenders"""
 
     bad_r2_names = []
     ranking_list = []
     for i, col_name in enumerate(expanded_names_output):
         r2_name = col_name + "_r2"
-        r2_avg = analysis_df[r2_name].mean()
+        r2_avg = analysis_data.r2_vec[i].mean()
         if r2_avg <= 0.0:
             # Will use mean for this column instead as prediction worse than that
             bad_r2_names.append(col_name)
@@ -1275,8 +1291,7 @@ def do_cnn_training():
                     total_loss = 0  # Reset the loss for the next n steps
         
         # Validation step
-        if do_analysis:
-            analysis_df = pl.DataFrame()
+        analysis_data = AnalysisData()
 
         model.eval()
         val_loss = 0
@@ -1284,10 +1299,10 @@ def do_cnn_training():
             for batch_idx, (inputs, outputs_true) in enumerate(val_loader):
                 outputs_pred = model(inputs)
                 val_loss += criterion(outputs_pred, outputs_true).item()
-                if do_analysis and analysis_df.height < max_analysis_output_rows:
+                if do_analysis:
                     outputs_pred_np = outputs_pred.cpu().numpy()
                     outputs_true_np = outputs_true.cpu().numpy()
-                    analysis_df = analyse_batch(analysis_df, outputs_pred_np, outputs_true_np)
+                    analyse_batch(analysis_data, outputs_pred_np, outputs_true_np)
 
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Validation batch {batch_idx + 1}')
@@ -1298,7 +1313,7 @@ def do_cnn_training():
         with open(epoch_counter_path, 'w') as fd:
             fd.write(f'{tot_epochs}\n')
 
-        print(f'Epoch {tot_epochs}, Validation Loss: {avg_val_loss}')
+        print(f'Epoch {tot_epochs}, Validation Loss: {avg_val_loss}, R2: {analysis_data.r2_clean}')
         with open(loss_log_path, 'a') as fd:
             fd.write(f'{tot_epochs},{avg_val_loss}\n')
 
@@ -1306,8 +1321,8 @@ def do_cnn_training():
         scheduler.step(avg_val_loss)  # Adjust learning rate
 
         if do_analysis:
-            analysis_df.head(max_analysis_output_rows).write_csv(analysis_df_path)
-            bad_r2_output_names = calc_output_r2_ranking(analysis_df)
+            analysis_data.df.head(max_analysis_output_rows).write_csv(analysis_df_path)
+            bad_r2_output_names = calc_output_r2_ranking(analysis_data)
 
         if avg_val_loss < overall_best_val_loss:
             overall_best_val_loss = avg_val_loss
@@ -1402,8 +1417,7 @@ def do_catboost_training():
         return
 
     # Validation step
-    if do_analysis:
-        analysis_df = pl.DataFrame()
+    analysis_data = AnalysisData()
     
     for batch_idx, block_idx in enumerate(val_block_idx):
         block_base_row_idx = block_idx * max_batch_size
@@ -1412,8 +1426,7 @@ def do_catboost_training():
         predicted_y = overall_model.predict(train_x)
         r2_score = sklearn.metrics.r2_score(train_y, predicted_y)
         print(f"Catboost validation batch {batch_idx+1} of {len(val_block_idx)} normalised r2={r2_score}")
-        if do_analysis and analysis_df.height < max_analysis_output_rows:
-            analysis_df = analyse_batch(analysis_df, predicted_y, train_y)
+        analyse_batch(analysis_data, predicted_y, train_y)
 
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
@@ -1421,9 +1434,8 @@ def do_catboost_training():
             stop_requested = True
             break
 
-    if do_analysis:
-        analysis_df.head(max_analysis_output_rows).write_csv(analysis_df_path)
-        bad_r2_output_names = calc_output_r2_ranking(analysis_df)
+    analysis_data.df.head(max_analysis_output_rows).write_csv(analysis_df_path)
+    bad_r2_output_names = calc_output_r2_ranking(analysis_data)
 
     return  bad_r2_output_names
 
