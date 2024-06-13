@@ -82,6 +82,10 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 Submission Results
 ------------------
 
+submission.csv -- hmm slightly worse doing 10M not 1M training rows... many failed R2 test in fact.
+Complete · 4m ago · Commit f2bc0a9 all-rows catboost run after R2<=0 fix
+0.22795
+
 submission.csv
 Complete · 2m ago · Commit 0d79ad2 catboost test run with 1M rows after R2<=0 exclusion bugfix
 0.23663

@@ -1,0 +1,69 @@
+Loading training HoloFrame...
+Loading submission weights...
+Opening previous scalings...
+Saved scalings for next time
+Starting training loop...
+Catboost training batch 1 of 453
+0:	learn: 15.6717182	total: 24s	remaining: 3m 35s
+9:	learn: 14.5543765	total: 1m 9s	remaining: 0us
+Catboost training batch 2 of 453
+0:	learn: 19.3974998	total: 2.35s	remaining: 21.1s
+9:	learn: 18.4794683	total: 19.8s	remaining: 0us
+...
+Catboost validation batch 51 of 51 normalised r2=-6.516529048960994e+28
+Loading test HoloFrame...
+Using model model.pkl for test run and submission
+Removing poor R2 cols from those that will be predicted: [
+'ptend_t_17', 'ptend_t_18', 'ptend_t_19', 'ptend_t_21',
+'ptend_t_22', 'ptend_t_23', 'ptend_t_56', 'ptend_t_57', 'ptend_t_58', 'ptend_t_59',
+ 'ptend_q0001_13', 'ptend_q0001_15', 'ptend_q0001_19', 'ptend_q0001_20', 'ptend_q0001_21', 
+ 'ptend_q0001_22', 'ptend_q0001_23', 'ptend_q0001_24', 'ptend_q0001_25', 'ptend_q0001_26', 
+ 'ptend_q0001_27', 'ptend_q0001_35', 'ptend_q0001_37', 'ptend_q0001_40', 'ptend_q0001_43', 
+ 'ptend_q0001_52', 'ptend_q0001_53', 'ptend_q0002_24', 'ptend_q0002_28', 'ptend_q0002_29', 
+ 'ptend_q0002_30', 'ptend_q0002_31', 'ptend_q0002_32', 'ptend_q0002_33', 'ptend_q0002_34', 
+ 'ptend_q0002_35', 'ptend_q0002_36', 'ptend_q0002_37', 'ptend_q0002_38', 'ptend_q0002_39', 
+ 'ptend_q0002_44', 'ptend_q0002_45', 'ptend_q0002_46', 'ptend_q0002_47', 'ptend_q0002_48', 
+ 'ptend_q0002_53', 
+ 'ptend_q0003_13', 'ptend_q0003_14', 'ptend_q0003_18', 'ptend_q0003_19', 'ptend_q0003_20', 
+ 'ptend_q0003_28', 'ptend_q0003_32', 'ptend_q0003_33', 'ptend_q0003_34', 'ptend_q0003_35',
+  'ptend_q0003_36', 'ptend_q0003_37', 'ptend_q0003_38', 'ptend_q0003_39', 'ptend_q0003_40', 
+  'ptend_q0003_41', 'ptend_q0003_42', 'ptend_q0003_43', 'ptend_q0003_44', 'ptend_q0003_51', 
+  'ptend_q0003_52', 'ptend_q0003_53', 
+  'ptend_u_15', 'ptend_u_16', 'ptend_u_17', 'ptend_u_18', 'ptend_u_25', 'ptend_u_30', 'ptend_u_31', 
+  'ptend_u_32', 'ptend_u_33', 'ptend_u_34', 'ptend_u_35', 'ptend_u_36', 'ptend_u_37', 'ptend_u_38',
+   'ptend_u_39', 'ptend_u_40', 'ptend_u_41', 'ptend_u_42', 'ptend_u_43', 'ptend_u_44', 'ptend_u_45',
+    'ptend_u_46', 'ptend_u_47', 'ptend_u_48', 'ptend_u_49', 'ptend_u_50', 'ptend_u_51', 'ptend_u_52',
+     'ptend_u_53', 'ptend_u_54', 'ptend_u_55', 'ptend_u_56', 'ptend_u_57', 'ptend_u_58', 
+     'ptend_v_13',
+      'ptend_v_14', 'ptend_v_15', 'ptend_v_16', 'ptend_v_17', 'ptend_v_18', 'ptend_v_19', 'ptend_v_20', 
+      'ptend_v_21', 'ptend_v_22', 'ptend_v_23', 'ptend_v_24', 'ptend_v_25', 'ptend_v_26', 'ptend_v_27', 
+      'ptend_v_29', 'ptend_v_30', 'ptend_v_31', 'ptend_v_32', 'ptend_v_33', 'ptend_v_34', 'ptend_v_35',
+       'ptend_v_36', 'ptend_v_37', 'ptend_v_38', 'ptend_v_39', 'ptend_v_40', 'ptend_v_41', 'ptend_v_42', 
+       'ptend_v_43', 'ptend_v_44', 'ptend_v_45', 'ptend_v_46', 'ptend_v_47', 'ptend_v_48', 'ptend_v_49',
+        'ptend_v_50', 'ptend_v_51', 'ptend_v_52', 'ptend_v_53', 'ptend_v_54', 'ptend_v_55', 'ptend_v_56',
+         'ptend_v_57', 'ptend_v_58', 'ptend_v_59']
+Processing submission from row 0
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 20000
+...
+Processing submission from row 620000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+submission_df: shape: (9, 370)
+┌───────────┬───────────┬───────────┬───────────┬───┬───────────┬───────────┬───────────┬──────────┐
+│ statistic ┆ sample_id ┆ ptend_t_0 ┆ ptend_t_1 ┆ … ┆ cam_out_S ┆ cam_out_S ┆ cam_out_S ┆ cam_out_ │
+│ ---       ┆ ---       ┆ ---       ┆ ---       ┆   ┆ OLS       ┆ OLL       ┆ OLSD      ┆ SOLLD    │
+│ str       ┆ str       ┆ f64       ┆ f64       ┆   ┆ ---       ┆ ---       ┆ ---       ┆ ---      │
+│           ┆           ┆           ┆           ┆   ┆ f64       ┆ f64       ┆ f64       ┆ f64      │
+╞═══════════╪═══════════╪═══════════╪═══════════╪═══╪═══════════╪═══════════╪═══════════╪══════════╡
+│ count     ┆ 625000    ┆ 625000.0  ┆ 625000.0  ┆ … ┆ 625000.0  ┆ 625000.0  ┆ 625000.0  ┆ 625000.0 │
+│ null_coun ┆ 0         ┆ 0.0       ┆ 0.0       ┆ … ┆ 0.0       ┆ 0.0       ┆ 0.0       ┆ 0.0      │
+│ t         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆          │
+│ mean      ┆ null      ┆ 0.31763   ┆ -0.152548 ┆ … ┆ 0.56702   ┆ 0.583503  ┆ 0.716483  ┆ 0.58826  │
+│ std       ┆ null      ┆ 0.248093  ┆ 0.253514  ┆ … ┆ 0.289531  ┆ 0.290612  ┆ 0.292016  ┆ 0.241887 │
+│ min       ┆ test_0    ┆ -0.074617 ┆ -0.450506 ┆ … ┆ 0.342653  ┆ 0.354229  ┆ 0.454515  ┆ 0.369822 │
+│ 25%       ┆ null      ┆ 0.10183   ┆ -0.366138 ┆ … ┆ 0.346694  ┆ 0.361515  ┆ 0.462993  ┆ 0.380932 │
+│ 50%       ┆ null      ┆ 0.146292  ┆ -0.340449 ┆ … ┆ 0.35979   ┆ 0.37354   ┆ 0.488125  ┆ 0.409024 │
+│ 75%       ┆ null      ┆ 0.619648  ┆ 0.147292  ┆ … ┆ 0.80241   ┆ 0.827849  ┆ 1.059806  ┆ 0.832661 │
+│ max       ┆ test_9999 ┆ 0.681275  ┆ 0.251224  ┆ … ┆ 1.214312  ┆ 1.230245  ┆ 1.301834  ┆ 1.148153 │
+│           ┆ 9         ┆           ┆           ┆   ┆           ┆           ┆           ┆          │
+└───────────┴───────────┴───────────┴───────────┴───┴───────────┴───────────┴───────────┴──────────┘
