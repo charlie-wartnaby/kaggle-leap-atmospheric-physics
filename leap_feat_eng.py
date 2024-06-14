@@ -7,7 +7,7 @@ is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = True
+clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
 model_type = "catboost"
@@ -31,8 +31,8 @@ else:
 
 subset_base_row = 0
 
-multitrain_params = {'border_count' : [16,32], # 64 too much
-                     'depth' : [8,32],
+multitrain_params = {'border_count' : [32,16], # 64 too much
+                     'depth' : [8, 4], # crashed at 16, 12
                      'iterations' : [3, 20],
                      'learning_rate' : [0.02,0.1],
                      'l2_leaf_reg' : [2, 10]}
