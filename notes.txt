@@ -82,6 +82,10 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 Submission Results
 ------------------
 
+submission.csv -- doing better with more iterations and higher learning rate
+Complete · 4h ago · Commit 63d2cf47 multitrain hyperparam search with catboost, ended using model_border_count_16_depth_8_iterations_20_learning_rate_0.1_l2_leaf_reg_2.pkl
+0.30880
+
 submission.csv -- hmm slightly worse doing 10M not 1M training rows... many failed R2 test in fact.
 Complete · 4m ago · Commit f2bc0a9 all-rows catboost run after R2<=0 fix
 0.22795
