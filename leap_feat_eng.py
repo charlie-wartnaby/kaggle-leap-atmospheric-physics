@@ -1,7 +1,7 @@
 # LEAP competition with feature engineering
 
 # This block will be different in Kaggle notebook:
-debug = True
+debug = False
 do_test = True
 is_rerun = False
 do_analysis = True
@@ -22,7 +22,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 100000
+    max_train_rows = 1000000
     max_test_rows  = 1000000000
     max_batch_size = 20000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
@@ -31,7 +31,11 @@ else:
 
 subset_base_row = 0
 
-multitrain_params = {'depth' : [4,8,16]}
+multitrain_params = {'border_count' : [16,32], # 64 too much
+                     'depth' : [8,32],
+                     'iterations' : [3, 20],
+                     'learning_rate' : [0.02,0.1],
+                     'l2_leaf_reg' : [2, 10]}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -1427,8 +1431,10 @@ def do_catboost_training(exec_data, iterations=10, depth=8, learning_rate=0.05,
         fd.write(f'{analysis_data.r2_raw},{analysis_data.r2_clean}\n')
 
     if analysis_data.r2_clean > exec_data.overall_best_val_metric:
+        print(f'Best model so far {model_save_path}')
         exec_data.overall_best_model_name = model_save_path
         exec_data.overall_best_model = overall_model
+        exec_data.overall_best_val_metric = analysis_data.r2_clean
 
     return  bad_r2_output_names
 
@@ -1481,11 +1487,11 @@ for param_permutation in param_permutations:
     if model_type == "cnn":
         bad_r2_output_names = do_cnn_training(exec_data)
     else:
-        bad_r2_output_names = do_catboost_training(exec_data)
+        bad_r2_output_names = do_catboost_training(exec_data, **model_params)
 
     if do_feature_knockout:
         with open(feature_knockout_path, 'a') as fd:
-            fd.write(f"{feature_knockout_idx},{best_val_loss},{feature_knockout_name},{feature_knockout_description}\n")
+            fd.write(f"{feature_knockout_idx},{exec_data.overall_best_val_metric},{feature_knockout_name},{feature_knockout_description}\n")
 
 # Test
 if do_test:
