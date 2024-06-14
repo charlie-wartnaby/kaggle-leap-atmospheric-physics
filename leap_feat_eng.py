@@ -7,16 +7,16 @@ is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = False
+clear_batch_cache_at_start = True
 scale_using_range_limits = False
 use_float64 = False
 model_type = "catboost"
 #
 
 if debug:
-    max_train_rows = 10000
+    max_train_rows = 500
     max_test_rows  = 100
-    max_batch_size = 1000
+    max_batch_size = 100
     patience = 4
     train_proportion = 0.8
     max_epochs = 1
@@ -31,7 +31,7 @@ else:
 
 subset_base_row = 0
 
-multitrain_params = {}
+multitrain_params = {'depth' : [4,8,16]}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -1230,17 +1230,7 @@ def calc_output_r2_ranking(analysis_data):
     return bad_r2_names
 
 
-# Training loop
-stop_requested = False
-overall_best_model = None
-overall_best_model_state = None
-overall_best_model_name = ""
-overall_best_val_loss = float('inf')
-
-def do_cnn_training():
-    global stop_requested
-    global overall_best_model, overall_best_model_state, overall_best_model_name
-    global overall_best_val_loss
+def do_cnn_training(exec_data):
 
     if is_rerun and os.path.exists(epoch_counter_path):
         try:
@@ -1324,11 +1314,11 @@ def do_cnn_training():
             analysis_data.df.head(max_analysis_output_rows).write_csv(analysis_df_path)
             bad_r2_output_names = calc_output_r2_ranking(analysis_data)
 
-        if avg_val_loss < overall_best_val_loss:
-            overall_best_val_loss = avg_val_loss
-            overall_best_model = model
-            overall_best_model_state = model.state_dict() # TODO is this static anyway?
-            overall_best_model_name = model_save_path
+        if avg_val_loss < exec_data.overall_best_val_metric:
+            exec_data.overall_best_val_metric = avg_val_loss
+            exec_data.overall_best_model = model
+            exec_data.overall_best_model_state = model.state_dict() # TODO is this static anyway?
+            exec_data.overall_best_model_name = model_save_path
             print(f"{model_save_path} best so far")
 
         # Update best model if current epoch's validation loss is lower
@@ -1351,29 +1341,27 @@ def do_cnn_training():
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
             os.remove(stopfile_path)
-            stop_requested = True
+            exec_data.stop_requested = True
             break
 
     return bad_r2_output_names
 
 
-def do_catboost_training():
+def do_catboost_training(exec_data, iterations=10, depth=8, learning_rate=0.05,
+                                    border_count=32, l2_leaf_reg=3):
     # Catboost, mutually exclusive to start with
-    global stop_requested
-    global overall_best_model, overall_best_model_state, overall_best_model_name
-    global overall_best_val_loss
 
     cat_params = {
-                    'iterations': 10, 
-                    'depth': 8, 
+                    'iterations': iterations, 
+                    'depth': depth, 
                     'task_type' : "CPU" if machine == "narg" else "GPU",
                     'use_best_model': False, # requires validation data
                     #'eval_metric': 'R2',
                     'loss_function': 'MultiRMSE',
                     'early_stopping_rounds': 200,
-                    'learning_rate': 0.05,
-                    'border_count': 32,
-                    'l2_leaf_reg': 3,
+                    'learning_rate': learning_rate,
+                    'border_count': border_count,
+                    'l2_leaf_reg': l2_leaf_reg,
                     "verbose": 500 # iterations per output
                 }
 
@@ -1405,15 +1393,13 @@ def do_catboost_training():
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
             os.remove(stopfile_path)
-            stop_requested = True
+            exec_data.stop_requested = True
             break
 
     with open(model_save_path, "wb") as fd:
         pickle.dump(overall_model, fd)
-    overall_best_model_name = model_save_path # not measuring goodness yet
-    overall_best_model = overall_model
 
-    if stop_requested:
+    if exec_data.stop_requested:
         return
 
     # Validation step
@@ -1431,17 +1417,40 @@ def do_catboost_training():
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
             os.remove(stopfile_path)
-            stop_requested = True
+            exec_data.stop_requested = True
             break
 
     analysis_data.df.head(max_analysis_output_rows).write_csv(analysis_df_path)
     bad_r2_output_names = calc_output_r2_ranking(analysis_data)
+    print(f"Final validation R2={analysis_data.r2_raw}, bad excl R2={analysis_data.r2_clean}")
+    with open(loss_log_path, 'a') as fd:
+        fd.write(f'{analysis_data.r2_raw},{analysis_data.r2_clean}\n')
+
+    if analysis_data.r2_clean > exec_data.overall_best_val_metric:
+        exec_data.overall_best_model_name = model_save_path
+        exec_data.overall_best_model = overall_model
 
     return  bad_r2_output_names
 
 
+
+# Training loop
+class ExecData():
+    def __init__(self):
+        self.stop_requested = False
+        self.overall_best_model = None
+        self.overall_best_model_state = None
+        self.overall_best_model_name = ""
+        self.overall_best_val_metric = 0.0
+
+exec_data = ExecData()
+if model_type == "cnn":
+    exec_data.overall_best_val_metric = float('inf')
+else:
+    exec_data.overall_best_val_metric = float('-inf') # R2 bigger the better
+
 for param_permutation in param_permutations:
-    if stop_requested:
+    if exec_data.stop_requested:
         break
 
     print("Starting training loop...")
@@ -1463,15 +1472,16 @@ for param_permutation in param_permutations:
     model_save_path = model_root_path + suffix
     if model_type == "cnn":
         model_save_path += ".pt"
-        with open(loss_log_path, 'a') as fd:
-            fd.write(f'{model_save_path}\n')
     else:
         model_save_path += ".pkl"
 
+    with open(loss_log_path, 'a') as fd:
+        fd.write(f'{model_save_path}\n')
+
     if model_type == "cnn":
-        bad_r2_output_names = do_cnn_training()
+        bad_r2_output_names = do_cnn_training(exec_data)
     else:
-        bad_r2_output_names = do_catboost_training()
+        bad_r2_output_names = do_catboost_training(exec_data)
 
     if do_feature_knockout:
         with open(feature_knockout_path, 'a') as fd:
@@ -1484,10 +1494,10 @@ if do_test:
 
     submission_df = None
 
-    print(f'Using model {overall_best_model_name} for test run and submission')
+    print(f'Using model {exec_data.overall_best_model_name} for test run and submission')
     if model_type == "cnn":
-        overall_best_model.load_state_dict(overall_best_model_state)
-        overall_best_model.eval()
+        exec_data.overall_best_model.load_state_dict(exec_data.overall_best_model_state)
+        exec_data.overall_best_model.eval()
  
     print("Removing poor R2 cols from those that will be predicted:", bad_r2_output_names)
     for name in bad_r2_output_names:
@@ -1510,11 +1520,11 @@ if do_test:
 
             # No need to track gradients for inference
             with torch.no_grad():
-                outputs_pred = overall_best_model(inputs)
+                outputs_pred = exec_data.overall_best_model(inputs)
                 y_predictions = outputs_pred.cpu().numpy()
         else:
             xt = xt.reshape((num_rows,-1)) # Leaving layer duplicates of scalars for now
-            y_predictions = overall_best_model.predict(xt)
+            y_predictions = exec_data.overall_best_model.predict(xt)
 
         unscale_outputs(y_predictions, my, sy)
 
