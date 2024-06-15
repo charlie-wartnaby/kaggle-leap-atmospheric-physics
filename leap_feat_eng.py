@@ -31,11 +31,11 @@ else:
 
 subset_base_row = 0
 
-multitrain_params = {'border_count' : [24], # 64 too much (32 max allowed)
+multitrain_params = {'border_count' : [32,24,16], # 64 too much (32 max allowed)
                      'depth' : [8], # crashed at 16, 12, 10
-                     'iterations' : [400,200], # strange error when tried 500
-                     'learning_rate' : [1.0,0.5],
-                     'l2_leaf_reg' : [3]}
+                     'iterations' : [400], # strange error when tried 500
+                     'learning_rate' : [0.75,0.25],
+                     'l2_leaf_reg' : [5,2]}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -1394,17 +1394,9 @@ def do_catboost_training(exec_data, iterations=10, depth=8, learning_rate=0.05,
                                                 weights=(old_propn, new_propn))
         del block_model
         gc.collect()
-        if os.path.exists(stopfile_path):
-            print("Stop file detected, deleting it and stopping now")
-            os.remove(stopfile_path)
-            exec_data.stop_requested = True
-            break
 
     with open(model_save_path, "wb") as fd:
         pickle.dump(overall_model, fd)
-
-    if exec_data.stop_requested:
-        return
 
     # Validation step
     analysis_data = AnalysisData()
@@ -1456,7 +1448,13 @@ else:
     exec_data.overall_best_val_metric = float('-inf') # R2 bigger the better
 
 for param_permutation in param_permutations:
-    if exec_data.stop_requested:
+    if os.path.exists(stopfile_path):
+        print("Stop file detected, deleting it and stopping now")
+        os.remove(stopfile_path)
+        exec_data.stop_requested = True
+        break
+
+    if exec_data.stop_requested: # can happen inside training loop
         break
 
     print("Starting training loop...")
