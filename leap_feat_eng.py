@@ -33,9 +33,9 @@ subset_base_row = 0
 
 multitrain_params = {'border_count' : [24], # 64 too much
                      'depth' : [8], # crashed at 16, 12, 10
-                     'iterations' : [50],
-                     'learning_rate' : [0.2,0.5],
-                     'l2_leaf_reg' : [3,8]}
+                     'iterations' : [300,100],
+                     'learning_rate' : [1.0,0.5],
+                     'l2_leaf_reg' : [3]}
 
 show_timings = False # debug
 batch_report_interval = 10
