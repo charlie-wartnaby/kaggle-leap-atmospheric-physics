@@ -31,11 +31,11 @@ else:
 
 subset_base_row = 0
 
-multitrain_params = {'border_count' : [32,24,16], # 64 too much (32 max allowed)
+multitrain_params = {'border_count' : [32], # 64 too much (32 max allowed)
                      'depth' : [8], # crashed at 16, 12, 10
                      'iterations' : [400], # strange error when tried 500
-                     'learning_rate' : [0.75,0.25],
-                     'l2_leaf_reg' : [5,2]}
+                     'learning_rate' : [0.25],
+                     'l2_leaf_reg' : [1,10]}
 
 show_timings = False # debug
 batch_report_interval = 10
