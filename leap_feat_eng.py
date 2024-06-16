@@ -22,7 +22,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 2000000
+    max_train_rows = 200000
     max_test_rows  = 1000000000
     max_batch_size = 20000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
@@ -1391,6 +1391,11 @@ def do_catboost_training(exec_data, iterations=400, depth=8, learning_rate=0.25,
                                                 weights=(old_propn, new_propn))
         del block_model
         gc.collect()
+        if os.path.exists(stopfile_path):
+            print("Stop file detected during catboost training, deleting it and stopping now")
+            os.remove(stopfile_path)
+            exec_data.stop_requested = True
+            break
 
     with open(model_save_path, "wb") as fd:
         pickle.dump(overall_model, fd)
@@ -1406,9 +1411,10 @@ def do_catboost_training(exec_data, iterations=400, depth=8, learning_rate=0.25,
         r2_score = sklearn.metrics.r2_score(train_y, predicted_y)
         print(f"Catboost validation batch {batch_idx+1} of {len(val_block_idx)} normalised r2={r2_score}")
         analyse_batch(analysis_data, predicted_y, train_y)
-
+        # Not checking if stop requested previously because might want to interrupt training
+        # but still do validation, but if stopfile detected again then stop
         if os.path.exists(stopfile_path):
-            print("Stop file detected, deleting it and stopping now")
+            print("Stop file detected during catboost validation, deleting it and stopping now")
             os.remove(stopfile_path)
             exec_data.stop_requested = True
             break
