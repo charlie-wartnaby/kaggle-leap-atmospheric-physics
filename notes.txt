@@ -83,7 +83,7 @@ Submission Results
 ------------------
 
 submission.csv
-Complete · 4m ago · Commit c6093c7b best catboost params on 2M rows but looks worse than 100K expts for some reason
+Complete · 4m ago · Commit c6093c7b best catboost params on 2M [actually 200K] rows but looks worse than 100K expts for some reason
 0.36803
 
 submission.csv -- doing better with more iterations and higher learning rate

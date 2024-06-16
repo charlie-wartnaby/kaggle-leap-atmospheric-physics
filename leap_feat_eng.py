@@ -34,7 +34,7 @@ subset_base_row = 0
 multitrain_params = {'border_count' : [32], # 64 too much (32 max allowed)
                      'depth' : [8], # crashed at 16, 12, 10
                      'iterations' : [400], # strange error when tried 500
-                     'learning_rate' : [0.25],
+                     'learning_rate' : [0.5],
                      'l2_leaf_reg' : [5]}
 
 show_timings = False # debug
