@@ -749,6 +749,8 @@ else:
             start_time = time.time()
             with open(prenorm_cache_path, 'wb') as fd:
                 pickle.dump((cache_np_x, cache_np_y), fd)
+                fd.flush()
+                os.fsync(fd)
             del cache_np_x, cache_np_y
             gc.collect()
 
@@ -820,6 +822,8 @@ else:
             start_time = time.time()
             with open(postnorm_cache_path, 'wb') as fd:
                 pickle.dump((x_postnorm, y_postnorm), fd)
+                fd.flush()
+                os.fsync(fd)
             os.remove(prenorm_cache_path)
             del x_postnorm, y_postnorm
             gc.collect()
@@ -1394,11 +1398,6 @@ def do_catboost_training(exec_data, iterations=10, depth=8, learning_rate=0.05,
                                                 weights=(old_propn, new_propn))
         del block_model
         gc.collect()
-        if os.path.exists(stopfile_path):
-            print("Stop file detected during catboost training, deleting it and stopping now")
-            os.remove(stopfile_path)
-            exec_data.stop_requested = True
-            break
 
     with open(model_save_path, "wb") as fd:
         pickle.dump(overall_model, fd)
@@ -1414,10 +1413,9 @@ def do_catboost_training(exec_data, iterations=10, depth=8, learning_rate=0.05,
         r2_score = sklearn.metrics.r2_score(train_y, predicted_y)
         print(f"Catboost validation batch {batch_idx+1} of {len(val_block_idx)} normalised r2={r2_score}")
         analyse_batch(analysis_data, predicted_y, train_y)
-        # Not checking if stop requested previously because might want to interrupt training
-        # but still do validation, but if stopfile detected again then stop
+
         if os.path.exists(stopfile_path):
-            print("Stop file detected during catboost validation, deleting it and stopping now")
+            print("Stop file detected, deleting it and stopping now")
             os.remove(stopfile_path)
             exec_data.stop_requested = True
             break
