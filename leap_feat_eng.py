@@ -22,14 +22,14 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 500000
+    max_train_rows = 100000
     max_test_rows  = 1000000000
     max_batch_size = 20000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.8
     max_epochs = 50
 
-subset_base_row = 0
+subset_base_row = 100000
 
 multitrain_params = {'border_count' : [32], # 64 too much (32 max allowed)
                      'depth' : [8], # crashed at 16, 12, 10
