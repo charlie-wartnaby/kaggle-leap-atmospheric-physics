@@ -1,0 +1,183 @@
+Traceback (most recent call last):
+  File "/mnt/share/git/kaggle-leap-atmospheric-physics/leap_feat_eng.py", line 83, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+Loading training HoloFrame...
+Loading submission weights...
+Opening previous scalings...
+Saved scalings for next time
+Starting training loop...
+... border_count=32
+... depth=8
+... iterations=400
+... learning_rate=0.25
+... l2_leaf_reg=5
+Catboost training batch 1 of 20
+0:	learn: 15.4437738	total: 2.81s	remaining: 18m 39s
+399:	learn: 6.8520319	total: 14m 26s	remaining: 0us
+Catboost training batch 2 of 20
+0:	learn: 15.8537740	total: 2.18s	remaining: 14m 29s
+399:	learn: 7.0449261	total: 14m 21s	remaining: 0us
+Catboost training batch 3 of 20
+0:	learn: 15.8465951	total: 2.7s	remaining: 17m 57s
+399:	learn: 6.8228115	total: 14m 14s	remaining: 0us
+Catboost training batch 4 of 20
+0:	learn: 18.5041475	total: 2.46s	remaining: 16m 23s
+399:	learn: 7.7911929	total: 14m 4s	remaining: 0us
+Catboost training batch 5 of 20
+0:	learn: 15.9039217	total: 2.23s	remaining: 14m 49s
+399:	learn: 7.0104449	total: 14m 2s	remaining: 0us
+Catboost training batch 6 of 20
+0:	learn: 16.0004609	total: 2.98s	remaining: 19m 47s
+399:	learn: 6.8687130	total: 14m 34s	remaining: 0us
+Catboost training batch 7 of 20
+0:	learn: 15.1330648	total: 2.44s	remaining: 16m 14s
+399:	learn: 6.5216447	total: 14m 39s	remaining: 0us
+Catboost training batch 8 of 20
+0:	learn: 14.6272913	total: 2.9s	remaining: 19m 17s
+399:	learn: 6.5781772	total: 14m 41s	remaining: 0us
+Catboost training batch 9 of 20
+0:	learn: 15.6368403	total: 2.16s	remaining: 14m 21s
+399:	learn: 6.6853202	total: 14m 32s	remaining: 0us
+Catboost training batch 10 of 20
+0:	learn: 15.5500924	total: 2.64s	remaining: 17m 33s
+399:	learn: 6.7550451	total: 14m 35s	remaining: 0us
+Catboost training batch 11 of 20
+0:	learn: 15.8664111	total: 2.77s	remaining: 18m 25s
+399:	learn: 7.2065083	total: 14m 21s	remaining: 0us
+Catboost training batch 12 of 20
+0:	learn: 15.4913871	total: 2.51s	remaining: 16m 43s
+399:	learn: 6.9183104	total: 14m 37s	remaining: 0us
+Catboost training batch 13 of 20
+0:	learn: 17.1564077	total: 2.85s	remaining: 18m 58s
+399:	learn: 7.6790270	total: 14m 24s	remaining: 0us
+Catboost training batch 14 of 20
+0:	learn: 15.2232388	total: 2.22s	remaining: 14m 45s
+399:	learn: 6.9924222	total: 14m 20s	remaining: 0us
+Catboost training batch 15 of 20
+0:	learn: 17.0821661	total: 2.85s	remaining: 18m 55s
+399:	learn: 7.5214992	total: 14m 37s	remaining: 0us
+Catboost training batch 16 of 20
+0:	learn: 14.6419500	total: 2.81s	remaining: 18m 42s
+399:	learn: 6.4194015	total: 14m 40s	remaining: 0us
+Catboost training batch 17 of 20
+0:	learn: 15.0155911	total: 2.69s	remaining: 17m 52s
+399:	learn: 6.6842125	total: 14m 38s	remaining: 0us
+Catboost training batch 18 of 20
+0:	learn: 15.5722092	total: 2.94s	remaining: 19m 32s
+399:	learn: 6.8294548	total: 15m	remaining: 0us
+Catboost training batch 19 of 20
+0:	learn: 16.5418787	total: 2.51s	remaining: 16m 41s
+399:	learn: 7.1238394	total: 14m 25s	remaining: 0us
+Catboost training batch 20 of 20
+0:	learn: 15.6521883	total: 2.74s	remaining: 18m 13s
+399:	learn: 6.7792662	total: 14m 25s	remaining: 0us
+Catboost validation batch 1 of 5 normalised r2=-1.0430628362377633e+18
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Batch all R2=-953.3319609979468, bad excl R2=0.5385309009600083
+Catboost validation batch 2 of 5 normalised r2=-2.4710515566261358e+20
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Batch all R2=-135.19804341848695, bad excl R2=0.5388958110003567
+Catboost validation batch 3 of 5 normalised r2=-1.3348932660394262e+17
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Batch all R2=-6206.454302879086, bad excl R2=0.5082793259434075
+Catboost validation batch 4 of 5 normalised r2=-3.2129143628094633e+18
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Batch all R2=-51711.7406391285, bad excl R2=0.4200800748343456
+Catboost validation batch 5 of 5 normalised r2=-5.666150069406117e+20
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Batch all R2=-390.28874473635994, bad excl R2=0.5540171373220129
+Final validation R2=-11879.402738232076, bad excl R2=0.5119606500120262
+Best model so far model_border_count_32_depth_8_iterations_400_learning_rate_0.25_l2_leaf_reg_5.pkl
+Loading test HoloFrame...
+Using model model_border_count_32_depth_8_iterations_400_learning_rate_0.25_l2_leaf_reg_5.pkl for test run and submission
+Removing poor R2 cols from those that will be predicted: ['ptend_q0001_14', 'ptend_q0001_15', 'ptend_q0002_24', 'ptend_q0002_25', 'ptend_q0003_17', 'ptend_q0003_18', 'ptend_q0003_19', 'ptend_q0003_20', 'ptend_q0003_21', 'ptend_q0003_22', 'ptend_q0003_23', 'ptend_q0003_24', 'ptend_q0003_25', 'ptend_q0003_26', 'ptend_u_12', 'ptend_u_13', 'ptend_u_20', 'ptend_u_21', 'ptend_u_22', 'ptend_u_23', 'ptend_u_24', 'ptend_u_25', 'ptend_u_26', 'ptend_u_27', 'ptend_u_28', 'ptend_u_29', 'ptend_u_30', 'ptend_v_12', 'ptend_v_13', 'ptend_v_22', 'ptend_v_23', 'ptend_v_24', 'ptend_v_26', 'ptend_v_27', 'ptend_v_28', 'ptend_v_29', 'ptend_v_30', 'ptend_v_31', 'ptend_v_32', 'ptend_v_33', 'ptend_v_34']
+Processing submission from row 0
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 20000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 40000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 60000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 80000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 100000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 120000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 140000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 160000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 180000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 200000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 220000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 240000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 260000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 280000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 300000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 320000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 340000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 360000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 380000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 400000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 420000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 440000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 460000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 480000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 500000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 520000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 540000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 560000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 580000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 600000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 620000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+submission_df: shape: (9, 370)
+┌───────────┬───────────┬───────────┬───────────┬───┬───────────┬───────────┬───────────┬──────────┐
+│ statistic ┆ sample_id ┆ ptend_t_0 ┆ ptend_t_1 ┆ … ┆ cam_out_S ┆ cam_out_S ┆ cam_out_S ┆ cam_out_ │
+│ ---       ┆ ---       ┆ ---       ┆ ---       ┆   ┆ OLS       ┆ OLL       ┆ OLSD      ┆ SOLLD    │
+│ str       ┆ str       ┆ f64       ┆ f64       ┆   ┆ ---       ┆ ---       ┆ ---       ┆ ---      │
+│           ┆           ┆           ┆           ┆   ┆ f64       ┆ f64       ┆ f64       ┆ f64      │
+╞═══════════╪═══════════╪═══════════╪═══════════╪═══╪═══════════╪═══════════╪═══════════╪══════════╡
+│ count     ┆ 625000    ┆ 625000.0  ┆ 625000.0  ┆ … ┆ 625000.0  ┆ 625000.0  ┆ 625000.0  ┆ 625000.0 │
+│ null_coun ┆ 0         ┆ 0.0       ┆ 0.0       ┆ … ┆ 0.0       ┆ 0.0       ┆ 0.0       ┆ 0.0      │
+│ t         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆          │
+│ mean      ┆ null      ┆ 0.269692  ┆ -0.257268 ┆ … ┆ 0.569098  ┆ 0.587364  ┆ 0.72318   ┆ 0.598872 │
+│ std       ┆ null      ┆ 0.728766  ┆ 0.746998  ┆ … ┆ 0.93457   ┆ 0.930098  ┆ 0.866919  ┆ 0.792316 │
+│ min       ┆ test_0    ┆ -1.35771  ┆ -1.820996 ┆ … ┆ -0.597638 ┆ -0.558948 ┆ -0.343171 ┆ -0.43983 │
+│           ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 2        │
+│ 25%       ┆ null      ┆ -0.417232 ┆ -0.892087 ┆ … ┆ -0.005763 ┆ -0.003257 ┆ 0.017557  ┆ 0.000371 │
+│ 50%       ┆ null      ┆ -0.025625 ┆ -0.48232  ┆ … ┆ 0.066129  ┆ 0.080138  ┆ 0.206876  ┆ 0.213801 │
+│ 75%       ┆ null      ┆ 1.053131  ┆ 0.494339  ┆ … ┆ 0.840143  ┆ 0.914471  ┆ 1.402256  ┆ 1.05182  │
+│ max       ┆ test_9999 ┆ 2.086445  ┆ 1.235283  ┆ … ┆ 4.146227  ┆ 4.113852  ┆ 4.146277  ┆ 4.412727 │
+│           ┆ 9         ┆           ┆           ┆   ┆           ┆           ┆           ┆          │
+└───────────┴───────────┴───────────┴───────────┴───┴───────────┴───────────┴───────────┴──────────┘

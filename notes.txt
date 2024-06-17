@@ -82,6 +82,10 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 Submission Results
 ------------------
 
+averaged_submission.csv
+Complete · 5m ago · Commit 15a6f84 Experimentally averaging 5 individual submission dataframes over first 500K rows to compare with catboost model sum over same data
+0.37763
+
 submission.csv
 Complete · 26m ago · Commit 02a87b6 catboost over 500K rows but data normalised over 5M
 0.39272

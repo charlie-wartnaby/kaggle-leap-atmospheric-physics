@@ -1,0 +1,116 @@
+Loading training HoloFrame...
+Loading submission weights...
+Opening previous scalings...
+Saved scalings for next time
+Starting training loop...
+... border_count=32
+... depth=8
+... iterations=400
+... learning_rate=0.25
+... l2_leaf_reg=5
+Catboost training batch 1 of 4
+0:	learn: 15.5722092	total: 2.91s	remaining: 19m 19s
+399:	learn: 6.8294550	total: 14m 54s	remaining: 0us
+Catboost training batch 2 of 4
+0:	learn: 15.1330648	total: 2.42s	remaining: 16m 6s
+399:	learn: 6.5216445	total: 14m 42s	remaining: 0us
+Catboost training batch 3 of 4
+0:	learn: 15.0155902	total: 2.67s	remaining: 17m 44s
+399:	learn: 6.6842125	total: 14m 37s	remaining: 0us
+Catboost training batch 4 of 4
+0:	learn: 15.8537740	total: 2.22s	remaining: 14m 47s
+399:	learn: 7.0449259	total: 14m 24s	remaining: 0us
+Catboost validation batch 1 of 1 normalised r2=-5.5789316351700435e+20
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Batch all R2=0.5539704076647499, bad excl R2=0.5602901807451178
+Final validation R2=0.5539704076647499, bad excl R2=0.5602901807451178
+Best model so far model_border_count_32_depth_8_iterations_400_learning_rate_0.25_l2_leaf_reg_5.pkl
+Loading test HoloFrame...
+Using model model_border_count_32_depth_8_iterations_400_learning_rate_0.25_l2_leaf_reg_5.pkl for test run and submission
+Removing poor R2 cols from those that will be predicted: ['ptend_q0003_21', 'ptend_q0003_22', 'ptend_q0003_23', 'ptend_q0003_24', 'ptend_q0003_25', 'ptend_q0003_26', 'ptend_u_20', 'ptend_u_21', 'ptend_u_22', 'ptend_u_23', 'ptend_u_24', 'ptend_u_25', 'ptend_u_30', 'ptend_v_12', 'ptend_v_13', 'ptend_v_14', 'ptend_v_30', 'ptend_v_31']
+Processing submission from row 0
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 20000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 40000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 60000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 80000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 100000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 120000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 140000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 160000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 180000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 200000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 220000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 240000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 260000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 280000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 300000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 320000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 340000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 360000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 380000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 400000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 420000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 440000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 460000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 480000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 500000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 520000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 540000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 560000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 580000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 600000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+Processing submission from row 620000
+Zeroed-out due to scaling not blacklist: ['ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23']
+submission_df: shape: (9, 370)
+┌───────────┬───────────┬───────────┬───────────┬───┬───────────┬───────────┬───────────┬──────────┐
+│ statistic ┆ sample_id ┆ ptend_t_0 ┆ ptend_t_1 ┆ … ┆ cam_out_S ┆ cam_out_S ┆ cam_out_S ┆ cam_out_ │
+│ ---       ┆ ---       ┆ ---       ┆ ---       ┆   ┆ OLS       ┆ OLL       ┆ OLSD      ┆ SOLLD    │
+│ str       ┆ str       ┆ f64       ┆ f64       ┆   ┆ ---       ┆ ---       ┆ ---       ┆ ---      │
+│           ┆           ┆           ┆           ┆   ┆ f64       ┆ f64       ┆ f64       ┆ f64      │
+╞═══════════╪═══════════╪═══════════╪═══════════╪═══╪═══════════╪═══════════╪═══════════╪══════════╡
+│ count     ┆ 625000    ┆ 625000.0  ┆ 625000.0  ┆ … ┆ 625000.0  ┆ 625000.0  ┆ 625000.0  ┆ 625000.0 │
+│ null_coun ┆ 0         ┆ 0.0       ┆ 0.0       ┆ … ┆ 0.0       ┆ 0.0       ┆ 0.0       ┆ 0.0      │
+│ t         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆          │
+│ mean      ┆ null      ┆ 0.133688  ┆ -0.25302  ┆ … ┆ 0.554168  ┆ 0.574856  ┆ 0.70753   ┆ 0.582233 │
+│ std       ┆ null      ┆ 0.760358  ┆ 0.764324  ┆ … ┆ 0.930685  ┆ 0.92407   ┆ 0.867275  ┆ 0.799972 │
+│ min       ┆ test_0    ┆ -2.386506 ┆ -1.929357 ┆ … ┆ -0.659189 ┆ -0.639048 ┆ -0.414849 ┆ -0.51509 │
+│           ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 6        │
+│ 25%       ┆ null      ┆ -0.547215 ┆ -0.872556 ┆ … ┆ -0.013167 ┆ -0.007981 ┆ 0.00769   ┆ -0.01365 │
+│           ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 3        │
+│ 50%       ┆ null      ┆ -0.201965 ┆ -0.462213 ┆ … ┆ 0.069606  ┆ 0.08565   ┆ 0.203685  ┆ 0.198187 │
+│ 75%       ┆ null      ┆ 0.933415  ┆ 0.494309  ┆ … ┆ 0.803828  ┆ 0.879848  ┆ 1.386511  ┆ 1.0333   │
+│ max       ┆ test_9999 ┆ 1.550885  ┆ 1.381158  ┆ … ┆ 4.21322   ┆ 4.228029  ┆ 4.255875  ┆ 4.819543 │
+│           ┆ 9         ┆           ┆           ┆   ┆           ┆           ┆           ┆          │
+└───────────┴───────────┴───────────┴───────────┴───┴───────────┴───────────┴───────────┴──────────┘
