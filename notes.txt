@@ -83,6 +83,14 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 26m ago · Commit 02a87b6 catboost over 500K rows but data normalised over 5M
+0.39272
+
+submission.csv
+Complete · 23m ago · Commit 718c237 catboost over first 100K rows but data normalised over 5M
+0.35673
+
+submission.csv
 Complete · 4m ago · Commit c6093c7b best catboost params on 2M [actually 200K] rows but looks worse than 100K expts for some reason
 0.36803
 
