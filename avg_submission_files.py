@@ -29,4 +29,5 @@ for submission_file in tqdm.tqdm(submission_files):
 
 overall_df = pd.concat((test_ids_df,avg_submission_df), axis=1)
 
-overall_df.to_csv("averaged_submission.csv")
+# Submission rejected as having too many cols unless suppress index col pandas inserts by default
+overall_df.to_csv("averaged_submission.csv", index=False)
