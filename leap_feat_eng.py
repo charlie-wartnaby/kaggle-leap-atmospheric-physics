@@ -1,6 +1,50 @@
-# LEAP competition with feature engineering
+#!/bin/env python
 
-# This block will be different in Kaggle notebook:
+# (c) Charlie Wartnaby 2024
+#
+# This is my entry for this competition:
+# https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim
+#
+# This uses a 1-D convolutional neural network approach in PyTorch,
+# and/or a decisition tree approach using catboost.
+#
+# The original set of features is augmented using new ones inspired by
+# the physics of air parcels which I hoped would get better results.
+#
+# See README.md for more
+#
+# These example notebooks for PyTorch and catboost got me started, thank you:
+# https://www.kaggle.com/code/airazusta014/pytorch-nn/notebook
+# https://www.kaggle.com/code/lonnieqin/leap-catboost-baseline
+# https://www.kaggle.com/code/gogo827jz/multiregression-catboost-1-model-for-206-targets
+
+
+# This can be run locally or the whole thing pasted into a single Kaggle notebook cell
+
+
+import catboost
+import copy
+import gc
+import numpy as np
+import os
+import pickle
+import polars as pl
+import random
+import re
+import shutil
+import sklearn.metrics
+import sklearn.model_selection
+import socket
+import sys
+import time
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from   torch.utils.data import Dataset, DataLoader
+import warnings
+
+
+# Settings
 debug = False
 do_test = True
 is_rerun = False
@@ -31,72 +75,27 @@ else:
 
 subset_base_row = 400000
 
-multitrain_params = {'border_count' : [32], # 64 too much (32 max allowed)
-                     'depth' : [8], # crashed at 16, 12, 10
-                     'iterations' : [400], # strange error when tried 500
-                     'learning_rate' : [0.25],
-                     'l2_leaf_reg' : [5]}
+multitrain_params = {
+                    }
 
 show_timings = False # debug
 batch_report_interval = 10
 dropout_p = 0.1
 initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
-clear_batch_cache_at_end = False # not debug -- save Kaggle quota by deleting there?
+clear_batch_cache_at_end = False # can save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
 holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 min_std = 1e-8 # TODO suspicious needs investigating
-
-multitrain_keys = list(multitrain_params.keys())
-if len(multitrain_keys) < 1:
-    param_permutations = [{}]
-else:
-    permutation_indices = [0] * len(multitrain_keys)
-    current_key_idx = 0
-    param_permutations = []
-    while (True):
-        permutation = {}
-        for param_idx in range(len(multitrain_keys)):
-            param = multitrain_keys[param_idx]
-            permutation[param] = multitrain_params[param][permutation_indices[param_idx]]
-        param_permutations.append(permutation)
-        if permutation_indices[current_key_idx] < len(multitrain_params[multitrain_keys[current_key_idx]]) - 1:
-            permutation_indices[current_key_idx] += 1
-            continue
-        while (current_key_idx < len(multitrain_keys) and
-            permutation_indices[current_key_idx] >= (len(multitrain_params[multitrain_keys[current_key_idx]]) - 1)):
-            current_key_idx += 1
-            for i in range(current_key_idx):
-                permutation_indices[i] = 0
-        if current_key_idx >= len(multitrain_keys):
-            break
-        else:
-            permutation_indices[current_key_idx] += 1
-            current_key_idx = 0
-
-if is_rerun and len(param_permutations) > 1:
-    print("Cannot do multitraining experiment and resume previous run")
-    sys.exit(1)
-
-import copy
-import gc
-import numpy as np
-import os
-import pickle
-import polars as pl
-import re
-import shutil
-import sklearn.metrics
-import sklearn.model_selection
-import socket
-import sys
-import time
+np.random.seed(42)
+random.seed(42)
 
 machine = socket.gethostname()
 is_kaggle = re.match(r"[a-f0-9]{12}", machine) # Kaggle e.g. machine "1e5e4ffe5117"
 run_local = not is_kaggle
 
 if machine == 'narg':
+    # Small computer which can't cope with the full huge files
     train_root = 'train-top-5000'
     test_root = 'test-top-1000'
     submission_root = 'sample_submission-top-1000'
@@ -134,13 +133,120 @@ else:
 feature_knockout_path = 'feature_knockout.csv'
 stopfile_path = 'stop.txt'
 
-if os.path.exists(stopfile_path):
-    print("Stop file detected on entry, deleting it")
-    os.remove(stopfile_path)
-if not is_rerun and os.path.exists(epoch_counter_path):
-    os.remove(epoch_counter_path)
-if not is_rerun and os.path.exists(loss_log_path):
-    os.remove(loss_log_path)
+
+def main():
+    entry_clean_up()
+
+    # Read in training data
+    print('Loading training HoloFrame...')
+    train_hf = HoloFrame(train_path, train_offsets_path)
+
+    num_train_rows = min(len(train_hf), max_train_rows)
+    assert(subset_base_row + num_train_rows <= len(train_hf))
+
+    # First row is all we need from sample submission, to get col weightings. 
+    # sample_id column labels are identical to test.csv (checked first rows at least)
+    print('Loading submission weights...')
+    sample_submission_df = pl.read_csv(submission_template_path, n_rows=1)
+
+    if do_feature_knockout:
+        param_permutations = range(len(unexpanded_input_col_names))
+        with open(feature_knockout_path, 'w') as fd:
+            fd.write(f"i,best_val_loss,Variable,Description\n")
+    else:
+        param_permutations = expand_multitrain_permutations()
+
+    # TODO make nice struct(s)
+    unexpanded_cols_by_name, unexpanded_input_col_names, unexpanded_output_col_names,unexpanded_output_vector_col_names,unexpanded_output_scalar_col_names = form_col_data()
+    expanded_cols_by_name,expanded_names_input,expanded_names_output,num_all_outputs_as_vectors,num_pure_vector_outputs,num_scalar_outputs = expand_vector_col_info()
+
+    # Cache normalisation data needed for any rerun later
+    scaling_cache_filename = 'scaling_normalisation.pkl'
+    scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
+    have_cached_scalings = False
+    if os.path.exists(scaling_cache_path):
+        print("Opening previous scalings...")
+        with open(scaling_cache_path, 'rb') as fd:
+            (mx, sx, my, sy, xlim, ylim) = pickle.load(fd)
+        have_cached_scalings = True
+    else:
+        print("No previous scalings so starting afresh")
+        mx_sample = [] # Each element vector of means of input columns, from one holo batch
+        sx_sample = [] # ... and scaling factor
+        my_sample = []
+        sy_sample = []
+        xlim_sample = [] # min/max values found
+        ylim_sample = []
+
+    if have_cached_scalings:
+        # Everything should already be cached
+        pass
+    else:
+        preprocess_training_data()
+
+    training_loop()
+
+    if do_test:
+        test_submission()
+
+    exit_clean_up()
+
+
+def expand_multitrain_permutations():
+    multitrain_keys = list(multitrain_params.keys())
+    if len(multitrain_keys) < 1:
+        param_permutations = [{}]
+    else:
+        permutation_indices = [0] * len(multitrain_keys)
+        current_key_idx = 0
+        param_permutations = []
+        while (True):
+            permutation = {}
+            for param_idx in range(len(multitrain_keys)):
+                param = multitrain_keys[param_idx]
+                permutation[param] = multitrain_params[param][permutation_indices[param_idx]]
+            param_permutations.append(permutation)
+            if permutation_indices[current_key_idx] < len(multitrain_params[multitrain_keys[current_key_idx]]) - 1:
+                permutation_indices[current_key_idx] += 1
+                continue
+            while (current_key_idx < len(multitrain_keys) and
+                permutation_indices[current_key_idx] >= (len(multitrain_params[multitrain_keys[current_key_idx]]) - 1)):
+                current_key_idx += 1
+                for i in range(current_key_idx):
+                    permutation_indices[i] = 0
+            if current_key_idx >= len(multitrain_keys):
+                break
+            else:
+                permutation_indices[current_key_idx] += 1
+                current_key_idx = 0
+
+    if is_rerun and len(param_permutations) > 1:
+        print("Cannot do multitraining experiment and resume previous run")
+        sys.exit(1)
+
+    return param_permutations
+
+
+def entry_clean_up():
+    if os.path.exists(stopfile_path):
+        print("Stop file detected on entry, deleting it")
+        os.remove(stopfile_path)
+    if not is_rerun and os.path.exists(epoch_counter_path):
+        os.remove(epoch_counter_path)
+    if not is_rerun and os.path.exists(loss_log_path):
+        os.remove(loss_log_path)
+    if clear_batch_cache_at_start and os.path.exists(batch_cache_dir):
+        if save_backup_cache:
+            # From times I've regretted deleting cache data...
+            backup_cache_dir = batch_cache_dir + '_bak'
+            if os.path.exists(backup_cache_dir):
+                shutil.rmtree(backup_cache_dir)
+            print(f'Saving old cache files to {backup_cache_dir} just in case...')
+            os.rename(batch_cache_dir, backup_cache_dir)
+        else:
+            print('Deleting any previous batch cache files...')
+            shutil.rmtree(batch_cache_dir)
+    os.makedirs(batch_cache_dir, exist_ok=True)
 
 
 class HoloFrame:
@@ -179,34 +285,10 @@ class HoloFrame:
         slice_df = pl.read_csv(complete_slice_csv)
         return slice_df
 
-# Read in training data
-print('Loading training HoloFrame...')
-train_hf = HoloFrame(train_path, train_offsets_path)
 
-num_train_rows = min(len(train_hf), max_train_rows)
-assert(subset_base_row + num_train_rows <= len(train_hf))
-
-
-# First row is all we need from submissions, to get col weightings. 
-# sample_id column labels are identical to test.csv (checked first rows at least)
-print('Loading submission weights...')
-sample_submission_df = pl.read_csv(submission_template_path, n_rows=1)
-
-if clear_batch_cache_at_start and os.path.exists(batch_cache_dir):
-    if save_backup_cache:
-        backup_cache_dir = batch_cache_dir + '_bak'
-        if os.path.exists(backup_cache_dir):
-            shutil.rmtree(backup_cache_dir)
-        print(f'Saving old cache files to {backup_cache_dir} just in case...')
-        os.rename(batch_cache_dir, backup_cache_dir)
-    else:
-        print('Deleting any previous batch cache files...')
-        shutil.rmtree(batch_cache_dir)
-os.makedirs(batch_cache_dir, exist_ok=True)
 
 # Altitude levels in hPa from ClimSim-main\grid_info\ClimSim_low-res_grid-info.nc
 level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.2529232969453412, 0.4492506351686618, 0.7863461614709879, 1.3473557602677517, 2.244777286900205, 3.6164314830257718, 5.615836425337344, 8.403253219853443, 12.144489352066294, 17.016828024303006, 23.21079811610005, 30.914346261995327, 40.277580662953575, 51.37463234765765, 64.18922841394662, 78.63965761131159, 94.63009200213703, 112.09127353988006, 130.97780378937776, 151.22131809551237, 172.67390465199267, 195.08770981962772, 218.15593476138105, 241.60037901222947, 265.2585152868483, 289.12232222921756, 313.31208711045167, 338.0069992368819, 363.37349177951705, 389.5233382784413, 416.5079218282233, 444.3314120123719, 472.9572063769364, 502.2919169181905, 532.1522731583445, 562.2393924639011, 592.1492760575118, 621.4328411158061, 649.689897132655, 676.6564846051039, 702.2421877859194, 726.4985894989197, 749.5376452869328, 771.4452171682528, 792.2342599534793, 811.8566751313328, 830.2596431972574, 847.4506530638328, 863.5359020075301, 878.7158746040692, 893.2460179738746, 907.3852125876941, 921.3543974831824, 935.3167171670306, 949.3780562075774, 963.5995994020714, 978.013432382012, 992.6355435925217]
-num_levels = len(level_pressure_hpa)
 # Convert to Pa and reshape to be convenient later
 level_pressure_pa_np = 100.0 * np.array(level_pressure_hpa, dtype=np.float32).reshape(1, -1)
 
@@ -221,127 +303,130 @@ class ColumnInfo():
         self.units            = units
         self.first_useful_idx = first_useful_idx
 
-# Data column metadata from https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/data
-unexpanded_col_list = [
-    #         input?   Name                Description                                    Dimension   Units   Useful-from-idx
-    ColumnInfo(True,  'state_t',          'air temperature',                                     60, 'K'      ),
-    ColumnInfo(True,  'state_q0001',      'specific humidity',                                   60, 'kg/kg'  ),
-    ColumnInfo(True,  'state_q0002',      'cloud liquid mixing ratio',                           60, 'kg/kg'  ),
-    ColumnInfo(True,  'state_q0003',      'cloud ice mixing ratio',                              60, 'kg/kg'  ),
-    ColumnInfo(True,  'state_u',          'zonal wind speed',                                    60, 'm/s'    ),
-    ColumnInfo(True,  'state_v',          'meridional wind speed',                               60, 'm/s'    ),
-    ColumnInfo(True,  'state_ps',         'surface pressure',                                     1, 'Pa'     ),
-    ColumnInfo(True,  'pbuf_SOLIN',       'solar insolation',                                     1, 'W/m2'   ),
-    ColumnInfo(True,  'pbuf_LHFLX',       'surface latent heat flux',                             1, 'W/m2'   ),
-    ColumnInfo(True,  'pbuf_SHFLX',       'surface sensible heat flux',                           1, 'W/m2'   ),
-    ColumnInfo(True,  'pbuf_TAUX',        'zonal surface stress',                                 1, 'N/m2'   ),
-    ColumnInfo(True,  'pbuf_TAUY',        'meridional surface stress',                            1, 'N/m2'   ),
-    ColumnInfo(True,  'pbuf_COSZRS',      'cosine of solar zenith angle',                         1           ),
-    ColumnInfo(True,  'cam_in_ALDIF',     'albedo for diffuse longwave radiation',                1           ),
-    ColumnInfo(True,  'cam_in_ALDIR',     'albedo for direct longwave radiation',                 1           ),
-    ColumnInfo(True,  'cam_in_ASDIF',     'albedo for diffuse shortwave radiation',               1           ),
-    ColumnInfo(True,  'cam_in_ASDIR',     'albedo for direct shortwave radiation',                1           ),
-    ColumnInfo(True,  'cam_in_LWUP',      'upward longwave flux',                                 1, 'W/m2'   ),
-    ColumnInfo(True,  'cam_in_ICEFRAC',   'sea-ice areal fraction',                               1           ),
-    ColumnInfo(True,  'cam_in_LANDFRAC',  'land areal fraction',                                  1           ),
-    ColumnInfo(True,  'cam_in_OCNFRAC',   'ocean areal fraction',                                 1           ),
-    ColumnInfo(True,  'cam_in_SNOWHLAND', 'snow depth over land',                                 1, 'm'      ),
-    ColumnInfo(True,  'pbuf_ozone',       'ozone volume mixing ratio',                           60, 'mol/mol'),
-    ColumnInfo(True,  'pbuf_CH4',         'methane volume mixing ratio',                         60, 'mol/mol'),
-    ColumnInfo(True,  'pbuf_N2O',         'nitrous oxide volume mixing ratio',                   60, 'mol/mol'),
-    ColumnInfo(False, 'ptend_t',          'heating tendency',                                    60, 'K/s'    ),
-    ColumnInfo(False, 'ptend_q0001',      'moistening tendency',                                 60, 'kg/kg/s', 12),
-    ColumnInfo(False, 'ptend_q0002',      'cloud liquid mixing ratio change over time',          60, 'kg/kg/s', 15),
-    ColumnInfo(False, 'ptend_q0003',      'cloud ice mixing ratio change over time',             60, 'kg/kg/s', 12),
-    ColumnInfo(False, 'ptend_u',          'zonal wind acceleration',                             60, 'm/s2'   , 12),
-    ColumnInfo(False, 'ptend_v',          'meridional wind acceleration',                        60, 'm/s2'   , 12),
-    ColumnInfo(False, 'cam_out_NETSW',    'net shortwave flux at surface',                        1, 'W/m2'   ),
-    ColumnInfo(False, 'cam_out_FLWDS',    'ownward longwave flux at surface',                     1, 'W/m2'   ),
-    ColumnInfo(False, 'cam_out_PRECSC',   'snow rate (liquid water equivalent)',                  1, 'm/s'    ),
-    ColumnInfo(False, 'cam_out_PRECC',    'rain rate',                                            1, 'm/s'    ),
-    ColumnInfo(False, 'cam_out_SOLS',     'downward visible direct solar flux to surface',        1, 'W/m2'   ),
-    ColumnInfo(False, 'cam_out_SOLL',     'downward near-infrared direct solar flux to surface',  1, 'W/m2'   ),
-    ColumnInfo(False, 'cam_out_SOLSD',    'downward diffuse solar flux to surface',               1, 'W/m2'   ),
-    ColumnInfo(False, 'cam_out_SOLLD',    'downward diffuse near-infrared solar flux to surface', 1, 'W/m2'   ),
-]
+def form_col_data():
+    # Data column metadata from https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/data
+    unexpanded_col_list = [
+        #         input?   Name                Description                                    Dimension   Units   Useful-from-idx
+        ColumnInfo(True,  'state_t',          'air temperature',                                     60, 'K'      ),
+        ColumnInfo(True,  'state_q0001',      'specific humidity',                                   60, 'kg/kg'  ),
+        ColumnInfo(True,  'state_q0002',      'cloud liquid mixing ratio',                           60, 'kg/kg'  ),
+        ColumnInfo(True,  'state_q0003',      'cloud ice mixing ratio',                              60, 'kg/kg'  ),
+        ColumnInfo(True,  'state_u',          'zonal wind speed',                                    60, 'm/s'    ),
+        ColumnInfo(True,  'state_v',          'meridional wind speed',                               60, 'm/s'    ),
+        ColumnInfo(True,  'state_ps',         'surface pressure',                                     1, 'Pa'     ),
+        ColumnInfo(True,  'pbuf_SOLIN',       'solar insolation',                                     1, 'W/m2'   ),
+        ColumnInfo(True,  'pbuf_LHFLX',       'surface latent heat flux',                             1, 'W/m2'   ),
+        ColumnInfo(True,  'pbuf_SHFLX',       'surface sensible heat flux',                           1, 'W/m2'   ),
+        ColumnInfo(True,  'pbuf_TAUX',        'zonal surface stress',                                 1, 'N/m2'   ),
+        ColumnInfo(True,  'pbuf_TAUY',        'meridional surface stress',                            1, 'N/m2'   ),
+        ColumnInfo(True,  'pbuf_COSZRS',      'cosine of solar zenith angle',                         1           ),
+        ColumnInfo(True,  'cam_in_ALDIF',     'albedo for diffuse longwave radiation',                1           ),
+        ColumnInfo(True,  'cam_in_ALDIR',     'albedo for direct longwave radiation',                 1           ),
+        ColumnInfo(True,  'cam_in_ASDIF',     'albedo for diffuse shortwave radiation',               1           ),
+        ColumnInfo(True,  'cam_in_ASDIR',     'albedo for direct shortwave radiation',                1           ),
+        ColumnInfo(True,  'cam_in_LWUP',      'upward longwave flux',                                 1, 'W/m2'   ),
+        ColumnInfo(True,  'cam_in_ICEFRAC',   'sea-ice areal fraction',                               1           ),
+        ColumnInfo(True,  'cam_in_LANDFRAC',  'land areal fraction',                                  1           ),
+        ColumnInfo(True,  'cam_in_OCNFRAC',   'ocean areal fraction',                                 1           ),
+        ColumnInfo(True,  'cam_in_SNOWHLAND', 'snow depth over land',                                 1, 'm'      ),
+        ColumnInfo(True,  'pbuf_ozone',       'ozone volume mixing ratio',                           60, 'mol/mol'),
+        ColumnInfo(True,  'pbuf_CH4',         'methane volume mixing ratio',                         60, 'mol/mol'),
+        ColumnInfo(True,  'pbuf_N2O',         'nitrous oxide volume mixing ratio',                   60, 'mol/mol'),
+        ColumnInfo(False, 'ptend_t',          'heating tendency',                                    60, 'K/s'    ),
+        ColumnInfo(False, 'ptend_q0001',      'moistening tendency',                                 60, 'kg/kg/s', 12),
+        ColumnInfo(False, 'ptend_q0002',      'cloud liquid mixing ratio change over time',          60, 'kg/kg/s', 15),
+        ColumnInfo(False, 'ptend_q0003',      'cloud ice mixing ratio change over time',             60, 'kg/kg/s', 12),
+        ColumnInfo(False, 'ptend_u',          'zonal wind acceleration',                             60, 'm/s2'   , 12),
+        ColumnInfo(False, 'ptend_v',          'meridional wind acceleration',                        60, 'm/s2'   , 12),
+        ColumnInfo(False, 'cam_out_NETSW',    'net shortwave flux at surface',                        1, 'W/m2'   ),
+        ColumnInfo(False, 'cam_out_FLWDS',    'ownward longwave flux at surface',                     1, 'W/m2'   ),
+        ColumnInfo(False, 'cam_out_PRECSC',   'snow rate (liquid water equivalent)',                  1, 'm/s'    ),
+        ColumnInfo(False, 'cam_out_PRECC',    'rain rate',                                            1, 'm/s'    ),
+        ColumnInfo(False, 'cam_out_SOLS',     'downward visible direct solar flux to surface',        1, 'W/m2'   ),
+        ColumnInfo(False, 'cam_out_SOLL',     'downward near-infrared direct solar flux to surface',  1, 'W/m2'   ),
+        ColumnInfo(False, 'cam_out_SOLSD',    'downward diffuse solar flux to surface',               1, 'W/m2'   ),
+        ColumnInfo(False, 'cam_out_SOLLD',    'downward diffuse near-infrared solar flux to surface', 1, 'W/m2'   ),
+    ]
 
-# Add columns for new features
-unexpanded_col_list.append(ColumnInfo(True, 'pressure',             'air pressure',                        60, 'N/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'density',              'air density',                         60, 'kg/m3'      ))
-unexpanded_col_list.append(ColumnInfo(True, 'recip_density',        'reciprocal air density',              60, 'm3/kg'      ))
-unexpanded_col_list.append(ColumnInfo(True, 'recip_ice_cloud',      'reciprocal ice cloud',                60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'recip_water_cloud',    'reciprocal water cloud',              60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'wind_rh_prod',         'wind-rel humidity product',           60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'wind_cloud_prod',      'wind-total cloud product',            60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'total_cloud',          'total ice + liquid cloud',            60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'total_cloud_density',  'total cloud density product',         60, 'kg/m3'      ))
-unexpanded_col_list.append(ColumnInfo(True, 'total_gwp',            'total global warming potential',      60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'sensible_flux_gwp_prod','total GWP - sensible heat flux prod',60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'up_lw_flux_gwp_prod',  'total GWP - upward longwave flux prod',60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'abs_wind',             'abs wind magnitude',                  60, 'm/s'        ))
-unexpanded_col_list.append(ColumnInfo(True, 'abs_momentum',         'abs momentum per unit volume',        60, '(kg.m/s)/m3'))
-unexpanded_col_list.append(ColumnInfo(True, 'abs_stress',           'abs stress magnitude',                60, 'N/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',         'relative humidity (proportion)',      60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity',   'reciprocal relative humidity',        60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'buoyancy',             'Beucler buoyancy metric',             60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'up_integ_tot_cloud',   'ground-up integral of total cloud',   60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'down_integ_tot_cloud', 'sky-down integral of total cloud',    60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'lat_heat_div_density', 'latent heat flux divided by density', 60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'sen_heat_div_density', 'sensible heat flux divided by density', 60               ))
-unexpanded_col_list.append(ColumnInfo(True, 'vert_insolation',      'zenith-adjusted insolation',           1, 'W/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'direct_sw_absorb',     'direct shortwave absorbance',          1, 'W/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'diffuse_sw_absorb',    'diffuse shortwave absorbance',         1, 'W/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'direct_lw_absorb',     'direct longwave absorbance',           1, 'W/m2'       ))
-unexpanded_col_list.append(ColumnInfo(True, 'diffuse_lw_absorb',    'diffuse longwave absorbance',          1, 'W/m2'       ))
+    # Add columns for new features
+    unexpanded_col_list.append(ColumnInfo(True, 'pressure',             'air pressure',                          60, 'N/m2'       ))
+    unexpanded_col_list.append(ColumnInfo(True, 'density',              'air density',                           60, 'kg/m3'      ))
+    unexpanded_col_list.append(ColumnInfo(True, 'recip_density',        'reciprocal air density',                60, 'm3/kg'      ))
+    unexpanded_col_list.append(ColumnInfo(True, 'recip_ice_cloud',      'reciprocal ice cloud',                  60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'recip_water_cloud',    'reciprocal water cloud',                60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'wind_rh_prod',         'wind-rel humidity product',             60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'wind_cloud_prod',      'wind-total cloud product',              60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'total_cloud',          'total ice + liquid cloud',              60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'total_cloud_density',  'total cloud density product',           60, 'kg/m3'      ))
+    unexpanded_col_list.append(ColumnInfo(True, 'total_gwp',            'total global warming potential',        60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'sensible_flux_gwp_prod','total GWP - sensible heat flux prod',  60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'up_lw_flux_gwp_prod',  'total GWP - upward longwave flux prod', 60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'abs_wind',             'abs wind magnitude',                    60, 'm/s'        ))
+    unexpanded_col_list.append(ColumnInfo(True, 'abs_momentum',         'abs momentum per unit volume',          60, '(kg.m/s)/m3'))
+    unexpanded_col_list.append(ColumnInfo(True, 'abs_stress',           'abs stress magnitude',                  60, 'N/m2'       ))
+    unexpanded_col_list.append(ColumnInfo(True, 'rel_humidity',         'relative humidity (proportion)',        60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'recip_rel_humidity',   'reciprocal relative humidity',          60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'buoyancy',             'Beucler buoyancy metric',               60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'up_integ_tot_cloud',   'ground-up integral of total cloud',     60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'down_integ_tot_cloud', 'sky-down integral of total cloud',      60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'lat_heat_div_density', 'latent heat flux divided by density',   60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'sen_heat_div_density', 'sensible heat flux divided by density', 60               ))
+    unexpanded_col_list.append(ColumnInfo(True, 'vert_insolation',      'zenith-adjusted insolation',             1, 'W/m2'       ))
+    unexpanded_col_list.append(ColumnInfo(True, 'direct_sw_absorb',     'direct shortwave absorbance',            1, 'W/m2'       ))
+    unexpanded_col_list.append(ColumnInfo(True, 'diffuse_sw_absorb',    'diffuse shortwave absorbance',           1, 'W/m2'       ))
+    unexpanded_col_list.append(ColumnInfo(True, 'direct_lw_absorb',     'direct longwave absorbance',             1, 'W/m2'       ))
+    unexpanded_col_list.append(ColumnInfo(True, 'diffuse_lw_absorb',    'diffuse longwave absorbance',            1, 'W/m2'       ))
 
 
-if do_feature_knockout:
-    current_normal_knockout_features = []
-else:
-    if model_type == "cnn":
-        current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
-                                        'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
+    if do_feature_knockout:
+        current_normal_knockout_features = []
     else:
-        # Experimental tiny subset of only key features to see if catboost can work
-        # fast enough to cover more training set. Well, longer now
-        key_features = set(['state_q0002', 'state_q0003', 'rel_humidity',
-                            'state_v',
-                            'state_t',
-                            'cam_in_LANDFRAC',
-                            'diffuse_lw_absorb',
-                            'abs_momentum',
-                            'direct_sw_absorb',
-                            'buoyancy',
-                            'up_integ_tot_cloud',
-                            'cam_in_ALDIR',
-                            'recip_rel_humidity',
-                            'state_q0001',
-                            'cam_in_OCNFRAC',
-                            'pbuf_LHFLX',
-                            'pbuf_CH4',
-                            'state_ps',
-                            'cam_in_ICEFRAC',
-                            'pressure',
-                            'pbuf_COSZRS',
-                            'density'
-])
+        if model_type == "cnn":
+            current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
+                                            'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
+        else:
+            # Experimental tiny subset of only key features to see if catboost can work
+            # fast enough to cover more training set. Well, longer now
+            key_features = set(['state_q0002', 'state_q0003', 'rel_humidity',
+                                'state_v',
+                                'state_t',
+                                'cam_in_LANDFRAC',
+                                'diffuse_lw_absorb',
+                                'abs_momentum',
+                                'direct_sw_absorb',
+                                'buoyancy',
+                                'up_integ_tot_cloud',
+                                'cam_in_ALDIR',
+                                'recip_rel_humidity',
+                                'state_q0001',
+                                'cam_in_OCNFRAC',
+                                'pbuf_LHFLX',
+                                'pbuf_CH4',
+                                'state_ps',
+                                'cam_in_ICEFRAC',
+                                'pressure',
+                                'pbuf_COSZRS',
+                                'density'
+    ])
         
         current_normal_knockout_features = [feat.name for feat in unexpanded_col_list if feat.is_input and feat.name not in key_features]
 
-for feature in current_normal_knockout_features:
-    # Slow but trivial one-off
-    for i in range(len(unexpanded_col_list)):
-        if unexpanded_col_list[i].name == feature:
-            del unexpanded_col_list[i]
-            break
+    for feature in current_normal_knockout_features:
+        # Slow but trivial one-off
+        for i in range(len(unexpanded_col_list)):
+            if unexpanded_col_list[i].name == feature:
+                del unexpanded_col_list[i]
+                break
 
 
-unexpanded_col_names = [col.name for col in unexpanded_col_list]
-unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
-unexpanded_input_col_names = [col.name for col in unexpanded_col_list if col.is_input]
-unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not col.is_input]
-unexpanded_output_vector_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension > 1]
-unexpanded_output_scalar_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension <= 1]
+    unexpanded_col_names = [col.name for col in unexpanded_col_list]
+    unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
+    unexpanded_input_col_names = [col.name for col in unexpanded_col_list if col.is_input]
+    unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not col.is_input]
+    unexpanded_output_vector_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension > 1]
+    unexpanded_output_scalar_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension <= 1]
+    return unexpanded_cols_by_name, unexpanded_input_col_names, unexpanded_output_col_names,unexpanded_output_vector_col_names,unexpanded_output_scalar_col_names
+
 
 def expand_and_add_cols(col_list, cols_by_name, col_names):
     for col_name in col_names:
@@ -354,25 +439,21 @@ def expand_and_add_cols(col_list, cols_by_name, col_names):
                 col_info.name = col_info.name + f'_{i}'
                 col_list.append(col_info)
 
-expanded_col_list = []
-expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_input_col_names)
-expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_output_col_names)
+def expand_vector_col_info():
+    expanded_col_list = []
+    expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_input_col_names)
+    expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_output_col_names)
 
-expanded_names = [col.name for col in expanded_col_list]
-expanded_cols_by_name = dict(zip(expanded_names, expanded_col_list))
-expanded_names_input = [col.name for col in expanded_col_list if col.is_input]
-expanded_names_output = [col.name for col in expanded_col_list if not col.is_input]
+    expanded_names = [col.name for col in expanded_col_list]
+    expanded_cols_by_name = dict(zip(expanded_names, expanded_col_list))
+    expanded_names_input = [col.name for col in expanded_col_list if col.is_input]
+    expanded_names_output = [col.name for col in expanded_col_list if not col.is_input]
 
-num_all_outputs_as_vectors = len(unexpanded_output_col_names)
-num_pure_vector_outputs = len(unexpanded_output_vector_col_names)
-num_scalar_outputs = len(unexpanded_output_scalar_col_names)
-num_total_expanded_outputs = len(expanded_names_output)
+    num_all_outputs_as_vectors = len(unexpanded_output_col_names)
+    num_pure_vector_outputs = len(unexpanded_output_vector_col_names)
+    num_scalar_outputs = len(unexpanded_output_scalar_col_names)
 
-if do_feature_knockout:
-    param_permutations = range(len(unexpanded_input_col_names))
-    with open(feature_knockout_path, 'w') as fd:
-        fd.write(f"i,best_val_loss,Variable,Description\n")
-
+    return expanded_cols_by_name,expanded_names_input,expanded_names_output,num_all_outputs_as_vectors,num_pure_vector_outputs,num_scalar_outputs
 
 # Functions to compute saturation pressure at given temperature taken from
 # https://colab.research.google.com/github/tbeucler/CBRAIN-CAM/blob/master/Climate_Invariant_Guide.ipynb#scrollTo=1Hsy9p4Ghe-G
@@ -622,24 +703,6 @@ def vectorise_data(pl_df):
 
     return vector_dict
 
-# Cache normalisation data needed for any rerun later
-scaling_cache_filename = 'scaling_normalisation.pkl'
-scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
-have_cached_scalings = False
-if os.path.exists(scaling_cache_path):
-    print("Opening previous scalings...")
-    with open(scaling_cache_path, 'rb') as fd:
-        (mx, sx, my, sy, xlim, ylim) = pickle.load(fd)
-    have_cached_scalings = True
-else:
-    print("No previous scalings so starting afresh")
-    mx_sample = [] # Each element vector of means of input columns, from one holo batch
-    sx_sample = [] # ... and scaling factor
-    my_sample = []
-    sy_sample = []
-    xlim_sample = [] # min/max values found
-    ylim_sample = []
-
 def mean_vector_across_samples(sample_list):
     """Given series of sample row vectors across data columns, form
     new row vector which is mean of those samples"""
@@ -725,10 +788,8 @@ def normalise_data(x, y, mx, sx, my, sy, has_outputs):
 
     return x, y
 
-if have_cached_scalings:
-    # Everything should already be cached
-    pass
-else:
+
+def preprocess_training_data():
     # Preprocess entire dataset, gathering statistics for subsequent normalisation along the way
 
     # Single row of weights for outputs
@@ -749,7 +810,7 @@ else:
             start_time = time.time()
             with open(prenorm_cache_path, 'wb') as fd:
                 pickle.dump((cache_np_x, cache_np_y), fd)
-                fd.flush()
+                fd.flush() # Attempting to avoid random Ubuntu resets
                 os.fsync(fd)
             del cache_np_x, cache_np_y
             gc.collect()
@@ -828,39 +889,13 @@ else:
             del x_postnorm, y_postnorm
             gc.collect()
 
-# Save scalings, need them to process test data if do a rerun
-with open(scaling_cache_path, 'wb') as fd:
-    pickle.dump((mx, sx, my, sy, xlim, ylim), fd)
-    print("Saved scalings for next time")
-
-# Now very loosely based on public notebook but with the new features and model:
-# https://www.kaggle.com/code/airazusta014/pytorch-nn/notebook
-# Catboost examples:
-# https://www.kaggle.com/code/lonnieqin/leap-catboost-baseline
-# https://www.kaggle.com/code/gogo827jz/multiregression-catboost-1-model-for-206-targets
-
-import catboost
-import random, gc, warnings
-import numpy as np
-#import pandas as pd
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-import warnings
-
-warnings.filterwarnings('ignore', category=FutureWarning)
-np.random.seed(42)
-random.seed(42)
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-DEBUGGING = not do_test
-
-#
+    # Save scalings, need them to process test data if do a rerun
+    with open(scaling_cache_path, 'wb') as fd:
+        pickle.dump((mx, sx, my, sy, xlim, ylim), fd)
+        print("Saved scalings for next time")
 
 
 
-#
 
 class AtmLayerCNN(nn.Module):
     def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
@@ -1239,6 +1274,9 @@ def calc_output_r2_ranking(analysis_data):
 
 
 def do_cnn_training(exec_data):
+    warnings.filterwarnings('ignore', category=FutureWarning)
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     if is_rerun and os.path.exists(epoch_counter_path):
         try:
@@ -1355,8 +1393,8 @@ def do_cnn_training(exec_data):
     return bad_r2_output_names
 
 
-def do_catboost_training(exec_data, iterations=10, depth=8, learning_rate=0.05,
-                                    border_count=32, l2_leaf_reg=3):
+def do_catboost_training(exec_data, iterations=400, depth=8, learning_rate=0.25,
+                                    border_count=32, l2_leaf_reg=5):
     # Catboost, mutually exclusive to start with
 
     cat_params = {
@@ -1445,58 +1483,58 @@ class ExecData():
         self.overall_best_model_name = ""
         self.overall_best_val_metric = 0.0
 
-exec_data = ExecData()
-if model_type == "cnn":
-    exec_data.overall_best_val_metric = float('inf')
-else:
-    exec_data.overall_best_val_metric = float('-inf') # R2 bigger the better
-
-for param_permutation in param_permutations:
-    if os.path.exists(stopfile_path):
-        print("Stop file detected, deleting it and stopping now")
-        os.remove(stopfile_path)
-        exec_data.stop_requested = True
-        break
-
-    if exec_data.stop_requested: # can happen inside training loop
-        break
-
-    print("Starting training loop...")
-    if do_feature_knockout:
-        # permutation is just index of feature to knock out
-        model_params = {}
-        feature_knockout_idx = param_permutation
-        feature_knockout_name = unexpanded_input_col_names[feature_knockout_idx]
-        feature_knockout_col = unexpanded_cols_by_name[feature_knockout_name]
-        feature_knockout_description = feature_knockout_col.description
-        print(f"... knocking out feature {feature_knockout_idx}: {feature_knockout_name} - {feature_knockout_description}")
-        suffix = f"_knockout_{feature_knockout_idx}_{feature_knockout_name}"
-    else:
-        model_params = param_permutation
-        suffix = ""
-        for key in param_permutation.keys():
-            print(f"... {key}={param_permutation[key]}")
-            suffix += f"_{key}_{param_permutation[key]}"
-    model_save_path = model_root_path + suffix
+def training_loop():
+    exec_data = ExecData()
     if model_type == "cnn":
-        model_save_path += ".pt"
+        exec_data.overall_best_val_metric = float('inf')
     else:
-        model_save_path += ".pkl"
+        exec_data.overall_best_val_metric = float('-inf') # R2 bigger the better
 
-    with open(loss_log_path, 'a') as fd:
-        fd.write(f'{model_save_path}\n')
+    for param_permutation in param_permutations:
+        if os.path.exists(stopfile_path):
+            print("Stop file detected, deleting it and stopping now")
+            os.remove(stopfile_path)
+            exec_data.stop_requested = True
+            break
 
-    if model_type == "cnn":
-        bad_r2_output_names = do_cnn_training(exec_data)
-    else:
-        bad_r2_output_names = do_catboost_training(exec_data, **model_params)
+        if exec_data.stop_requested: # can happen inside training loop
+            break
 
-    if do_feature_knockout:
-        with open(feature_knockout_path, 'a') as fd:
-            fd.write(f"{feature_knockout_idx},{exec_data.overall_best_val_metric},{feature_knockout_name},{feature_knockout_description}\n")
+        print("Starting training loop...")
+        if do_feature_knockout:
+            # permutation is just index of feature to knock out
+            model_params = {}
+            feature_knockout_idx = param_permutation
+            feature_knockout_name = unexpanded_input_col_names[feature_knockout_idx]
+            feature_knockout_col = unexpanded_cols_by_name[feature_knockout_name]
+            feature_knockout_description = feature_knockout_col.description
+            print(f"... knocking out feature {feature_knockout_idx}: {feature_knockout_name} - {feature_knockout_description}")
+            suffix = f"_knockout_{feature_knockout_idx}_{feature_knockout_name}"
+        else:
+            model_params = param_permutation
+            suffix = ""
+            for key in param_permutation.keys():
+                print(f"... {key}={param_permutation[key]}")
+                suffix += f"_{key}_{param_permutation[key]}"
+        model_save_path = model_root_path + suffix
+        if model_type == "cnn":
+            model_save_path += ".pt"
+        else:
+            model_save_path += ".pkl"
 
-# Test
-if do_test:
+        with open(loss_log_path, 'a') as fd:
+            fd.write(f'{model_save_path}\n')
+
+        if model_type == "cnn":
+            bad_r2_output_names = do_cnn_training(exec_data)
+        else:
+            bad_r2_output_names = do_catboost_training(exec_data, **model_params)
+
+        if do_feature_knockout:
+            with open(feature_knockout_path, 'a') as fd:
+                fd.write(f"{feature_knockout_idx},{exec_data.overall_best_val_metric},{feature_knockout_name},{feature_knockout_description}\n")
+
+def test_submission():
     print('Loading test HoloFrame...')
     test_hf = HoloFrame(test_path, test_offsets_path)
 
@@ -1555,7 +1593,12 @@ if do_test:
 
     submission_df.write_csv("submission.csv")
 
+def exit_clean_up():
+    if clear_batch_cache_at_end:
+        print('Deleting batch cache files...')
+        shutil.rmtree(batch_cache_dir)
 
-if clear_batch_cache_at_end:
-    print('Deleting batch cache files...')
-    shutil.rmtree(batch_cache_dir)
+
+if __name__ == "__main__":
+    # Note: this is true when executed in Kaggle notebook cell too
+    main()
