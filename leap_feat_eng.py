@@ -45,13 +45,13 @@ import warnings
 
 
 # Settings
-debug = False
+debug = True
 do_test = True
 is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = False
+clear_batch_cache_at_start = True
 scale_using_range_limits = False
 use_float64 = False
 model_type = "catboost"
@@ -129,6 +129,8 @@ else:
     epoch_counter_path = 'epochs.txt'
     loss_log_path = 'loss_log.csv'
     batch_cache_dir = 'batch_cache'
+scaling_cache_filename = 'scaling_normalisation.pkl'
+scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
 
 feature_knockout_path = 'feature_knockout.csv'
 stopfile_path = 'stop.txt'
@@ -144,10 +146,6 @@ def main():
     num_train_rows = min(len(train_hf), max_train_rows)
     assert(subset_base_row + num_train_rows <= len(train_hf))
 
-    # First row is all we need from sample submission, to get col weightings. 
-    # sample_id column labels are identical to test.csv (checked first rows at least)
-    print('Loading submission weights...')
-    sample_submission_df = pl.read_csv(submission_template_path, n_rows=1)
 
     if do_feature_knockout:
         param_permutations = range(len(unexpanded_input_col_names))
@@ -156,38 +154,25 @@ def main():
     else:
         param_permutations = expand_multitrain_permutations()
 
-    # TODO make nice struct(s)
-    unexpanded_cols_by_name, unexpanded_input_col_names, unexpanded_output_col_names,unexpanded_output_vector_col_names,unexpanded_output_scalar_col_names = form_col_data()
-    expanded_cols_by_name,expanded_names_input,expanded_names_output,num_all_outputs_as_vectors,num_pure_vector_outputs,num_scalar_outputs = expand_vector_col_info()
+    col_data = form_col_data()
+    expand_vector_col_info(col_data)
+
+    submission_weights = load_submission_weights(col_data)
 
     # Cache normalisation data needed for any rerun later
-    scaling_cache_filename = 'scaling_normalisation.pkl'
-    scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
-    have_cached_scalings = False
     if os.path.exists(scaling_cache_path):
         print("Opening previous scalings...")
         with open(scaling_cache_path, 'rb') as fd:
-            (mx, sx, my, sy, xlim, ylim) = pickle.load(fd)
-        have_cached_scalings = True
-    else:
-        print("No previous scalings so starting afresh")
-        mx_sample = [] # Each element vector of means of input columns, from one holo batch
-        sx_sample = [] # ... and scaling factor
-        my_sample = []
-        sy_sample = []
-        xlim_sample = [] # min/max values found
-        ylim_sample = []
-
-    if have_cached_scalings:
+            scaling_data = Sca1ingMetadata(pickle.load(fd))
         # Everything should already be cached
-        pass
     else:
-        preprocess_training_data()
+        scaling_data = preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights)
 
-    training_loop()
+
+    training_loop(train_hf)
 
     if do_test:
-        test_submission()
+        test_submission(col_data, scaling_data, submission_weights)
 
     exit_clean_up()
 
@@ -302,6 +287,23 @@ class ColumnInfo():
         self.dimension        = dimension
         self.units            = units
         self.first_useful_idx = first_useful_idx
+
+class ColumnMetadata():
+    def __init__(self):
+        # Will assign members directly as loose struct
+        pass
+
+class ScalingMetadata():
+    def __init__(self, mx=None, sx=None, my=None, sy=None, xlim=None, ylim=None):
+        # Will assign other members directly as loose struct
+        self.mx = mx
+        self.sx = sx
+        self.my = my
+        self.sy = sy
+        self.xlim = xlim
+        self.ylim = ylim
+        pass
+
 
 def form_col_data():
     # Data column metadata from https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/data
@@ -419,13 +421,15 @@ def form_col_data():
                 break
 
 
+    col_data = ColumnMetadata()
     unexpanded_col_names = [col.name for col in unexpanded_col_list]
-    unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
-    unexpanded_input_col_names = [col.name for col in unexpanded_col_list if col.is_input]
-    unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not col.is_input]
-    unexpanded_output_vector_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension > 1]
-    unexpanded_output_scalar_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension <= 1]
-    return unexpanded_cols_by_name, unexpanded_input_col_names, unexpanded_output_col_names,unexpanded_output_vector_col_names,unexpanded_output_scalar_col_names
+    col_data.unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
+    col_data.unexpanded_input_col_names = [col.name for col in unexpanded_col_list if col.is_input]
+    col_data.unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not col.is_input]
+    col_data.unexpanded_output_vector_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension > 1]
+    col_data.unexpanded_output_scalar_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension <= 1]
+
+    return col_data
 
 
 def expand_and_add_cols(col_list, cols_by_name, col_names):
@@ -439,21 +443,20 @@ def expand_and_add_cols(col_list, cols_by_name, col_names):
                 col_info.name = col_info.name + f'_{i}'
                 col_list.append(col_info)
 
-def expand_vector_col_info():
-    expanded_col_list = []
-    expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_input_col_names)
-    expand_and_add_cols(expanded_col_list, unexpanded_cols_by_name, unexpanded_output_col_names)
+def expand_vector_col_info(col_data):
+    col_data.expanded_col_list = []
+    expand_and_add_cols(col_data.expanded_col_list, col_data.unexpanded_cols_by_name, col_data.unexpanded_input_col_names)
+    expand_and_add_cols(col_data.expanded_col_list, col_data.unexpanded_cols_by_name, col_data.unexpanded_output_col_names)
 
-    expanded_names = [col.name for col in expanded_col_list]
-    expanded_cols_by_name = dict(zip(expanded_names, expanded_col_list))
-    expanded_names_input = [col.name for col in expanded_col_list if col.is_input]
-    expanded_names_output = [col.name for col in expanded_col_list if not col.is_input]
+    expanded_names = [col.name for col in col_data.expanded_col_list]
+    col_data.expanded_cols_by_name = dict(zip(expanded_names, col_data.expanded_col_list))
+    col_data.expanded_names_input = [col.name for col in col_data.expanded_col_list if col.is_input]
+    col_data.expanded_names_output = [col.name for col in col_data.expanded_col_list if not col.is_input]
 
-    num_all_outputs_as_vectors = len(unexpanded_output_col_names)
-    num_pure_vector_outputs = len(unexpanded_output_vector_col_names)
-    num_scalar_outputs = len(unexpanded_output_scalar_col_names)
+    col_data.num_all_outputs_as_vectors = len(col_data.unexpanded_output_col_names)
+    col_data.num_pure_vector_outputs = len(col_data.unexpanded_output_vector_col_names)
+    col_data.num_scalar_outputs = len(col_data.unexpanded_output_scalar_col_names)
 
-    return expanded_cols_by_name,expanded_names_input,expanded_names_output,num_all_outputs_as_vectors,num_pure_vector_outputs,num_scalar_outputs
 
 # Functions to compute saturation pressure at given temperature taken from
 # https://colab.research.google.com/github/tbeucler/CBRAIN-CAM/blob/master/Climate_Invariant_Guide.ipynb#scrollTo=1Hsy9p4Ghe-G
@@ -668,7 +671,7 @@ def add_vector_features(vector_dict):
 
 re_vector_heading = re.compile('([A-Za-z0-9_]+?)_([0-9]+)')
 
-def vectorise_data(pl_df):
+def vectorise_data(pl_df, col_data):
     vector_dict = {}
     col_idx = 0
     while col_idx < len(pl_df.columns):
@@ -692,7 +695,7 @@ def vectorise_data(pl_df):
             # Scalar column
             row_vector = pl_df[: , col_name].to_numpy().astype(np.float64)
             row_vector = row_vector.reshape(len(row_vector), 1)
-            col_info = unexpanded_cols_by_name.get(col_name)
+            col_info = col_data.unexpanded_cols_by_name.get(col_name)
             if col_info and not col_info.is_input and col_info.dimension <= 1:
                 # Leave output scalars as they are
                 row_level_matrix = row_vector
@@ -720,12 +723,12 @@ def minmax_vector_across_samples(sample_tuple_list):
     global_max = np.max(all_maxs, axis=0)
     return (global_min, global_max)
 
-def preprocess_data(pl_df, has_outputs):
-    vector_dict = vectorise_data(pl_df)
+def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weights):
+    vector_dict = vectorise_data(pl_df, col_data)
     add_vector_features(vector_dict)
     # Glue input columns together by rows in batch, then feature, then atm level
     # (Works with torch.nn.Conv1d)
-    for i, col_name in enumerate(unexpanded_input_col_names):
+    for i, col_name in enumerate(col_data.unexpanded_input_col_names):
         if i == 0:
             x = vector_dict[col_name]
             (rows,cols) = x.shape
@@ -735,7 +738,7 @@ def preprocess_data(pl_df, has_outputs):
 
     if has_outputs:
         # Leaving y-data expanded, model has to expand outputs to match
-        for i, col_name in enumerate(unexpanded_output_col_names):
+        for i, col_name in enumerate(col_data.unexpanded_output_col_names):
             if i == 0:
                 y = vector_dict[col_name]
             else:
@@ -748,14 +751,14 @@ def preprocess_data(pl_df, has_outputs):
     if has_outputs:
         # Now applying same scaling across whole 60-level channel, for x at least:
         mx = x.mean(axis=(0,2))
-        mx = mx.reshape(1, len(unexpanded_input_col_names), 1)
-        mx_sample.append(mx)
+        mx = mx.reshape(1, len(col_data.unexpanded_input_col_names), 1)
+        scaling_data.mx_sample.append(mx)
 
         x_min = np.min(x, axis=(0,2))
-        x_min = x_min.reshape(1, len(unexpanded_input_col_names), 1)
+        x_min = x_min.reshape(1, len(col_data.unexpanded_input_col_names), 1)
         x_max = np.max(x, axis=(0,2))
-        x_max = x_max.reshape(1, len(unexpanded_input_col_names), 1)
-        xlim_sample.append((x_min,x_max))
+        x_max = x_max.reshape(1, len(col_data.unexpanded_input_col_names), 1)
+        scaling_data.xlim_sample.append((x_min,x_max))
 
         # Scaling outputs by weights that wil be used anyway for submission, so we get
         # rid of very tiny values that will give very small variances, and will make
@@ -763,37 +766,54 @@ def preprocess_data(pl_df, has_outputs):
         y = y * submission_weights
 
         my = y.mean(axis=0)
-        my_sample.append(my)
+        scaling_data.my_sample.append(my)
         y_min = np.min(y, axis=0)
         y_max = np.max(y, axis=0)
-        ylim_sample.append((y_min,y_max))
+        scaling_data.ylim_sample.append((y_min,y_max))
 
     del pl_df
+    gc.collect()
 
     return x, y
 
 
-def normalise_data(x, y, mx, sx, my, sy, has_outputs):
+def normalise_data(x, y, scaling_data, has_outputs):
 
     # Original had mx.reshape(1,-1) to go from 1D row vector to 2D array with
     # one row but seems unnecessary
-    x = (x - mx) / sx
+    x = (x - scaling_data.mx) / scaling_data.sx
     if not use_float64: x = x.astype(np.float32)
 
     if has_outputs:
-        y = y / sy # Again experimenting with not using mean offset in y: (y - my) / sy
+        y = y / scaling_data.sy # Again experimenting with not using mean offset in y: (y - my) / sy
         if not use_float64: y = y.astype(np.float32)
     else:
         y = None
 
     return x, y
 
-
-def preprocess_training_data():
-    # Preprocess entire dataset, gathering statistics for subsequent normalisation along the way
+def load_submission_weights(col_data):
+    # First row is all we need from sample submission, to get col weightings. 
+    # sample_id column labels are identical to test.csv (checked first rows at least)
+    print('Loading submission weights...')
+    sample_submission_df = pl.read_csv(submission_template_path, n_rows=1)
 
     # Single row of weights for outputs
-    submission_weights = sample_submission_df[expanded_names_output].to_numpy().astype(np.float64)
+    submission_weights = sample_submission_df[col_data.expanded_names_output].to_numpy().astype(np.float64)
+    return submission_weights
+
+
+def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights):
+    # Preprocess entire dataset, gathering statistics for subsequent normalisation along the way
+
+    print("No previous scalings so starting afresh")
+    scaling_data = ScalingMetadata()
+    scaling_data.mx_sample = [] # Each element vector of means of input columns, from one holo batch
+    scaling_data.sx_sample = [] # ... and scaling factor
+    scaling_data.my_sample = []
+    scaling_data.sy_sample = []
+    scaling_data.xlim_sample = [] # min/max values found
+    scaling_data.ylim_sample = []
 
     for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, max_batch_size):
                         # Process slice of large dataframe corresponding to batch
@@ -805,7 +825,7 @@ def preprocess_training_data():
         if not os.path.exists(postnorm_cache_path) and not os.path.exists(prenorm_cache_path):
             print(f"Building {prenorm_cache_path}...")
             pl_slice_df = train_hf.get_slice(true_file_index, true_file_index + max_batch_size)
-            cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True)
+            cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True, col_data, scaling_data, submission_weights)
             if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
             start_time = time.time()
             with open(prenorm_cache_path, 'wb') as fd:
@@ -817,18 +837,18 @@ def preprocess_training_data():
 
     # Mean of means gives us overall mean for each quantity (whole vectors for inputs,
     # individual columns for outputs with their differing submission weightings)
-    mx = mean_vector_across_samples(mx_sample)
-    my = mean_vector_across_samples(my_sample)
+    scaling_data.mx = mean_vector_across_samples(scaling_data.mx_sample)
+    scaling_data.my = mean_vector_across_samples(scaling_data.my_sample)
 
     # Range limits:
-    xlim = minmax_vector_across_samples(xlim_sample)
-    ylim = minmax_vector_across_samples(ylim_sample)
+    scaling_data.xlim = minmax_vector_across_samples(scaling_data.xlim_sample)
+    scaling_data.ylim = minmax_vector_across_samples(scaling_data.ylim_sample)
 
     if scale_using_range_limits:
         sx = (xlim[1] - xlim[0]) / 2.0 # aiming for [-1, 1] normalised range
-        sx = np.maximum(sx, min_std)
+        scaling_data.sx = np.maximum(sx, min_std)
         bigger_y_lim = np.maximum(np.abs(ylim[0]), np.abs(ylim[1])) # as not centring with mean
-        sy = np.maximum(bigger_y_lim, min_std)
+        scaling_data.sy = np.maximum(bigger_y_lim, min_std)
     else:
         # Do another pass to get standard deviation stats across whole dataset, which we
         # needed means across whole dataset for
@@ -844,10 +864,10 @@ def preprocess_training_data():
                 print(f"Getting variances from {prenorm_cache_path}...")
                 with open(prenorm_cache_path, 'rb') as fd:
                     (x_prenorm, y_prenorm) = pickle.load(fd)
-                x_diffs_sqd = (x_prenorm - mx) ** 2
+                x_diffs_sqd = (x_prenorm - scaling_data.mx) ** 2
                 x_sum_sqs = x_diffs_sqd.sum(axis=(0,2)) # sum over batch rows and over atm layers to leave num vector features
                 x_sumsq_sample.append(x_sum_sqs)
-                y_diffs_sqd = (y_prenorm - my) ** 2
+                y_diffs_sqd = (y_prenorm - scaling_data.my) ** 2
                 y_sum_sqs = y_diffs_sqd.sum(axis=0)
                 y_sumsq_sample.append(y_sum_sqs)
                 del x_prenorm, y_prenorm, x_diffs_sqd, y_diffs_sqd
@@ -859,11 +879,11 @@ def preprocess_training_data():
         x_sumsq_avg = mean_vector_across_samples(x_sumsq_sample) / (max_batch_size * num_atm_levels)
         y_sumsq_avg = mean_vector_across_samples(y_sumsq_sample) / max_batch_size
         sx = np.sqrt(x_sumsq_avg)
-        sx = sx.reshape((1,len(unexpanded_input_col_names),1))
+        scaling_data.sx = sx.reshape((1,len(col_data.unexpanded_input_col_names),1))
         # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
         # gives loss value like competition criterion but I see no training advantage:
         # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
-        sy = np.maximum(np.sqrt(y_sumsq_avg), min_std)
+        scaling_data.sy = np.maximum(np.sqrt(y_sumsq_avg), min_std)
 
     for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, max_batch_size):
                         # Process slice of large dataframe corresponding to batch
@@ -878,7 +898,8 @@ def preprocess_training_data():
             with open(prenorm_cache_path, 'rb') as fd:
                 (x_prenorm, y_prenorm) = pickle.load(fd)
 
-            x_postnorm, y_postnorm = normalise_data(x_prenorm, y_prenorm, mx, sx, my, sy, True)
+            x_postnorm, y_postnorm = normalise_data(x_prenorm, y_prenorm,
+                                                    scaling_data, True)
             if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
             start_time = time.time()
             with open(postnorm_cache_path, 'wb') as fd:
@@ -891,9 +912,11 @@ def preprocess_training_data():
 
     # Save scalings, need them to process test data if do a rerun
     with open(scaling_cache_path, 'wb') as fd:
-        pickle.dump((mx, sx, my, sy, xlim, ylim), fd)
+        pickle.dump((scaling_data.mx, scaling_data.sx, scaling_data.my,
+                     scaling_data.sy, scaling_data.xlim, scaling_data.ylim), fd)
         print("Saved scalings for next time")
 
+    return scaling_data
 
 
 
@@ -1110,26 +1133,7 @@ class HoloDataset(Dataset):
         return self.cache_np_x, self.cache_np_y
 #
 
-dataset = HoloDataset(train_hf, holo_cache_rows)
 
-# Access data in blocks that we can cache efficiently, but on a macro scale access those
-# randomly for training and validation
-
-# If divides exactly this is OK:
-num_blocks = num_train_rows // holo_cache_rows
-blocks_divide_exactly = True
-num_full_blocks = num_blocks
-# Not currently using any spillover, because training batch may then start with smaller
-# awkward number of rows and continue into rows belonging into another block, giving
-# a misalgined pattern
-#if num_train_rows % holo_cache_rows != 0:
-#    # Some rows spill over into last less-than-full block
-#    num_blocks += 1
-#    blocks_divide_exactly = False
-
-block_indices = range(num_blocks)
-train_block_size = int(train_proportion * num_blocks)
-train_block_idx, val_block_idx = sklearn.model_selection.train_test_split(block_indices, train_size=train_block_size)
 
 def form_row_range_from_block_range(block_indices):
     row_idx = []
@@ -1143,37 +1147,6 @@ def form_row_range_from_block_range(block_indices):
         row_idx.extend(list(range(base_row_idx, base_row_idx + num_rows_in_block)))
     return row_idx
 
-train_row_idx = form_row_range_from_block_range(train_block_idx)
-val_row_idx = form_row_range_from_block_range(val_block_idx)
-
-if model_type == "cnn":
-    train_dataset = torch.utils.data.Subset(dataset, train_row_idx)
-    val_dataset = torch.utils.data.Subset(dataset, val_row_idx)
-    train_loader = DataLoader(train_dataset, batch_size=max_batch_size, shuffle=False)
-    val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
-
-input_size = len(expanded_names_input) # number of input features/columns
-output_size = len(expanded_names_output)
-
-# Currently have problem with large R2 for ptend_q0002_24_r2, ptend_q0002_25_r2,
-# ptend_q0002_26_r2 in validation (earlier ones get zeroed anyway through small
-# std check currently)
-# Also in big run ptend_q0003_14_r2, ptend_u_17_r2 to ptend_u_19_r2
-# So overall:
-#    ptend_q0002 <= 26 (<15 officially zero)
-#    ptend_q0003 = 14 (<12 officially zero)
-#    ptend_u in [17, 19] (<12 officially zero) but good scores [12, 16]!
-bad_col_names = []
-bad_col_names.extend([f'ptend_q0001_{i}' for i in range(12)]) # official
-bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15)]) # official
-#bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15, 26)]) # training value ranges zero or tiny up to 25
-bad_col_names.extend([f'ptend_q0003_{i}' for i in range(12)]) # officially to 12 was doing 15
-bad_col_names.extend([f'ptend_u_{i}' for i in range(12)]) # official
-#bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
-bad_col_names.extend([f'ptend_v_{i}' for i in range(12)]) # official
-bad_col_names_set = set()
-for name in bad_col_names:
-    bad_col_names_set.add(name)
 
 
 def unscale_outputs(y, my, sy):
@@ -1273,8 +1246,10 @@ def calc_output_r2_ranking(analysis_data):
     return bad_r2_names
 
 
-def do_cnn_training(exec_data):
+def do_cnn_training(exec_data, train_hf):
     warnings.filterwarnings('ignore', category=FutureWarning)
+
+    dataset = HoloDataset(train_hf, holo_cache_rows)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -1483,7 +1458,58 @@ class ExecData():
         self.overall_best_model_name = ""
         self.overall_best_val_metric = 0.0
 
-def training_loop():
+def training_loop(train_hf):
+        # Access data in blocks that we can cache efficiently, but on a macro scale access those
+    # randomly for training and validation
+
+    # If divides exactly this is OK:
+    num_blocks = num_train_rows // holo_cache_rows
+    blocks_divide_exactly = True
+    num_full_blocks = num_blocks
+    # Not currently using any spillover, because training batch may then start with smaller
+    # awkward number of rows and continue into rows belonging into another block, giving
+    # a misalgined pattern
+    #if num_train_rows % holo_cache_rows != 0:
+    #    # Some rows spill over into last less-than-full block
+    #    num_blocks += 1
+    #    blocks_divide_exactly = False
+
+    block_indices = range(num_blocks)
+    train_block_size = int(train_proportion * num_blocks)
+    train_block_idx, val_block_idx = sklearn.model_selection.train_test_split(block_indices, train_size=train_block_size)
+
+    train_row_idx = form_row_range_from_block_range(train_block_idx)
+    val_row_idx = form_row_range_from_block_range(val_block_idx)
+
+    if model_type == "cnn":
+        train_dataset = torch.utils.data.Subset(dataset, train_row_idx)
+        val_dataset = torch.utils.data.Subset(dataset, val_row_idx)
+        train_loader = DataLoader(train_dataset, batch_size=max_batch_size, shuffle=False)
+        val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
+
+        input_size = len(expanded_names_input) # number of input features/columns
+        output_size = len(expanded_names_output)
+
+    # Currently have problem with large R2 for ptend_q0002_24_r2, ptend_q0002_25_r2,
+    # ptend_q0002_26_r2 in validation (earlier ones get zeroed anyway through small
+    # std check currently)
+    # Also in big run ptend_q0003_14_r2, ptend_u_17_r2 to ptend_u_19_r2
+    # So overall:
+    #    ptend_q0002 <= 26 (<15 officially zero)
+    #    ptend_q0003 = 14 (<12 officially zero)
+    #    ptend_u in [17, 19] (<12 officially zero) but good scores [12, 16]!
+    bad_col_names = []
+    bad_col_names.extend([f'ptend_q0001_{i}' for i in range(12)]) # official
+    bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15)]) # official
+    #bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15, 26)]) # training value ranges zero or tiny up to 25
+    bad_col_names.extend([f'ptend_q0003_{i}' for i in range(12)]) # officially to 12 was doing 15
+    bad_col_names.extend([f'ptend_u_{i}' for i in range(12)]) # official
+    #bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
+    bad_col_names.extend([f'ptend_v_{i}' for i in range(12)]) # official
+    bad_col_names_set = set()
+    for name in bad_col_names:
+        bad_col_names_set.add(name)
+
     exec_data = ExecData()
     if model_type == "cnn":
         exec_data.overall_best_val_metric = float('inf')
@@ -1526,7 +1552,7 @@ def training_loop():
             fd.write(f'{model_save_path}\n')
 
         if model_type == "cnn":
-            bad_r2_output_names = do_cnn_training(exec_data)
+            bad_r2_output_names = do_cnn_training(exec_data, train_hf)
         else:
             bad_r2_output_names = do_catboost_training(exec_data, **model_params)
 
@@ -1534,7 +1560,7 @@ def training_loop():
             with open(feature_knockout_path, 'a') as fd:
                 fd.write(f"{feature_knockout_idx},{exec_data.overall_best_val_metric},{feature_knockout_name},{feature_knockout_description}\n")
 
-def test_submission():
+def test_submission(col_data, scaling_data, submission_weights):
     print('Loading test HoloFrame...')
     test_hf = HoloFrame(test_path, test_offsets_path)
 
@@ -1557,8 +1583,8 @@ def test_submission():
         subset_df = test_hf.get_slice(base_row_idx, base_row_idx + num_rows)
         base_row_idx += num_rows
 
-        xt_prenorm, _ = preprocess_data(subset_df, False)
-        xt, _         = normalise_data(xt_prenorm, None, mx, sx, my, sy, False)
+        xt_prenorm, _ = preprocess_data(subset_df, False, col_data, scaling_data)
+        xt, _         = normalise_data(xt_prenorm, None, scaling_data, False)
 
         if model_type == "cnn":
             # Convert the current slice of xt to a PyTorch tensor
