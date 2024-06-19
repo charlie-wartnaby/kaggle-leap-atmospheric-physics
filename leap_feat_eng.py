@@ -45,7 +45,7 @@ import warnings
 
 
 # Settings
-debug = True
+debug = False
 do_test = True
 is_rerun = False
 do_analysis = True
@@ -68,7 +68,7 @@ else:
     # Use very large numbers for 'all'
     max_train_rows = 100000
     max_test_rows  = 1000000000
-    max_batch_size = 20000  # 5000 with pcuk151, 30000 greta
+    max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.8
     max_epochs = 50
@@ -1297,7 +1297,7 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permu
 
                 # Print every n steps
                 if (batch_idx + 1) % batch_report_interval == 0:
-                    print(f'Epoch {tot_epochs + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / steps:.4f}')
+                    print(f'Epoch {tot_epochs + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / batch_report_interval:.4f}')
                     total_loss = 0  # Reset the loss for the next n steps
         
         # Validation step
@@ -1369,7 +1369,8 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permu
 
 
 def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block_idx,
-                         iterations=400, depth=8, learning_rate=0.25,
+                         val_block_idx,
+                         iterations=10, depth=8, learning_rate=0.25,
                          border_count=32, l2_leaf_reg=5):
     # Catboost, mutually exclusive to start with
 
