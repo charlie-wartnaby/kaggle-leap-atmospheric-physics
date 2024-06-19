@@ -54,7 +54,7 @@ do_feature_knockout = False
 clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
-model_type = "catboost"
+model_type = "cnn"
 #
 
 if debug:
@@ -168,11 +168,12 @@ def main():
     else:
         scaling_data = preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights)
 
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    training_loop(train_hf, num_train_rows, param_permutations)
+    exec_data, bad_r2_output_names = training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permutations, device)
 
     if do_test:
-        test_submission(col_data, scaling_data, submission_weights)
+        test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device)
 
     exit_clean_up()
 
@@ -411,7 +412,7 @@ def form_col_data():
                                 'density'
     ])
         
-        current_normal_knockout_features = [feat.name for feat in unexpanded_col_list if feat.is_input and feat.name not in key_features]
+            current_normal_knockout_features = [feat.name for feat in unexpanded_col_list if feat.is_input and feat.name not in key_features]
 
     for feature in current_normal_knockout_features:
         # Slow but trivial one-off
@@ -921,7 +922,7 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
 
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
+    def __init__(self, col_data, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
                  norm_type="layer", activation_type="silu", poly_degree=0):
         super().__init__()
         
@@ -930,12 +931,13 @@ class AtmLayerCNN(nn.Module):
         else:
             dtype = torch.float32
 
+        self.col_data = col_data
         self.init_1x1 = init_1x1
         self.norm_type = norm_type
         self.activation_type = activation_type
         self.poly_degree = poly_degree
 
-        num_input_feature_chans = len(unexpanded_input_col_names)
+        num_input_feature_chans = len(col_data.unexpanded_input_col_names)
         if do_feature_knockout:
             num_input_feature_chans -= 1
 
@@ -975,7 +977,7 @@ class AtmLayerCNN(nn.Module):
 
         input_size = output_size
         self.last_conv_depth = gen_conv_depth
-        output_size = num_all_outputs_as_vectors * self.last_conv_depth
+        output_size = col_data.num_all_outputs_as_vectors * self.last_conv_depth
         self.conv_layer_2 = nn.Conv1d(input_size, output_size, gen_conv_width,
                                 padding='same', dtype=dtype)
         self.layernorm_2 = self.norm_layer(output_size, num_atm_levels, dtype=dtype)
@@ -985,13 +987,13 @@ class AtmLayerCNN(nn.Module):
         # Output layer - no dropout, no activation function
         # Data is structured such that all vector columns come first, then scalars
         input_size = output_size
-        self.conv_vector_harvest = nn.Conv1d(num_pure_vector_outputs * gen_conv_depth,
-                                         num_pure_vector_outputs, 1, padding='same', dtype=dtype)
+        self.conv_vector_harvest = nn.Conv1d(col_data.num_pure_vector_outputs * gen_conv_depth,
+                                         col_data.num_pure_vector_outputs, 1, padding='same', dtype=dtype)
         self.vector_flatten = nn.Flatten()
         self.pre_scalar_pool = nn.AvgPool1d(num_atm_levels)
         self.scalar_flatten = nn.Flatten()
-        self.linear_scalar_harvest = nn.Linear(num_scalar_outputs * gen_conv_depth, 
-                                               num_scalar_outputs, dtype=dtype)
+        self.linear_scalar_harvest = nn.Linear(col_data.num_scalar_outputs * gen_conv_depth, 
+                                               col_data.num_scalar_outputs, dtype=dtype)
 
         # Polynomial on top of that to hopefully cope better with wide dynamic
         # range of some outputs, initialising close to straight-through linear
@@ -999,8 +1001,8 @@ class AtmLayerCNN(nn.Module):
         # https://pytorch.org/tutorials/beginner/examples_nn/polynomial_module.html
         # Cubic probably a bit ambitious?
         # No 'a' offset because last layer will have own learnt bias
-        self.vector_poly_coeffs = self.create_coeff_param_list((num_pure_vector_outputs,1))
-        self.scalar_poly_coeffs = self.create_coeff_param_list((num_scalar_outputs))
+        self.vector_poly_coeffs = self.create_coeff_param_list((col_data.num_pure_vector_outputs,1))
+        self.scalar_poly_coeffs = self.create_coeff_param_list((col_data.num_scalar_outputs))
 
     def create_coeff_param_list(self, vector_shape):
         coeffs = []
@@ -1048,7 +1050,7 @@ class AtmLayerCNN(nn.Module):
         x = self.layernorm_2(x)
         x = self.activation_layer_2(x)
         x = self.dropout_layer_2(x)
-        num_conv_outputs_for_vectors = num_pure_vector_outputs * self.last_conv_depth
+        num_conv_outputs_for_vectors = self.col_data.num_pure_vector_outputs * self.last_conv_depth
         vector_subset = x[:, : num_conv_outputs_for_vectors, :]
         scalar_subset = x[:, num_conv_outputs_for_vectors :, :]
         scalars_pooled = self.pre_scalar_pool(scalar_subset)
@@ -1079,12 +1081,14 @@ class AtmLayerCNN(nn.Module):
 #
 
 class HoloDataset(Dataset):
-    def __init__(self, holo_df, cache_rows):
+    def __init__(self, holo_df, cache_rows, exec_data, device):
         """
         Initialize with HoloFrame instance.
         """
         self.holo_df = holo_df
         self.cache_rows = cache_rows
+        self.exec_data = exec_data
+        self.device = device
         self.cache_base_idx = -1
         self.cache_np_x = None
         self.cache_np_y = None
@@ -1124,9 +1128,9 @@ class HoloDataset(Dataset):
         y_np = self.cache_np_y[cache_idx]
         if do_feature_knockout:
             # Doing this post-processing so cached data can be used unchanged throughout
-            x_np = np.delete(x_np, feature_knockout_idx, axis=0)
-        return torch.from_numpy(x_np).to(device), \
-               torch.from_numpy(y_np).to(device)
+            x_np = np.delete(x_np, self.exec_data.feature_knockout_idx, axis=0)
+        return torch.from_numpy(x_np).to(self.device), \
+               torch.from_numpy(y_np).to(self.device)
     
     def get_np_block_slice(self, block_base_idx):
         self.ensure_block_loaded(block_base_idx)
@@ -1150,26 +1154,26 @@ def form_row_range_from_block_range(block_indices, num_train_rows, num_blocks, n
 
 
 
-def unscale_outputs(y, my, sy):
+def unscale_outputs(y, scaling_data, col_data):
     """Undo normalisation to return to true values (but with submission
     weights still multiplied in)"""
 
     zeroed_cols = []
-    for i in range(sy.shape[0]):
+    for i in range(scaling_data.sy.shape[0]):
         # CW: still using original threshold although now premultiplying outputs by
         # submission weightings, though does zero out those with zero weights
         # (and some others)
-        col_name = expanded_names_output[i]
-        tiny_scaling = (sy[i] < min_std * 1.1)
-        bad_col = col_name in bad_col_names_set
+        col_name = col_data.expanded_names_output[i]
+        tiny_scaling = (scaling_data.sy[i] < min_std * 1.1)
+        bad_col = col_name in col_data.bad_col_names_set
         if tiny_scaling or bad_col:
-            y[:,i] = my[i] # 0 # After rescaling becomes mean
+            y[:,i] = scaling_data.my[i] # 0 here if restore mean offset as added later
         if tiny_scaling and not bad_col:
-            zeroed_cols.append(expanded_names_output[i])
+            zeroed_cols.append(col_data.expanded_names_output[i])
     print(f"Zeroed-out due to scaling not blacklist: " + str(zeroed_cols))
 
     # undo y scaling
-    y = (y * sy) # Experimenting again with no mean offset: + my
+    y = (y * scaling_data.sy) # Experimenting again with no mean offset: + my
 
 class AnalysisData():
     def __init__(self):
@@ -1180,17 +1184,17 @@ class AnalysisData():
         self.r2_vec = None
 
 
-def analyse_batch(analysis_data, outputs_pred_np, outputs_true_np):
+def analyse_batch(analysis_data, outputs_pred_np, outputs_true_np, col_data, scaling_data):
     """Analyse batch of true versus predicted outputs"""
 
     # Return to original output scalings (but with submission weights
     # multiplied in) to match competition metric
-    unscale_outputs(outputs_pred_np, my, sy)
-    unscale_outputs(outputs_true_np, my, sy)
+    unscale_outputs(outputs_pred_np, scaling_data, col_data)
+    unscale_outputs(outputs_true_np, scaling_data, col_data)
 
     # Assuming variance of dataset outputs foudn in training more 
     # representative than variance in this small batch?
-    true_variance_sqd = sy * sy # undo sqrt in stdev
+    true_variance_sqd = scaling_data.sy ** 2 # undo sqrt in stdev
 
     error_residues = outputs_true_np - outputs_pred_np
     error_variance_sqd = np.square(error_residues)
@@ -1215,11 +1219,11 @@ def analyse_batch(analysis_data, outputs_pred_np, outputs_true_np):
     if do_analysis and analysis_data.df.height < max_analysis_output_rows:
         r2_cols = np.tile(r2_metric, (num_new_rows,1))
         batch_df = pl.DataFrame()
-        for i, output_name in enumerate(expanded_names_output):
+        for i, output_name in enumerate(col_data.expanded_names_output):
             batch_df = batch_df.with_columns(pl.from_numpy(outputs_true_np[:,i], [output_name + "_true"]))
             batch_df = batch_df.with_columns(pl.from_numpy(outputs_pred_np[:,i], [output_name + "_pred"]))
             batch_df = batch_df.with_columns(pl.from_numpy(r2_cols[:,i], [output_name + "_r2"]))
-        for i, vector_name in enumerate(unexpanded_output_vector_col_names):
+        for i, vector_name in enumerate(col_data.unexpanded_output_vector_col_names):
             first_col_idx = i * num_atm_levels
             end_col_idx = first_col_idx + num_atm_levels
             r2_avg_for_vector = np.mean(r2_cols[:, first_col_idx:end_col_idx], axis=1)
@@ -1247,10 +1251,8 @@ def calc_output_r2_ranking(analysis_data):
     return bad_r2_names
 
 
-def do_cnn_training(exec_data, dataset):
+def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permutations, train_loader, val_loader, device):
     warnings.filterwarnings('ignore', category=FutureWarning)
-
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     if is_rerun and os.path.exists(epoch_counter_path):
         try:
@@ -1263,17 +1265,17 @@ def do_cnn_training(exec_data, dataset):
     else:
         tot_epochs = 0
 
-    model = AtmLayerCNN(**model_params).to(device)
-    if try_reload_model and os.path.exists(model_save_path):
+    model = AtmLayerCNN(col_data, **model_params).to(device)
+    if try_reload_model and os.path.exists(exec_data.model_save_path):
         print('Attempting to reload model from disk...')
-        model.load_state_dict(torch.load(model_save_path))
+        model.load_state_dict(torch.load(exec_data.model_save_path))
 
     best_val_loss = float('inf')  # Set initial best as infinity
     criterion = nn.MSELoss()  # Using MSE for regression
     optimizer = optim.AdamW(model.parameters(), lr=initial_learning_rate, weight_decay=0.01)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
     torch.autograd.set_detect_anomaly(debug)
-    best_model_state = None       # To store the best model's state
+    exec_data.best_model_state = None       # To store the best model's state
     patience_count = 0
 
     if len(param_permutations) > 1:
@@ -1312,7 +1314,7 @@ def do_cnn_training(exec_data, dataset):
                 if do_analysis:
                     outputs_pred_np = outputs_pred.cpu().numpy()
                     outputs_true_np = outputs_true.cpu().numpy()
-                    analyse_batch(analysis_data, outputs_pred_np, outputs_true_np)
+                    analyse_batch(analysis_data, outputs_pred_np, outputs_true_np, col_data, scaling_data)
 
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Validation batch {batch_idx + 1}')
@@ -1338,8 +1340,8 @@ def do_cnn_training(exec_data, dataset):
             exec_data.overall_best_val_metric = avg_val_loss
             exec_data.overall_best_model = model
             exec_data.overall_best_model_state = model.state_dict() # TODO is this static anyway?
-            exec_data.overall_best_model_name = model_save_path
-            print(f"{model_save_path} best so far")
+            exec_data.overall_best_model_name = exec_data.model_save_path
+            print(f"{exec_data.model_save_path} best so far")
 
         # Update best model if current epoch's validation loss is lower
         if avg_val_loss < best_val_loss:
@@ -1367,7 +1369,7 @@ def do_cnn_training(exec_data, dataset):
     return bad_r2_output_names
 
 
-def do_catboost_training(exec_data, dataset, train_block_idx,
+def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block_idx,
                          iterations=400, depth=8, learning_rate=0.25,
                          border_count=32, l2_leaf_reg=5):
     # Catboost, mutually exclusive to start with
@@ -1425,7 +1427,7 @@ def do_catboost_training(exec_data, dataset, train_block_idx,
         predicted_y = overall_model.predict(train_x)
         r2_score = sklearn.metrics.r2_score(train_y, predicted_y)
         print(f"Catboost validation batch {batch_idx+1} of {len(val_block_idx)} normalised r2={r2_score}")
-        analyse_batch(analysis_data, predicted_y, train_y)
+        analyse_batch(analysis_data, predicted_y, train_y, col_data, scaling_data)
 
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
@@ -1458,7 +1460,7 @@ class ExecData():
         self.overall_best_model_name = ""
         self.overall_best_val_metric = 0.0
 
-def training_loop(train_hf, num_train_rows, param_permutations):
+def training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permutations, device):
         # Access data in blocks that we can cache efficiently, but on a macro scale access those
     # randomly for training and validation
 
@@ -1483,14 +1485,22 @@ def training_loop(train_hf, num_train_rows, param_permutations):
     train_row_idx = form_row_range_from_block_range(train_block_idx, num_train_rows, num_blocks, num_full_blocks)
     val_row_idx = form_row_range_from_block_range(val_block_idx, num_train_rows, num_blocks, num_full_blocks)
 
+    exec_data = ExecData()
+    if model_type == "cnn":
+        exec_data.overall_best_val_metric = float('inf')
+    else:
+        exec_data.overall_best_val_metric = float('-inf') # R2 bigger the better
+
+    dataset = HoloDataset(train_hf, holo_cache_rows, exec_data, device)
+
     if model_type == "cnn":
         train_dataset = torch.utils.data.Subset(dataset, train_row_idx)
         val_dataset = torch.utils.data.Subset(dataset, val_row_idx)
         train_loader = DataLoader(train_dataset, batch_size=max_batch_size, shuffle=False)
         val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
 
-        input_size = len(expanded_names_input) # number of input features/columns
-        output_size = len(expanded_names_output)
+        input_size = len(col_data.expanded_names_input) # number of input features/columns
+        output_size = len(col_data.expanded_names_output)
 
     # Currently have problem with large R2 for ptend_q0002_24_r2, ptend_q0002_25_r2,
     # ptend_q0002_26_r2 in validation (earlier ones get zeroed anyway through small
@@ -1508,15 +1518,9 @@ def training_loop(train_hf, num_train_rows, param_permutations):
     bad_col_names.extend([f'ptend_u_{i}' for i in range(12)]) # official
     #bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
     bad_col_names.extend([f'ptend_v_{i}' for i in range(12)]) # official
-    bad_col_names_set = set()
+    col_data.bad_col_names_set = set()
     for name in bad_col_names:
-        bad_col_names_set.add(name)
-
-    exec_data = ExecData()
-    if model_type == "cnn":
-        exec_data.overall_best_val_metric = float('inf')
-    else:
-        exec_data.overall_best_val_metric = float('-inf') # R2 bigger the better
+        col_data.bad_col_names_set.add(name)
 
     for param_permutation in param_permutations:
         if os.path.exists(stopfile_path):
@@ -1533,8 +1537,8 @@ def training_loop(train_hf, num_train_rows, param_permutations):
             # permutation is just index of feature to knock out
             model_params = {}
             feature_knockout_idx = param_permutation
-            feature_knockout_name = unexpanded_input_col_names[feature_knockout_idx]
-            feature_knockout_col = unexpanded_cols_by_name[feature_knockout_name]
+            feature_knockout_name = col_data.unexpanded_input_col_names[feature_knockout_idx]
+            feature_knockout_col = col_data.unexpanded_cols_by_name[feature_knockout_name]
             feature_knockout_description = feature_knockout_col.description
             print(f"... knocking out feature {feature_knockout_idx}: {feature_knockout_name} - {feature_knockout_description}")
             suffix = f"_knockout_{feature_knockout_idx}_{feature_knockout_name}"
@@ -1553,18 +1557,19 @@ def training_loop(train_hf, num_train_rows, param_permutations):
         with open(loss_log_path, 'a') as fd:
             fd.write(f'{model_save_path}\n')
 
-        dataset = HoloDataset(train_hf, holo_cache_rows)
-
         if model_type == "cnn":
-            bad_r2_output_names = do_cnn_training(exec_data, dataset)
+            bad_r2_output_names = do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permutations, train_loader, val_loader, device)
         else:
-            bad_r2_output_names = do_catboost_training(exec_data, dataset, train_block_idx, **model_params)
+            bad_r2_output_names = do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block_idx, **model_params)
 
         if do_feature_knockout:
             with open(feature_knockout_path, 'a') as fd:
                 fd.write(f"{feature_knockout_idx},{exec_data.overall_best_val_metric},{feature_knockout_name},{feature_knockout_description}\n")
 
-def test_submission(col_data, scaling_data, submission_weights):
+    return exec_data, bad_r2_output_names
+
+
+def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device):
     print('Loading test HoloFrame...')
     test_hf = HoloFrame(test_path, test_offsets_path)
 
@@ -1577,7 +1582,7 @@ def test_submission(col_data, scaling_data, submission_weights):
  
     print("Removing poor R2 cols from those that will be predicted:", bad_r2_output_names)
     for name in bad_r2_output_names:
-        bad_col_names_set.add(name)
+        col_data.bad_col_names_set.add(name)
 
     base_row_idx = 0
     num_test_rows = min(max_test_rows, len(test_hf))
@@ -1602,7 +1607,7 @@ def test_submission(col_data, scaling_data, submission_weights):
             xt = xt.reshape((num_rows,-1)) # Leaving layer duplicates of scalars for now
             y_predictions = exec_data.overall_best_model.predict(xt)
 
-        unscale_outputs(y_predictions, my, sy)
+        unscale_outputs(y_predictions, scaling_data, col_data)
 
         # We already premultiplied training values by submission weights
         # so predictions should already be scaled the same way
