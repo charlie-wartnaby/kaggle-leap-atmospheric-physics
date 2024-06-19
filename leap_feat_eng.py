@@ -51,7 +51,7 @@ is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = True
+clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
 model_type = "catboost"
@@ -163,13 +163,13 @@ def main():
     if os.path.exists(scaling_cache_path):
         print("Opening previous scalings...")
         with open(scaling_cache_path, 'rb') as fd:
-            scaling_data = Sca1ingMetadata(pickle.load(fd))
+            scaling_data = ScalingMetadata(pickle.load(fd))
         # Everything should already be cached
     else:
         scaling_data = preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights)
 
 
-    training_loop(train_hf)
+    training_loop(train_hf, num_train_rows, param_permutations)
 
     if do_test:
         test_submission(col_data, scaling_data, submission_weights)
@@ -1135,7 +1135,8 @@ class HoloDataset(Dataset):
 
 
 
-def form_row_range_from_block_range(block_indices):
+def form_row_range_from_block_range(block_indices, num_train_rows, num_blocks, num_full_blocks):
+    blocks_divide_exactly = (num_blocks == num_full_blocks)
     row_idx = []
     for block_idx in block_indices:
         if block_idx == num_blocks - 1 and not blocks_divide_exactly:
@@ -1246,10 +1247,8 @@ def calc_output_r2_ranking(analysis_data):
     return bad_r2_names
 
 
-def do_cnn_training(exec_data, train_hf):
+def do_cnn_training(exec_data, dataset):
     warnings.filterwarnings('ignore', category=FutureWarning)
-
-    dataset = HoloDataset(train_hf, holo_cache_rows)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -1368,8 +1367,9 @@ def do_cnn_training(exec_data, train_hf):
     return bad_r2_output_names
 
 
-def do_catboost_training(exec_data, iterations=400, depth=8, learning_rate=0.25,
-                                    border_count=32, l2_leaf_reg=5):
+def do_catboost_training(exec_data, dataset, train_block_idx,
+                         iterations=400, depth=8, learning_rate=0.25,
+                         border_count=32, l2_leaf_reg=5):
     # Catboost, mutually exclusive to start with
 
     cat_params = {
@@ -1458,14 +1458,16 @@ class ExecData():
         self.overall_best_model_name = ""
         self.overall_best_val_metric = 0.0
 
-def training_loop(train_hf):
+def training_loop(train_hf, num_train_rows, param_permutations):
         # Access data in blocks that we can cache efficiently, but on a macro scale access those
     # randomly for training and validation
 
     # If divides exactly this is OK:
     num_blocks = num_train_rows // holo_cache_rows
-    blocks_divide_exactly = True
+    assert (num_train_rows / holo_cache_rows == num_blocks)
+    # Not worrying about using small leftover chunk of rows as yet
     num_full_blocks = num_blocks
+
     # Not currently using any spillover, because training batch may then start with smaller
     # awkward number of rows and continue into rows belonging into another block, giving
     # a misalgined pattern
@@ -1478,8 +1480,8 @@ def training_loop(train_hf):
     train_block_size = int(train_proportion * num_blocks)
     train_block_idx, val_block_idx = sklearn.model_selection.train_test_split(block_indices, train_size=train_block_size)
 
-    train_row_idx = form_row_range_from_block_range(train_block_idx)
-    val_row_idx = form_row_range_from_block_range(val_block_idx)
+    train_row_idx = form_row_range_from_block_range(train_block_idx, num_train_rows, num_blocks, num_full_blocks)
+    val_row_idx = form_row_range_from_block_range(val_block_idx, num_train_rows, num_blocks, num_full_blocks)
 
     if model_type == "cnn":
         train_dataset = torch.utils.data.Subset(dataset, train_row_idx)
@@ -1551,10 +1553,12 @@ def training_loop(train_hf):
         with open(loss_log_path, 'a') as fd:
             fd.write(f'{model_save_path}\n')
 
+        dataset = HoloDataset(train_hf, holo_cache_rows)
+
         if model_type == "cnn":
-            bad_r2_output_names = do_cnn_training(exec_data, train_hf)
+            bad_r2_output_names = do_cnn_training(exec_data, dataset)
         else:
-            bad_r2_output_names = do_catboost_training(exec_data, **model_params)
+            bad_r2_output_names = do_catboost_training(exec_data, dataset, train_block_idx, **model_params)
 
         if do_feature_knockout:
             with open(feature_knockout_path, 'a') as fd:
