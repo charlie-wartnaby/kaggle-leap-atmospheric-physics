@@ -146,16 +146,15 @@ def main():
     num_train_rows = min(len(train_hf), max_train_rows)
     assert(subset_base_row + num_train_rows <= len(train_hf))
 
+    col_data = form_col_data()
+    expand_vector_col_info(col_data)
 
     if do_feature_knockout:
-        param_permutations = range(len(unexpanded_input_col_names))
+        param_permutations = range(len(col_data.unexpanded_input_col_names))
         with open(feature_knockout_path, 'w') as fd:
             fd.write(f"i,best_val_loss,Variable,Description\n")
     else:
         param_permutations = expand_multitrain_permutations()
-
-    col_data = form_col_data()
-    expand_vector_col_info(col_data)
 
     submission_weights = load_submission_weights(col_data)
 
@@ -163,7 +162,7 @@ def main():
     if os.path.exists(scaling_cache_path):
         print("Opening previous scalings...")
         with open(scaling_cache_path, 'rb') as fd:
-            scaling_data = ScalingMetadata(pickle.load(fd))
+            scaling_data = ScalingMetadata(*pickle.load(fd))
         # Everything should already be cached
     else:
         scaling_data = preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights)
@@ -173,7 +172,7 @@ def main():
     exec_data, bad_r2_output_names = training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permutations, device)
 
     if do_test:
-        test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device)
+        test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device, submission_weights)
 
     exit_clean_up()
 
@@ -303,7 +302,6 @@ class ScalingMetadata():
         self.sy = sy
         self.xlim = xlim
         self.ylim = ylim
-        pass
 
 
 def form_col_data():
@@ -846,9 +844,9 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
     scaling_data.ylim = minmax_vector_across_samples(scaling_data.ylim_sample)
 
     if scale_using_range_limits:
-        sx = (xlim[1] - xlim[0]) / 2.0 # aiming for [-1, 1] normalised range
+        sx = (scaling_data.xlim[1] - scaling_data.xlim[0]) / 2.0 # aiming for [-1, 1] normalised range
         scaling_data.sx = np.maximum(sx, min_std)
-        bigger_y_lim = np.maximum(np.abs(ylim[0]), np.abs(ylim[1])) # as not centring with mean
+        bigger_y_lim = np.maximum(np.abs(scaling_data.ylim[0]), np.abs(scaling_data.ylim[1])) # as not centring with mean
         scaling_data.sy = np.maximum(bigger_y_lim, min_std)
     else:
         # Do another pass to get standard deviation stats across whole dataset, which we
@@ -1231,18 +1229,18 @@ def analyse_batch(analysis_data, outputs_pred_np, outputs_true_np, col_data, sca
         analysis_data.df = pl.concat([analysis_data.df, batch_df])
     
 
-def calc_output_r2_ranking(analysis_data):
+def calc_output_r2_ranking(col_data, analysis_data):
     """List columns in order of R2 goodness to identify worst offenders"""
 
     bad_r2_names = []
     ranking_list = []
-    for i, col_name in enumerate(expanded_names_output):
+    for i, col_name in enumerate(col_data.expanded_names_output):
         r2_name = col_name + "_r2"
         r2_avg = analysis_data.r2_vec[i].mean()
         if r2_avg <= 0.0:
             # Will use mean for this column instead as prediction worse than that
             bad_r2_names.append(col_name)
-        r2_description = expanded_cols_by_name[col_name].description
+        r2_description = col_data.expanded_cols_by_name[col_name].description
         ranking_list.append((r2_name, r2_avg, r2_description))
     ranking_list.sort(key=lambda x: x[1])
     ranking_df = pl.DataFrame(ranking_list, ["Var name", "R2", "Description"])
@@ -1334,13 +1332,14 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permu
 
         if do_analysis:
             analysis_data.df.head(max_analysis_output_rows).write_csv(analysis_df_path)
-            bad_r2_output_names = calc_output_r2_ranking(analysis_data)
+            bad_r2_output_names = calc_output_r2_ranking(col_data, analysis_data)
 
         if avg_val_loss < exec_data.overall_best_val_metric:
             exec_data.overall_best_val_metric = avg_val_loss
             exec_data.overall_best_model = model
             exec_data.overall_best_model_state = model.state_dict() # TODO is this static anyway?
             exec_data.overall_best_model_name = exec_data.model_save_path
+            exec_data.best_feature_knockout_idx = exec_data.feature_knockout_idx
             print(f"{exec_data.model_save_path} best so far")
 
         # Update best model if current epoch's validation loss is lower
@@ -1349,7 +1348,7 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permu
             best_model_state = model.state_dict()  # Save the best model state
             patience_count = 0
             print("Validation loss decreased, saving new best model and resetting patience counter.")
-            torch.save(model.state_dict(), model_save_path)
+            torch.save(model.state_dict(), exec_data.model_save_path)
         else:
             patience_count += 1
             print(f"No improvement in validation loss for {patience_count} epochs.")
@@ -1414,7 +1413,7 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
         del block_model
         gc.collect()
 
-    with open(model_save_path, "wb") as fd:
+    with open(exec_data.model_save_path, "wb") as fd:
         pickle.dump(overall_model, fd)
 
     # Validation step
@@ -1436,16 +1435,17 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
             break
 
     analysis_data.df.head(max_analysis_output_rows).write_csv(analysis_df_path)
-    bad_r2_output_names = calc_output_r2_ranking(analysis_data)
+    bad_r2_output_names = calc_output_r2_ranking(col_data, analysis_data)
     print(f"Final validation R2={analysis_data.r2_raw}, bad excl R2={analysis_data.r2_clean}")
     with open(loss_log_path, 'a') as fd:
         fd.write(f'{analysis_data.r2_raw},{analysis_data.r2_clean}\n')
 
     if analysis_data.r2_clean > exec_data.overall_best_val_metric:
-        print(f'Best model so far {model_save_path}')
-        exec_data.overall_best_model_name = model_save_path
+        print(f'Best model so far {exec_data.model_save_path}')
+        exec_data.overall_best_model_name = exec_data.model_save_path
         exec_data.overall_best_model = overall_model
         exec_data.overall_best_val_metric = analysis_data.r2_clean
+        exec_data.best_feature_knockout_idx = exec_data.feature_knockout_idx
 
     return  bad_r2_output_names
 
@@ -1459,6 +1459,8 @@ class ExecData():
         self.overall_best_model_state = None
         self.overall_best_model_name = ""
         self.overall_best_val_metric = 0.0
+        self.best_feature_knockout_idx = 0
+        self.feature_knockout_idx = 0
 
 def training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permutations, device):
         # Access data in blocks that we can cache efficiently, but on a macro scale access those
@@ -1536,40 +1538,41 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permut
         if do_feature_knockout:
             # permutation is just index of feature to knock out
             model_params = {}
-            feature_knockout_idx = param_permutation
-            feature_knockout_name = col_data.unexpanded_input_col_names[feature_knockout_idx]
-            feature_knockout_col = col_data.unexpanded_cols_by_name[feature_knockout_name]
-            feature_knockout_description = feature_knockout_col.description
-            print(f"... knocking out feature {feature_knockout_idx}: {feature_knockout_name} - {feature_knockout_description}")
-            suffix = f"_knockout_{feature_knockout_idx}_{feature_knockout_name}"
+            exec_data.feature_knockout_idx = param_permutation
+            exec_data.feature_knockout_name = col_data.unexpanded_input_col_names[exec_data.feature_knockout_idx]
+            exec_data.feature_knockout_col = col_data.unexpanded_cols_by_name[exec_data.feature_knockout_name]
+            exec_data.feature_knockout_description = exec_data.feature_knockout_col.description
+            print(f"... knocking out feature {exec_data.feature_knockout_idx}: {exec_data.feature_knockout_name} - {exec_data.feature_knockout_description}")
+            suffix = f"_knockout_{exec_data.feature_knockout_idx}_{exec_data.feature_knockout_name}"
         else:
             model_params = param_permutation
             suffix = ""
             for key in param_permutation.keys():
                 print(f"... {key}={param_permutation[key]}")
                 suffix += f"_{key}_{param_permutation[key]}"
-        model_save_path = model_root_path + suffix
+        exec_data.model_save_path = model_root_path + suffix
         if model_type == "cnn":
-            model_save_path += ".pt"
+            exec_data.model_save_path += ".pt"
         else:
-            model_save_path += ".pkl"
+            exec_data.model_save_path += ".pkl"
 
         with open(loss_log_path, 'a') as fd:
-            fd.write(f'{model_save_path}\n')
+            fd.write(f'{exec_data.model_save_path}\n')
 
         if model_type == "cnn":
             bad_r2_output_names = do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permutations, train_loader, val_loader, device)
         else:
-            bad_r2_output_names = do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block_idx, **model_params)
+            bad_r2_output_names = do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block_idx,
+                                                       val_block_idx, **model_params)
 
         if do_feature_knockout:
             with open(feature_knockout_path, 'a') as fd:
-                fd.write(f"{feature_knockout_idx},{exec_data.overall_best_val_metric},{feature_knockout_name},{feature_knockout_description}\n")
+                fd.write(f"{exec_data.feature_knockout_idx},{exec_data.overall_best_val_metric},{exec_data.feature_knockout_name},{exec_data.feature_knockout_description}\n")
 
     return exec_data, bad_r2_output_names
 
 
-def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device):
+def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device, submission_weights):
     print('Loading test HoloFrame...')
     test_hf = HoloFrame(test_path, test_offsets_path)
 
@@ -1592,8 +1595,11 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
         subset_df = test_hf.get_slice(base_row_idx, base_row_idx + num_rows)
         base_row_idx += num_rows
 
-        xt_prenorm, _ = preprocess_data(subset_df, False, col_data, scaling_data)
+        xt_prenorm, _ = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights)
         xt, _         = normalise_data(xt_prenorm, None, scaling_data, False)
+        if do_feature_knockout:
+            # Would never really do test run with single feature knocked out, but supporting anyway
+            xt = np.delete(xt, exec_data.best_feature_knockout_idx, axis=1)
 
         if model_type == "cnn":
             # Convert the current slice of xt to a PyTorch tensor
@@ -1615,7 +1621,7 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
         # Lose everything apart from sample ID:
         submission_subset_df = subset_df.select('sample_id')
         # Add output columns for submission
-        submission_subset_df = submission_subset_df.with_columns(pl.from_numpy(y_predictions, expanded_names_output))
+        submission_subset_df = submission_subset_df.with_columns(pl.from_numpy(y_predictions, col_data.expanded_names_output))
 
         if submission_df is not None:
             submission_df = pl.concat([submission_df, submission_subset_df])
