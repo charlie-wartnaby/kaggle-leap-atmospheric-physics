@@ -411,9 +411,14 @@ def form_col_data():
         col_data.catboost_input_feature_idx = col_data.cnn_input_feature_idx
     else:
         # Including most for CNN, eliminated some replaced by derived features:
-        current_cnn_knockout_features = set(['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
-                                             'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR',
-                                             'cam_in_LWUP'])
+        current_cnn_knockout_features = set(['pbuf_COSZRS',
+                                                'cam_in_ALDIF',
+                                                'cam_in_ALDIR',
+                                                'cam_in_ASDIF',
+                                                'cam_in_ASDIR',
+                                                'pbuf_ozone',
+                                                'pbuf_CH4',
+                                                'pbuf_N2O'])
         # List came from feature knockout ranking actually from CNN experiments:
         current_catboost_use_features = set(['state_q0002', 'state_q0003', 'rel_humidity', 'state_v',
                                             'state_t', 'cam_in_LANDFRAC', 'diffuse_lw_absorb',
