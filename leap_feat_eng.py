@@ -45,16 +45,16 @@ import warnings
 
 
 # Settings
-debug = False
+debug = True
 do_test = True
 is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = False
+clear_batch_cache_at_start = True
 scale_using_range_limits = False
 use_float64 = False
-model_type = "cnn"
+model_type = "catboost"
 #
 
 if debug:
@@ -379,47 +379,6 @@ def form_col_data():
     unexpanded_col_list.append(ColumnInfo(True, 'diffuse_lw_absorb',    'diffuse longwave absorbance',            1, 'W/m2'       ))
 
 
-    if do_feature_knockout:
-        current_normal_knockout_features = []
-    else:
-        if model_type == "cnn":
-            current_normal_knockout_features = ['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
-                                            'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR', 'cam_in_LWUP']
-        else:
-            # Experimental tiny subset of only key features to see if catboost can work
-            # fast enough to cover more training set. Well, longer now
-            key_features = set(['state_q0002', 'state_q0003', 'rel_humidity',
-                                'state_v',
-                                'state_t',
-                                'cam_in_LANDFRAC',
-                                'diffuse_lw_absorb',
-                                'abs_momentum',
-                                'direct_sw_absorb',
-                                'buoyancy',
-                                'up_integ_tot_cloud',
-                                'cam_in_ALDIR',
-                                'recip_rel_humidity',
-                                'state_q0001',
-                                'cam_in_OCNFRAC',
-                                'pbuf_LHFLX',
-                                'pbuf_CH4',
-                                'state_ps',
-                                'cam_in_ICEFRAC',
-                                'pressure',
-                                'pbuf_COSZRS',
-                                'density'
-    ])
-        
-            current_normal_knockout_features = [feat.name for feat in unexpanded_col_list if feat.is_input and feat.name not in key_features]
-
-    for feature in current_normal_knockout_features:
-        # Slow but trivial one-off
-        for i in range(len(unexpanded_col_list)):
-            if unexpanded_col_list[i].name == feature:
-                del unexpanded_col_list[i]
-                break
-
-
     col_data = ColumnMetadata()
     unexpanded_col_names = [col.name for col in unexpanded_col_list]
     col_data.unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
@@ -427,6 +386,40 @@ def form_col_data():
     col_data.unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not col.is_input]
     col_data.unexpanded_output_vector_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension > 1]
     col_data.unexpanded_output_scalar_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension <= 1]
+
+    # Form set of names to not compute outputs for according to competition
+    # description; may add our own poor ones to this set later
+    col_data.bad_col_names_set = set()
+    for col_name in col_data.unexpanded_output_col_names:
+        col = col_data.unexpanded_cols_by_name[col_name]
+        for i in range(col.first_useful_idx):
+            expanded_name = f'{col.name}_{i}'
+            col_data.bad_col_names_set.add(expanded_name)
+
+    if do_feature_knockout:
+        col_data.cnn_input_feature_idx = range(len(col_data.unexpanded_input_col_names))
+        col_data.catboost_input_feature_idx = col_data.cnn_input_feature_idx
+    else:
+        # Including most for CNN, eliminated some replaced by derived features:
+        current_cnn_knockout_features = set(['state_q0001', 'state_u', 'state_v', 'pbuf_SOLIN', 'pbuf_COSZRS',
+                                             'cam_in_ALDIF', 'cam_in_ALDIR', 'cam_in_ASDIF', 'cam_in_ASDIR',
+                                             'cam_in_LWUP'])
+        # List came from feature knockout ranking actually from CNN experiments:
+        current_catboost_use_features = set(['state_q0002', 'state_q0003', 'rel_humidity', 'state_v',
+                                            'state_t', 'cam_in_LANDFRAC', 'diffuse_lw_absorb',
+                                            'abs_momentum', 'direct_sw_absorb','buoyancy',
+                                            'up_integ_tot_cloud', 'cam_in_ALDIR', 'recip_rel_humidity',
+                                            'state_q0001', 'cam_in_OCNFRAC', 'pbuf_LHFLX', 'pbuf_CH4',
+                                            'state_ps', 'cam_in_ICEFRAC', 'pressure', 'pbuf_COSZRS',
+                                            'density'])
+        
+        col_data.cnn_input_feature_idx = []
+        col_data.catboost_input_feature_idx = []
+        for idx, name in enumerate(col_data.unexpanded_input_col_names):
+            if name not in current_cnn_knockout_features:
+                col_data.cnn_input_feature_idx.append(idx)
+            if name in current_catboost_use_features:
+                col_data.catboost_input_feature_idx.append(idx)
 
     return col_data
 
@@ -935,7 +928,7 @@ class AtmLayerCNN(nn.Module):
         self.activation_type = activation_type
         self.poly_degree = poly_degree
 
-        num_input_feature_chans = len(col_data.unexpanded_input_col_names)
+        num_input_feature_chans = len(col_data.cnn_input_feature_idx)
         if do_feature_knockout:
             num_input_feature_chans -= 1
 
@@ -1079,7 +1072,7 @@ class AtmLayerCNN(nn.Module):
 #
 
 class HoloDataset(Dataset):
-    def __init__(self, holo_df, cache_rows, exec_data, device):
+    def __init__(self, holo_df, cache_rows, exec_data, device, x_col_idx_list):
         """
         Initialize with HoloFrame instance.
         """
@@ -1087,6 +1080,7 @@ class HoloDataset(Dataset):
         self.cache_rows = cache_rows
         self.exec_data = exec_data
         self.device = device
+        self.x_col_idx_list = x_col_idx_list
         self.cache_base_idx = -1
         self.cache_np_x = None
         self.cache_np_y = None
@@ -1109,11 +1103,14 @@ class HoloDataset(Dataset):
             if os.path.exists(cache_path):
                 # Preprocessing already done, retrieve from binary cache file
                 with open(cache_path, 'rb') as fd:
-                    (self.cache_np_x, self.cache_np_y) = pickle.load(fd)
+                    (all_np_x, self.cache_np_y) = pickle.load(fd)
                 if show_timings: print(f'HoloDataset slice cache load at row {self.cache_base_idx} took {time.time() - start_time} s')    
             else:
                 print(f"ERROR: cached data not found at row {index}")
                 sys.exit(1)
+            # Unwanted features removed only when used here so different model types with
+            # different feature subsets can share cached disk data with all features
+            self.cache_np_x = all_np_x[:, self.x_col_idx_list, :]
 
     def __getitem__(self, index):
         """
@@ -1133,7 +1130,6 @@ class HoloDataset(Dataset):
     def get_np_block_slice(self, block_base_idx):
         self.ensure_block_loaded(block_base_idx)
         return self.cache_np_x, self.cache_np_y
-#
 
 
 
@@ -1395,7 +1391,7 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
         print(f"Catboost training batch {batch_idx+1} of {len(train_block_idx)}")
         block_base_row_idx = block_idx * max_batch_size
         train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
-        train_x = train_x.reshape((max_batch_size,-1)) # Leaving layer duplicates of scalars for now
+        train_x = catboost_process_input_batch(train_x)
         small_random_col = random_generator.random(max_batch_size).reshape((max_batch_size,1))
         small_random_col *= 1e-20
         train_y=np.where(train_y[:,]==0.0, small_random_col, train_y)
@@ -1422,12 +1418,12 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
     
     for batch_idx, block_idx in enumerate(val_block_idx):
         block_base_row_idx = block_idx * max_batch_size
-        train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
-        train_x = train_x.reshape((max_batch_size,-1)) # Leaving layer duplicates of scalars for now
-        predicted_y = overall_model.predict(train_x)
-        r2_score = sklearn.metrics.r2_score(train_y, predicted_y)
+        val_x, val_y = dataset.get_np_block_slice(block_base_row_idx)
+        val_x = catboost_process_input_batch(val_x)
+        predicted_y = overall_model.predict(val_x)
+        r2_score = sklearn.metrics.r2_score(val_y, predicted_y)
         print(f"Catboost validation batch {batch_idx+1} of {len(val_block_idx)} normalised r2={r2_score}")
-        analyse_batch(analysis_data, predicted_y, train_y, col_data, scaling_data)
+        analyse_batch(analysis_data, predicted_y, val_y, col_data, scaling_data)
 
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
@@ -1451,6 +1447,10 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
     return  bad_r2_output_names
 
 
+def catboost_process_input_batch(x_np):
+    num_rows = x_np.shape[0]
+    x_proc = x_np.reshape((num_rows,-1)) # Leaving layer duplicates of scalars for now
+    return x_proc
 
 # Training loop
 class ExecData():
@@ -1494,36 +1494,14 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permut
     else:
         exec_data.overall_best_val_metric = float('-inf') # R2 bigger the better
 
-    dataset = HoloDataset(train_hf, holo_cache_rows, exec_data, device)
+    cnn_dataset      = HoloDataset(train_hf, holo_cache_rows, exec_data, device, col_data.cnn_input_feature_idx)
+    catboost_dataset = HoloDataset(train_hf, holo_cache_rows, exec_data, device, col_data.catboost_input_feature_idx)
 
     if model_type == "cnn":
-        train_dataset = torch.utils.data.Subset(dataset, train_row_idx)
-        val_dataset = torch.utils.data.Subset(dataset, val_row_idx)
+        train_dataset = torch.utils.data.Subset(cnn_dataset, train_row_idx)
+        val_dataset = torch.utils.data.Subset(cnn_dataset, val_row_idx)
         train_loader = DataLoader(train_dataset, batch_size=max_batch_size, shuffle=False)
         val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
-
-        input_size = len(col_data.expanded_names_input) # number of input features/columns
-        output_size = len(col_data.expanded_names_output)
-
-    # Currently have problem with large R2 for ptend_q0002_24_r2, ptend_q0002_25_r2,
-    # ptend_q0002_26_r2 in validation (earlier ones get zeroed anyway through small
-    # std check currently)
-    # Also in big run ptend_q0003_14_r2, ptend_u_17_r2 to ptend_u_19_r2
-    # So overall:
-    #    ptend_q0002 <= 26 (<15 officially zero)
-    #    ptend_q0003 = 14 (<12 officially zero)
-    #    ptend_u in [17, 19] (<12 officially zero) but good scores [12, 16]!
-    bad_col_names = []
-    bad_col_names.extend([f'ptend_q0001_{i}' for i in range(12)]) # official
-    bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15)]) # official
-    #bad_col_names.extend([f'ptend_q0002_{i}' for i in range(15, 26)]) # training value ranges zero or tiny up to 25
-    bad_col_names.extend([f'ptend_q0003_{i}' for i in range(12)]) # officially to 12 was doing 15
-    bad_col_names.extend([f'ptend_u_{i}' for i in range(12)]) # official
-    #bad_col_names.extend([f'ptend_u_{i}' for i in range(17, 20)]) # my bad ones
-    bad_col_names.extend([f'ptend_v_{i}' for i in range(12)]) # official
-    col_data.bad_col_names_set = set()
-    for name in bad_col_names:
-        col_data.bad_col_names_set.add(name)
 
     for param_permutation in param_permutations:
         if os.path.exists(stopfile_path):
@@ -1563,7 +1541,7 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permut
         if model_type == "cnn":
             bad_r2_output_names = do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permutations, train_loader, val_loader, device)
         else:
-            bad_r2_output_names = do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block_idx,
+            bad_r2_output_names = do_catboost_training(exec_data, col_data, scaling_data, catboost_dataset, train_block_idx,
                                                        val_block_idx, **model_params)
 
         if do_feature_knockout:
@@ -1604,6 +1582,7 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
 
         if model_type == "cnn":
             # Convert the current slice of xt to a PyTorch tensor
+            xt = xt[:, col_data.cnn_input_feature_idx, :]
             inputs = torch.from_numpy(xt).to(device)
 
             # No need to track gradients for inference
@@ -1611,7 +1590,8 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
                 outputs_pred = exec_data.overall_best_model(inputs)
                 y_predictions = outputs_pred.cpu().numpy()
         else:
-            xt = xt.reshape((num_rows,-1)) # Leaving layer duplicates of scalars for now
+            xt = xt[:, col_data.catboost_input_feature_idx, :]
+            xt = catboost_process_input_batch(xt)
             y_predictions = exec_data.overall_best_model.predict(xt)
 
         unscale_outputs(y_predictions, scaling_data, col_data)

@@ -43,8 +43,8 @@ o Would it help to remove more old feature columns? Could automate experiment
   - brief expt removed temperature, bit worse
 o Would it help to group columns differently depending on technique?
 o Train/val split does appear deterministic (random seeds set)
-o Refactor so that cached data stable with all features, take any subset from that
-  when used
+o Use scalar inputs for catboost, can maybe use all without memory exhaustion then
+
 
 Scoring and why predictions zeroed for low-variance cols in example
 -------------------------------------------------------------------
