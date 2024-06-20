@@ -51,7 +51,7 @@ is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = True
+clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
 model_type = "catboost"
@@ -1391,7 +1391,7 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
         print(f"Catboost training batch {batch_idx+1} of {len(train_block_idx)}")
         block_base_row_idx = block_idx * max_batch_size
         train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
-        train_x = catboost_process_input_batch(train_x)
+        train_x = catboost_process_input_batch(train_x, col_data)
         small_random_col = random_generator.random(max_batch_size).reshape((max_batch_size,1))
         small_random_col *= 1e-20
         train_y=np.where(train_y[:,]==0.0, small_random_col, train_y)
@@ -1419,7 +1419,7 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
     for batch_idx, block_idx in enumerate(val_block_idx):
         block_base_row_idx = block_idx * max_batch_size
         val_x, val_y = dataset.get_np_block_slice(block_base_row_idx)
-        val_x = catboost_process_input_batch(val_x)
+        val_x = catboost_process_input_batch(val_x, col_data)
         predicted_y = overall_model.predict(val_x)
         r2_score = sklearn.metrics.r2_score(val_y, predicted_y)
         print(f"Catboost validation batch {batch_idx+1} of {len(val_block_idx)} normalised r2={r2_score}")
@@ -1447,9 +1447,21 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
     return  bad_r2_output_names
 
 
-def catboost_process_input_batch(x_np):
+def catboost_process_input_batch(x_np, col_data):
+
     num_rows = x_np.shape[0]
-    x_proc = x_np.reshape((num_rows,-1)) # Leaving layer duplicates of scalars for now
+    x_proc = x_np.reshape((num_rows,-1)) # Leaving layer duplicates of scalars
+
+    # Replace blocks of identical values from vectorised scalars with single
+    # scalar element they started as
+    x_idx = 0
+    for catboost_ip_feature_idx in col_data.catboost_input_feature_idx:
+        col_name = col_data.unexpanded_input_col_names[catboost_ip_feature_idx]
+        col = col_data.unexpanded_cols_by_name[col_name]
+        if (col.dimension <= 1):
+            x_proc = np.delete(x_proc, range(x_idx + 1, x_idx + num_atm_levels), axis=1)
+        x_idx += col.dimension
+
     return x_proc
 
 # Training loop
@@ -1591,7 +1603,7 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
                 y_predictions = outputs_pred.cpu().numpy()
         else:
             xt = xt[:, col_data.catboost_input_feature_idx, :]
-            xt = catboost_process_input_batch(xt)
+            xt = catboost_process_input_batch(xt, col_data)
             y_predictions = exec_data.overall_best_model.predict(xt)
 
         unscale_outputs(y_predictions, scaling_data, col_data)

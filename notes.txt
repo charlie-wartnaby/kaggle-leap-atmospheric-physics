@@ -31,10 +31,6 @@ o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
 o Deeper/alternative network structures
 o Try other ML techniques apart from NN
- - catboost in batches using sum_model, guess train vector and scalars separately
- - can't do one atm level at a time due to different y-scalings if premultiplied,
-   though could without submission weightings
- - apply catboost only to poor R2 outputs of CNN, and then mix only those in?
  - Use R2 scores from catboost and CNN to decide weighting for each output?
  - q0001 (moistening) and q0002 (cloud liquid ratio) worst from CNN at present but 
    all could do with some help
@@ -43,7 +39,6 @@ o Would it help to remove more old feature columns? Could automate experiment
   - brief expt removed temperature, bit worse
 o Would it help to group columns differently depending on technique?
 o Train/val split does appear deterministic (random seeds set)
-o Use scalar inputs for catboost, can maybe use all without memory exhaustion then
 
 
 Scoring and why predictions zeroed for low-variance cols in example
