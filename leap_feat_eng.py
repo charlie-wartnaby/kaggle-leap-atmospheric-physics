@@ -1354,7 +1354,7 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permu
 
         print(f'Epoch {tot_epochs}, Validation Loss: {avg_val_loss}, R2: {analysis_data.r2_clean}')
         with open(loss_log_path, 'a') as fd:
-            fd.write(f'{tot_epochs},{avg_val_loss}\n')
+            fd.write(f'{tot_epochs},{avg_val_loss},{analysis_data.r2_clean}\n')
 
         
         scheduler.step(avg_val_loss)  # Adjust learning rate
