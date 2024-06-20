@@ -45,7 +45,7 @@ import warnings
 
 
 # Settings
-debug = True
+debug = False
 do_test = True
 is_rerun = False
 do_analysis = True
@@ -68,15 +68,15 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 100000
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
     catboost_batch_size = 20000  # 5000 with pcuk151, 30000 greta
     cnn_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.8
+    train_proportion = 0.9
     max_epochs = 50
 
-subset_base_row = 400000
+subset_base_row = 0
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
@@ -151,6 +151,9 @@ def main():
     train_hf = HoloFrame(train_path, train_offsets_path)
 
     num_train_rows = min(len(train_hf), max_train_rows)
+    max_batch_size = max(cnn_batch_size, catboost_batch_size)
+    num_biggest_batches = num_train_rows // max_batch_size
+    num_train_rows = num_biggest_batches * max_batch_size # Now exact multiple of batch sizes
     assert(subset_base_row + num_train_rows <= len(train_hf))
 
     col_data = form_col_data()
