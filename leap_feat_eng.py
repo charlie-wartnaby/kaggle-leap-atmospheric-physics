@@ -54,13 +54,15 @@ do_feature_knockout = False
 clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
-model_type = "catboost"
+model_type = "cnn"
 #
 
 if debug:
     max_train_rows = 500
     max_test_rows  = 100
-    max_batch_size = 100
+    caboost_batch_size = 100
+    cnn_batch_size = 50
+    catboost_batch_size = 100
     patience = 4
     train_proportion = 0.8
     max_epochs = 1
@@ -68,15 +70,17 @@ else:
     # Use very large numbers for 'all'
     max_train_rows = 100000
     max_test_rows  = 1000000000
-    max_batch_size = 5000  # 5000 with pcuk151, 30000 greta
+    catboost_batch_size = 20000  # 5000 with pcuk151, 30000 greta
+    cnn_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.8
     max_epochs = 50
 
 subset_base_row = 400000
 
-multitrain_params = {
-                    }
+# For model parameters to form permutations of in hyperparameter search
+# Each entry is 'param_name' : [list of values for that parameter]
+multitrain_params = {}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -85,7 +89,6 @@ initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
 clear_batch_cache_at_end = False # can save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
-holo_cache_rows = max_batch_size # Explore later if helps to cache for multi batches
 min_std = 1e-8 # TODO suspicious needs investigating
 np.random.seed(42)
 random.seed(42)
@@ -135,6 +138,10 @@ scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
 feature_knockout_path = 'feature_knockout.csv'
 stopfile_path = 'stop.txt'
 
+# Use smallest common size for caching, so that we don't do unnecessarily
+# large numpy operations when loading cache batches
+cache_batch_size = min(cnn_batch_size, catboost_batch_size)
+test_batch_size = cache_batch_size
 
 def main():
     entry_clean_up()
@@ -807,7 +814,7 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
     scaling_data.xlim_sample = [] # min/max values found
     scaling_data.ylim_sample = []
 
-    for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, max_batch_size):
+    for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, cache_batch_size):
                         # Process slice of large dataframe corresponding to batch
         prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
         prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
@@ -816,7 +823,7 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
 
         if not os.path.exists(postnorm_cache_path) and not os.path.exists(prenorm_cache_path):
             print(f"Building {prenorm_cache_path}...")
-            pl_slice_df = train_hf.get_slice(true_file_index, true_file_index + max_batch_size)
+            pl_slice_df = train_hf.get_slice(true_file_index, true_file_index + cache_batch_size)
             cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True, col_data, scaling_data, submission_weights)
             if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
             start_time = time.time()
@@ -846,7 +853,7 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
         # needed means across whole dataset for
         x_sumsq_sample = []
         y_sumsq_sample = []
-        for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, max_batch_size):
+        for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, cache_batch_size):
             prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
             prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
             postnorm_cache_filename = f'{true_file_index}.pkl'
@@ -868,8 +875,8 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
         # Now normalise whole dataset using statistics gathered during preprocessing
         # Using scaling found in training data; though could use test data if big enough?
 
-        x_sumsq_avg = mean_vector_across_samples(x_sumsq_sample) / (max_batch_size * num_atm_levels)
-        y_sumsq_avg = mean_vector_across_samples(y_sumsq_sample) / max_batch_size
+        x_sumsq_avg = mean_vector_across_samples(x_sumsq_sample) / (cache_batch_size * num_atm_levels)
+        y_sumsq_avg = mean_vector_across_samples(y_sumsq_sample) / cache_batch_size
         sx = np.sqrt(x_sumsq_avg)
         scaling_data.sx = sx.reshape((1,len(col_data.unexpanded_input_col_names),1))
         # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
@@ -877,7 +884,7 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
         # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
         scaling_data.sy = np.maximum(np.sqrt(y_sumsq_avg), min_std)
 
-    for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, max_batch_size):
+    for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, cache_batch_size):
                         # Process slice of large dataframe corresponding to batch
         prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
         postnorm_cache_filename = f'{true_file_index}.pkl'
@@ -1127,22 +1134,40 @@ class HoloDataset(Dataset):
         return torch.from_numpy(x_np).to(self.device), \
                torch.from_numpy(y_np).to(self.device)
     
-    def get_np_block_slice(self, block_base_idx):
-        self.ensure_block_loaded(block_base_idx)
-        return self.cache_np_x, self.cache_np_y
+    def get_np_block_slice(self, block_base_idx, end_idx):
+        row_idx = block_base_idx
+        complete_x = None
+        complete_y = None
+        while True:
+            self.ensure_block_loaded(row_idx)
+            if complete_x is None:
+                complete_x = self.cache_np_x
+                complete_y = self.cache_np_y
+            else:
+                complete_x = np.concatenate((complete_x, self.cache_np_x), axis=0)
+                complete_y = np.concatenate((complete_y, self.cache_np_y), axis=0)
+            row_idx += self.cache_rows
+            if row_idx >= end_idx:
+                break
+        num_reqd_rows = end_idx - block_base_idx
+        captured_rows = complete_x.shape[0] 
+        if captured_rows > num_reqd_rows:
+            complete_x = complete_x[:num_reqd_rows,:,:]
+            complete_y = complete_y[:num_reqd_rows,:,:]
+        return complete_x, complete_y
 
 
 
-def form_row_range_from_block_range(block_indices, num_train_rows, num_blocks, num_full_blocks):
+def form_row_range_from_block_range(block_indices, num_train_rows, num_blocks, num_full_blocks, batch_size):
     blocks_divide_exactly = (num_blocks == num_full_blocks)
     row_idx = []
     for block_idx in block_indices:
         if block_idx == num_blocks - 1 and not blocks_divide_exactly:
             # Smaller number in last dangling block
-            num_rows_in_block = num_train_rows - num_full_blocks * holo_cache_rows
+            num_rows_in_block = num_train_rows - num_full_blocks * batch_size
         else:
-            num_rows_in_block = holo_cache_rows
-        base_row_idx = block_idx * holo_cache_rows
+            num_rows_in_block = batch_size
+        base_row_idx = block_idx * batch_size
         row_idx.extend(list(range(base_row_idx, base_row_idx + num_rows_in_block)))
     return row_idx
 
@@ -1289,7 +1314,7 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permu
 
                 total_loss += loss.item()
 
-                if show_timings: print(f'Training batch of {max_batch_size} took {time.time() - start_time} s')
+                if show_timings: print(f'Training batch of {cnn_batch_size} took {time.time() - start_time} s')
 
                 # Print every n steps
                 if (batch_idx + 1) % batch_report_interval == 0:
@@ -1389,10 +1414,10 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
     num_models = 0
     for batch_idx, block_idx in enumerate(train_block_idx):
         print(f"Catboost training batch {batch_idx+1} of {len(train_block_idx)}")
-        block_base_row_idx = block_idx * max_batch_size
-        train_x, train_y = dataset.get_np_block_slice(block_base_row_idx)
+        block_base_row_idx = block_idx * catboost_batch_size
+        train_x, train_y = dataset.get_np_block_slice(block_base_row_idx, block_base_row_idx + catboost_batch_size)
         train_x = catboost_process_input_batch(train_x, col_data)
-        small_random_col = random_generator.random(max_batch_size).reshape((max_batch_size,1))
+        small_random_col = random_generator.random(catboost_batch_size).reshape((catboost_batch_size,1))
         small_random_col *= 1e-20
         train_y=np.where(train_y[:,]==0.0, small_random_col, train_y)
         # Take validation data as last part of this batch; not good because
@@ -1417,8 +1442,8 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
     analysis_data = AnalysisData()
     
     for batch_idx, block_idx in enumerate(val_block_idx):
-        block_base_row_idx = block_idx * max_batch_size
-        val_x, val_y = dataset.get_np_block_slice(block_base_row_idx)
+        block_base_row_idx = block_idx * catboost_batch_size
+        val_x, val_y = dataset.get_np_block_slice(block_base_row_idx, block_base_row_idx + catboost_batch_size)
         val_x = catboost_process_input_batch(val_x, col_data)
         predicted_y = overall_model.predict(val_x)
         r2_score = sklearn.metrics.r2_score(val_y, predicted_y)
@@ -1476,12 +1501,20 @@ class ExecData():
         self.feature_knockout_idx = 0
 
 def training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permutations, device):
-        # Access data in blocks that we can cache efficiently, but on a macro scale access those
+    exec_data = ExecData()
+    if model_type == "cnn":
+        exec_data.overall_best_val_metric = float('inf')
+        batch_size = cnn_batch_size
+    else:
+        exec_data.overall_best_val_metric = float('-inf') # R2 bigger the better
+        batch_size = catboost_batch_size
+
+    # Access data in blocks that we can cache efficiently, but on a macro scale access those
     # randomly for training and validation
 
     # If divides exactly this is OK:
-    num_blocks = num_train_rows // holo_cache_rows
-    assert (num_train_rows / holo_cache_rows == num_blocks)
+    num_blocks = num_train_rows // batch_size
+    assert (num_train_rows / batch_size == num_blocks)
     # Not worrying about using small leftover chunk of rows as yet
     num_full_blocks = num_blocks
 
@@ -1497,23 +1530,17 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permut
     train_block_size = int(train_proportion * num_blocks)
     train_block_idx, val_block_idx = sklearn.model_selection.train_test_split(block_indices, train_size=train_block_size)
 
-    train_row_idx = form_row_range_from_block_range(train_block_idx, num_train_rows, num_blocks, num_full_blocks)
-    val_row_idx = form_row_range_from_block_range(val_block_idx, num_train_rows, num_blocks, num_full_blocks)
+    train_row_idx = form_row_range_from_block_range(train_block_idx, num_train_rows, num_blocks, num_full_blocks, batch_size)
+    val_row_idx = form_row_range_from_block_range(val_block_idx, num_train_rows, num_blocks, num_full_blocks, batch_size)
 
-    exec_data = ExecData()
-    if model_type == "cnn":
-        exec_data.overall_best_val_metric = float('inf')
-    else:
-        exec_data.overall_best_val_metric = float('-inf') # R2 bigger the better
-
-    cnn_dataset      = HoloDataset(train_hf, holo_cache_rows, exec_data, device, col_data.cnn_input_feature_idx)
-    catboost_dataset = HoloDataset(train_hf, holo_cache_rows, exec_data, device, col_data.catboost_input_feature_idx)
+    cnn_dataset      = HoloDataset(train_hf, cache_batch_size, exec_data, device, col_data.cnn_input_feature_idx)
+    catboost_dataset = HoloDataset(train_hf, cache_batch_size, exec_data, device, col_data.catboost_input_feature_idx)
 
     if model_type == "cnn":
         train_dataset = torch.utils.data.Subset(cnn_dataset, train_row_idx)
         val_dataset = torch.utils.data.Subset(cnn_dataset, val_row_idx)
-        train_loader = DataLoader(train_dataset, batch_size=max_batch_size, shuffle=False)
-        val_loader = DataLoader(val_dataset, batch_size=max_batch_size, shuffle=False)
+        train_loader = DataLoader(train_dataset, batch_size=cnn_batch_size, shuffle=False)
+        val_loader = DataLoader(val_dataset, batch_size=cnn_batch_size, shuffle=False)
 
     for param_permutation in param_permutations:
         if os.path.exists(stopfile_path):
@@ -1582,7 +1609,7 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
     num_test_rows = min(max_test_rows, len(test_hf))
     while base_row_idx < num_test_rows:
         print(f'Processing submission from row {base_row_idx}')
-        num_rows = min(len(test_hf) - base_row_idx, max_batch_size)
+        num_rows = min(len(test_hf) - base_row_idx, test_batch_size)
         subset_df = test_hf.get_slice(base_row_idx, base_row_idx + num_rows)
         base_row_idx += num_rows
 
