@@ -89,7 +89,7 @@ initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
 clear_batch_cache_at_end = False # can save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
-min_std = 1e-8 # TODO suspicious needs investigating
+min_std = 1e-22 # In case of invariant columns
 np.random.seed(42)
 random.seed(42)
 
@@ -347,7 +347,7 @@ def form_col_data():
         ColumnInfo(True,  'pbuf_N2O',         'nitrous oxide volume mixing ratio',                   60, 'mol/mol'),
         ColumnInfo(False, 'ptend_t',          'heating tendency',                                    60, 'K/s'    ),
         ColumnInfo(False, 'ptend_q0001',      'moistening tendency',                                 60, 'kg/kg/s', 12),
-        ColumnInfo(False, 'ptend_q0002',      'cloud liquid mixing ratio change over time',          60, 'kg/kg/s', 15),
+        ColumnInfo(False, 'ptend_q0002',      'cloud liquid mixing ratio change over time',          60, 'kg/kg/s', 12),
         ColumnInfo(False, 'ptend_q0003',      'cloud ice mixing ratio change over time',             60, 'kg/kg/s', 12),
         ColumnInfo(False, 'ptend_u',          'zonal wind acceleration',                             60, 'm/s2'   , 12),
         ColumnInfo(False, 'ptend_v',          'meridional wind acceleration',                        60, 'm/s2'   , 12),
@@ -1187,19 +1187,14 @@ def unscale_outputs(y, scaling_data, col_data):
     """Undo normalisation to return to true values (but with submission
     weights still multiplied in)"""
 
-    zeroed_cols = []
     for i in range(scaling_data.sy.shape[0]):
         # CW: still using original threshold although now premultiplying outputs by
         # submission weightings, though does zero out those with zero weights
         # (and some others)
         col_name = col_data.expanded_names_output[i]
-        tiny_scaling = (scaling_data.sy[i] < min_std * 1.1)
         bad_col = col_name in col_data.bad_col_names_set
-        if tiny_scaling or bad_col:
+        if bad_col:
             y[:,i] = scaling_data.my[i] # 0 here if restore mean offset as added later
-        if tiny_scaling and not bad_col:
-            zeroed_cols.append(col_data.expanded_names_output[i])
-    print(f"Zeroed-out due to scaling not blacklist: " + str(zeroed_cols))
 
     # undo y scaling
     y = (y * scaling_data.sy) # Experimenting again with no mean offset: + my
