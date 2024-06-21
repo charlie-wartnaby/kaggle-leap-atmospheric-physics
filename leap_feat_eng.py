@@ -47,7 +47,7 @@ import warnings
 # Settings
 debug = False
 do_test = True
-is_rerun = False
+is_rerun = True
 do_analysis = True
 do_train = True
 do_feature_knockout = False
@@ -137,6 +137,8 @@ scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
 
 feature_knockout_path = 'feature_knockout.csv'
 stopfile_path = 'stop.txt'
+cnn_analysis_data_path = 'cnn_analysis.data.pkl' # Including R2 score per output column
+catboost_analysis_data_path = 'catboost_analysis_data.pkl'
 
 # Use smallest common size for caching, so that we don't do unnecessarily
 # large numpy operations when loading cache batches
@@ -1394,6 +1396,9 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permu
             exec_data.stop_requested = True
             break
 
+    with open(cnn_analysis_data_path, 'wb') as fd:
+        pickle.dump(analysis_data, fd)
+
     return bad_r2_output_names
 
 
@@ -1476,6 +1481,9 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
         exec_data.overall_best_model = overall_model
         exec_data.overall_best_val_metric = analysis_data.r2_clean
         exec_data.best_feature_knockout_idx = exec_data.feature_knockout_idx
+
+    with open(catboost_analysis_data_path, 'wb') as fd:
+        pickle.dump(analysis_data, fd)
 
     return  bad_r2_output_names
 
