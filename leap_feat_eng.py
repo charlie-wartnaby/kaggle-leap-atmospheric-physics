@@ -45,17 +45,17 @@ import warnings
 
 
 # Settings
-debug = False
+debug = True
 do_test = True
-is_rerun = True
+is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = False
-scale_using_range_limits = False
+scale_using_range_limits = True
 use_float64 = False
 model_type = "cnn"
-emit_scaling_stats = False
+emit_scaling_stats = True
 
 
 if debug:
@@ -175,7 +175,7 @@ def main():
     if os.path.exists(scaling_cache_path):
         print("Opening previous scalings...")
         with open(scaling_cache_path, 'rb') as fd:
-            scaling_data = ScalingMetadata(*pickle.load(fd))
+            scaling_data = pickle.load(fd)
         # Everything should already be cached
     else:
         scaling_data = preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights)
@@ -310,14 +310,9 @@ class ColumnMetadata():
         pass
 
 class ScalingMetadata():
-    def __init__(self, mx=None, sx=None, my=None, sy=None, xlim=None, ylim=None):
-        # Will assign other members directly as loose struct
-        self.mx = mx
-        self.sx = sx
-        self.my = my
-        self.sy = sy
-        self.xlim = xlim
-        self.ylim = ylim
+    def __init__(self):
+        # Will assign members directly as loose struct
+        pass
 
 
 def form_col_data():
@@ -729,12 +724,13 @@ def mean_vector_across_samples(sample_list):
     mean_vector = all_samples.mean(axis=0)
     return mean_vector
 
-def minmax_vector_across_samples(sample_tuple_list):
-    all_mins = np.stack(sample_tuple_list[0])
-    global_min = np.min(all_mins, axis=0)
-    all_maxs = np.stack(sample_tuple_list[1])
-    global_max = np.max(all_maxs, axis=0)
-    return (global_min, global_max)
+def minmax_vector_across_samples(sample_tuple_list, is_min):
+    all_samples = np.stack(sample_tuple_list)
+    if is_min:
+        return np.min(all_samples, axis=0)
+    else:
+        return np.max(all_samples, axis=0)
+
 
 def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weights):
     vector_dict = vectorise_data(pl_df, col_data)
@@ -768,21 +764,31 @@ def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weigh
         scaling_data.mx_sample.append(mx)
 
         x_min = np.min(x, axis=(0,2))
-        x_min = x_min.reshape(1, len(col_data.unexpanded_input_col_names), 1)
+        x_min = x_min.reshape(-1)
+        scaling_data.xmin_sample.append(x_min)
         x_max = np.max(x, axis=(0,2))
-        x_max = x_max.reshape(1, len(col_data.unexpanded_input_col_names), 1)
-        scaling_data.xlim_sample.append((x_min,x_max))
+        x_max = x_max.reshape(-1)
+        scaling_data.xmax_sample.append(x_max)
+
+        # Pre-scaling stats for understanding
+        my_raw = y.mean(axis=0)
+        scaling_data.my_sample_raw.append(my_raw)
+        y_min = np.min(y, axis=0)
+        y_max = np.max(y, axis=0)
+        scaling_data.ymin_sample_raw.append(y_min)
+        scaling_data.ymax_sample_raw.append(y_max)
 
         # Scaling outputs by weights that wil be used anyway for submission, so we get
         # rid of very tiny values that will give very small variances, and will make
         # them suitable hopefully for conversion to float32
         y = y * submission_weights
 
-        my = y.mean(axis=0)
-        scaling_data.my_sample.append(my)
+        my_weighted = y.mean(axis=0)
+        scaling_data.my_sample_weighted.append(my_weighted)
         y_min = np.min(y, axis=0)
         y_max = np.max(y, axis=0)
-        scaling_data.ylim_sample.append((y_min,y_max))
+        scaling_data.ymin_sample_weighted.append(y_min)
+        scaling_data.ymax_sample_weighted.append(y_max)
 
     del pl_df
     gc.collect()
@@ -823,10 +829,15 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
     scaling_data = ScalingMetadata()
     scaling_data.mx_sample = [] # Each element vector of means of input columns, from one holo batch
     scaling_data.sx_sample = [] # ... and scaling factor
-    scaling_data.my_sample = []
+    scaling_data.my_sample_raw = []
+    scaling_data.my_sample_weighted = []
     scaling_data.sy_sample = []
-    scaling_data.xlim_sample = [] # min/max values found
-    scaling_data.ylim_sample = []
+    scaling_data.xmin_sample = []
+    scaling_data.xmax_sample = []
+    scaling_data.ymin_sample_raw = []
+    scaling_data.ymax_sample_raw = []
+    scaling_data.ymin_sample_weighted = []
+    scaling_data.ymax_sample_weighted = []
 
     for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, cache_batch_size):
                         # Process slice of large dataframe corresponding to batch
@@ -851,16 +862,21 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
     # Mean of means gives us overall mean for each quantity (whole vectors for inputs,
     # individual columns for outputs with their differing submission weightings)
     scaling_data.mx = mean_vector_across_samples(scaling_data.mx_sample)
-    scaling_data.my = mean_vector_across_samples(scaling_data.my_sample)
+    scaling_data.my_raw = mean_vector_across_samples(scaling_data.my_sample_raw)
+    scaling_data.my_weighted = mean_vector_across_samples(scaling_data.my_sample_weighted)
 
     # Range limits:
-    scaling_data.xlim = minmax_vector_across_samples(scaling_data.xlim_sample)
-    scaling_data.ylim = minmax_vector_across_samples(scaling_data.ylim_sample)
+    scaling_data.xmin = minmax_vector_across_samples(scaling_data.xmin_sample, True)
+    scaling_data.xmax = minmax_vector_across_samples(scaling_data.xmax_sample, False)
+    scaling_data.ymin_raw = minmax_vector_across_samples(scaling_data.ymin_sample_raw, True)
+    scaling_data.ymax_raw = minmax_vector_across_samples(scaling_data.ymax_sample_raw, False)
+    scaling_data.ymin_weighted = minmax_vector_across_samples(scaling_data.ymin_sample_weighted, True)
+    scaling_data.ymax_weighted = minmax_vector_across_samples(scaling_data.ymax_sample_weighted, False)
 
     if scale_using_range_limits:
-        sx = (scaling_data.xlim[1] - scaling_data.xlim[0]) / 2.0 # aiming for [-1, 1] normalised range
-        scaling_data.sx = np.maximum(sx, min_std)
-        bigger_y_lim = np.maximum(np.abs(scaling_data.ylim[0]), np.abs(scaling_data.ylim[1])) # as not centring with mean
+        sx = (scaling_data.xmax - scaling_data.xmin) / 2.0 # aiming for [-1, 1] normalised range
+        scaling_data.sx = np.maximum(sx, min_std).reshape(scaling_data.mx.shape)
+        bigger_y_lim = np.maximum(np.abs(scaling_data.ymin_weighted), np.abs(scaling_data.ymax_weighted)) # as not centring with mean
         scaling_data.sy = np.maximum(bigger_y_lim, min_std)
     else:
         # Do another pass to get standard deviation stats across whole dataset, which we
@@ -880,7 +896,7 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
                 x_diffs_sqd = (x_prenorm - scaling_data.mx) ** 2
                 x_sum_sqs = x_diffs_sqd.sum(axis=(0,2)) # sum over batch rows and over atm layers to leave num vector features
                 x_sumsq_sample.append(x_sum_sqs)
-                y_diffs_sqd = (y_prenorm - scaling_data.my) ** 2
+                y_diffs_sqd = (y_prenorm - scaling_data.my_weighted) ** 2
                 y_sum_sqs = y_diffs_sqd.sum(axis=0)
                 y_sumsq_sample.append(y_sum_sqs)
                 del x_prenorm, y_prenorm, x_diffs_sqd, y_diffs_sqd
@@ -925,8 +941,16 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
 
     # Save scalings, need them to process test data if do a rerun
     with open(scaling_cache_path, 'wb') as fd:
-        pickle.dump((scaling_data.mx, scaling_data.sx, scaling_data.my,
-                     scaling_data.sy, scaling_data.xlim, scaling_data.ylim), fd)
+        del scaling_data.mx_sample
+        del scaling_data.my_sample_raw
+        del scaling_data.my_sample_weighted
+        del scaling_data.xmin_sample
+        del scaling_data.xmax_sample
+        del scaling_data.ymin_sample_raw
+        del scaling_data.ymax_sample_raw
+        del scaling_data.ymin_sample_weighted
+        del scaling_data.ymax_sample_weighted
+        pickle.dump(scaling_data, fd)
         print("Saved scalings for next time")
 
     return scaling_data
@@ -935,17 +959,19 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
 def write_scaling_stats_to_file(scaling_data, col_data):
     x_df = pl.DataFrame()
     x_df = x_df.with_columns(pl.Series(name="var", values=col_data.unexpanded_input_col_names))
-    x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.xlim[0], (-1)), ["min"]))
-    x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.xlim[1], (-1)), ["max"]))
+    x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.xmin, (-1)), ["raw min"]))
+    x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.xmax, (-1)), ["raw max"]))
     x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.mx, (-1)), ["mean"]))
-    x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.sx, (-1)), ["std"]))
+    x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.sx, (-1)), ["scale"]))
     y_df = pl.DataFrame()
     y_df = y_df.with_columns(pl.Series(name="var", values=col_data.expanded_names_output))
-    y_df = y_df.with_columns(pl.from_numpy(scaling_data.ylim[0], ["min"]))
-    y_df = y_df.with_columns(pl.from_numpy(scaling_data.ylim[1], ["max"]))
-    y_df = y_df.with_columns(pl.from_numpy(scaling_data.my, ["mean"]))
-    y_df = y_df.with_columns(pl.from_numpy(scaling_data.sy, ["std"]))
-    tot_df = pl.concat([x_df,y_df])
+    y_df = y_df.with_columns(pl.from_numpy(scaling_data.ymin_raw, ["raw min"]))
+    y_df = y_df.with_columns(pl.from_numpy(scaling_data.ymax_raw, ["raw max"]))
+    y_df = y_df.with_columns(pl.from_numpy(scaling_data.ymin_weighted, ["weighted min"]))
+    y_df = y_df.with_columns(pl.from_numpy(scaling_data.ymax_weighted, ["weighted max"]))
+    y_df = y_df.with_columns(pl.from_numpy(scaling_data.my_weighted, ["mean"]))
+    y_df = y_df.with_columns(pl.from_numpy(scaling_data.sy, ["scale"]))
+    tot_df = pl.concat([x_df,y_df], how="diagonal")
     tot_df.write_csv("scaling_stats.csv")
 
 
@@ -1219,7 +1245,7 @@ def unscale_outputs(y, scaling_data, col_data):
         tiny_scaling = (scaling_data.sy[i] < min_std * 1.1)
         bad_col = col_name in col_data.bad_col_names_set
         if tiny_scaling or bad_col:
-            y[:,i] = scaling_data.my[i] # 0 here if restore addition of mean offset later
+            y[:,i] = scaling_data.my_weighted[i] # 0 here if restore addition of mean offset later
         if tiny_scaling and not bad_col:
             zeroed_cols.append(col_data.expanded_names_output[i])
     print(f"Zeroed-out due to scaling not blacklist: " + str(zeroed_cols))

@@ -25,6 +25,7 @@ o Would I do better by just zeroing/averaging some output columns with poor R2?
   - But existing R2 analysis had all R2 > 0, whereas mean would only score 0.
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
+o Try range instead of stdev scaling again now range calc fixed
 o Tried float64 on 1M samples, very slow and convergence oddly seemed worse
 o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
@@ -77,6 +78,11 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 
 Submission Results
 ------------------
+
+Still in trouble...
+submission.csv
+Complete · 4m ago · Commit 3628ba9 CNN contd with only 1M rows, min_std=1e-10 now
+-1146.31352
 
 submission.csv
 Complete · 5m ago · Commit b6c560a9 CNN big run but 20 epochs old weightings, to 31 epochs with new weightings hoping would transfer, R2 locally looks terrible though validation loss OK
