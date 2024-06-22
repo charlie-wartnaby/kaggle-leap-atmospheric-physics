@@ -45,13 +45,13 @@ import warnings
 
 
 # Settings
-debug = True
+debug = False
 do_test = True
-is_rerun = False
+is_rerun = True
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = False
+clear_batch_cache_at_start = True
 scale_using_range_limits = True
 use_float64 = False
 model_type = "cnn"
@@ -873,34 +873,29 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
     scaling_data.ymin_weighted = minmax_vector_across_samples(scaling_data.ymin_sample_weighted, True)
     scaling_data.ymax_weighted = minmax_vector_across_samples(scaling_data.ymax_sample_weighted, False)
 
-    if scale_using_range_limits:
-        sx = (scaling_data.xmax - scaling_data.xmin) / 2.0 # aiming for [-1, 1] normalised range
-        scaling_data.sx = np.maximum(sx, min_std).reshape(scaling_data.mx.shape)
-        bigger_y_lim = np.maximum(np.abs(scaling_data.ymin_weighted), np.abs(scaling_data.ymax_weighted)) # as not centring with mean
-        scaling_data.sy = np.maximum(bigger_y_lim, min_std)
-    else:
-        # Do another pass to get standard deviation stats across whole dataset, which we
-        # needed means across whole dataset for
-        x_sumsq_sample = []
-        y_sumsq_sample = []
-        for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, cache_batch_size):
-            prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
-            prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
-            postnorm_cache_filename = f'{true_file_index}.pkl'
-            postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
+    # Do another pass to get standard deviation stats across whole dataset, which we
+    # needed means across whole dataset for.
+    # Need this for R2 metric even using range scaling instead of stdev
+    x_sumsq_sample = []
+    y_sumsq_sample = []
+    for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, cache_batch_size):
+        prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
+        prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
+        postnorm_cache_filename = f'{true_file_index}.pkl'
+        postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
 
-            if not os.path.exists(postnorm_cache_path):
-                print(f"Getting variances from {prenorm_cache_path}...")
-                with open(prenorm_cache_path, 'rb') as fd:
-                    (x_prenorm, y_prenorm) = pickle.load(fd)
-                x_diffs_sqd = (x_prenorm - scaling_data.mx) ** 2
-                x_sum_sqs = x_diffs_sqd.sum(axis=(0,2)) # sum over batch rows and over atm layers to leave num vector features
-                x_sumsq_sample.append(x_sum_sqs)
-                y_diffs_sqd = (y_prenorm - scaling_data.my_weighted) ** 2
-                y_sum_sqs = y_diffs_sqd.sum(axis=0)
-                y_sumsq_sample.append(y_sum_sqs)
-                del x_prenorm, y_prenorm, x_diffs_sqd, y_diffs_sqd
-                gc.collect() # Had a couple of spontaneous Ubuntu reboots here previously
+        if not os.path.exists(postnorm_cache_path):
+            print(f"Getting variances from {prenorm_cache_path}...")
+            with open(prenorm_cache_path, 'rb') as fd:
+                (x_prenorm, y_prenorm) = pickle.load(fd)
+            x_diffs_sqd = (x_prenorm - scaling_data.mx) ** 2
+            x_sum_sqs = x_diffs_sqd.sum(axis=(0,2)) # sum over batch rows and over atm layers to leave num vector features
+            x_sumsq_sample.append(x_sum_sqs)
+            y_diffs_sqd = (y_prenorm - scaling_data.my_weighted) ** 2
+            y_sum_sqs = y_diffs_sqd.sum(axis=0)
+            y_sumsq_sample.append(y_sum_sqs)
+            del x_prenorm, y_prenorm, x_diffs_sqd, y_diffs_sqd
+            gc.collect() # Had a couple of spontaneous Ubuntu reboots here previously
 
         # Now normalise whole dataset using statistics gathered during preprocessing
         # Using scaling found in training data; though could use test data if big enough?
@@ -908,11 +903,20 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
         x_sumsq_avg = mean_vector_across_samples(x_sumsq_sample) / (cache_batch_size * num_atm_levels)
         y_sumsq_avg = mean_vector_across_samples(y_sumsq_sample) / cache_batch_size
         sx = np.sqrt(x_sumsq_avg)
-        scaling_data.sx = sx.reshape((1,len(col_data.unexpanded_input_col_names),1))
-        # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
-        # gives loss value like competition criterion but I see no training advantage:
-        # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
-        scaling_data.sy = np.maximum(np.sqrt(y_sumsq_avg), min_std)
+        scaling_data.stdev_x = sx.reshape((1,len(col_data.unexpanded_input_col_names),1))
+        scaling_data.stdev_y = np.maximum(np.sqrt(y_sumsq_avg), min_std)
+
+        if scale_using_range_limits:
+            sx = (scaling_data.xmax - scaling_data.xmin) / 2.0 # aiming for [-1, 1] normalised range
+            scaling_data.sx = np.maximum(sx, min_std).reshape(scaling_data.mx.shape)
+            bigger_y_lim = np.maximum(np.abs(scaling_data.ymin_weighted), np.abs(scaling_data.ymax_weighted)) # as not centring with mean
+            scaling_data.sy = np.maximum(bigger_y_lim, min_std)
+        else:
+            scaling_data.sx = scaling_data.stdev_x
+            # Donor notebook used RMS instead of stdev here, discussion thread suggesting that
+            # gives loss value like competition criterion but I see no training advantage:
+            # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/498806
+            scaling_data.sy = scaling_data.stdev_y
 
     for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, cache_batch_size):
                         # Process slice of large dataframe corresponding to batch
@@ -1271,7 +1275,7 @@ def analyse_batch(analysis_data, outputs_pred_np, outputs_true_np, col_data, sca
 
     # Assuming variance of dataset outputs foudn in training more 
     # representative than variance in this small batch?
-    true_variance_sqd = scaling_data.sy ** 2 # undo sqrt in stdev
+    true_variance_sqd = scaling_data.stdev_y ** 2 # undo sqrt in stdev
 
     error_residues = outputs_true_np - outputs_pred_np
     error_variance_sqd = np.square(error_residues)
