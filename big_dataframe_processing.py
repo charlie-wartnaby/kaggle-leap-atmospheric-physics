@@ -43,7 +43,7 @@ def make_csv_index_file(csv_path, cache_path):
 
     return eol_byte_offsets
 
-for name_root in [test_name_root, submission_name_root, train_name_root]:
+for name_root in [test_name_root, submission_name_root]:
     in_path = os.path.join(base_input_path,  name_root + '.csv')
     cache_path = os.path.join(base_output_path, name_root + '.pkl')
 

@@ -76,6 +76,15 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 Submission Results
 ------------------
 
+submission.csv
+Complete · 5m ago · Commit b6c560a9 CNN big run but 20 epochs old weightings, to 31 epochs with new weightings hoping would transfer, R2 locally looks terrible though validation loss OK
+-392.89850
+
+Hmm don't know what went so terribly wrong here...
+submission.csv
+Complete · 3m ago · Commit b6c560a9 switched to new submission weights for only last 4 of 20 epochs, baseline CNN rerun to check not broken after refactor
+-30331453942559299857621134082048.00000
+
 averaged_submission.csv
 Complete · 5m ago · Commit 15a6f84 Experimentally averaging 5 individual submission dataframes over first 500K rows to compare with catboost model sum over same data
 0.37763
