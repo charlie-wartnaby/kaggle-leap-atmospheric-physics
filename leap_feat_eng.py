@@ -47,7 +47,7 @@ import warnings
 # Settings
 debug = False
 do_test = True
-is_rerun = False
+is_rerun = True
 do_analysis = True
 do_train = True
 do_feature_knockout = False
@@ -90,7 +90,7 @@ initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
 clear_batch_cache_at_end = False # can save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
-min_std = 1e-22 # In case of invariant columns
+min_std = 1e-12 # TODO suspicious needs investigating
 np.random.seed(42)
 random.seed(42)
 
@@ -1207,17 +1207,24 @@ def unscale_outputs(y, scaling_data, col_data):
     """Undo normalisation to return to true values (but with submission
     weights still multiplied in)"""
 
+    # undo y scaling
+    y = (y * scaling_data.sy) # Experimenting again with no mean offset: + my
+
+    zeroed_cols = []
     for i in range(scaling_data.sy.shape[0]):
         # CW: still using original threshold although now premultiplying outputs by
         # submission weightings, though does zero out those with zero weights
         # (and some others)
         col_name = col_data.expanded_names_output[i]
+        tiny_scaling = (scaling_data.sy[i] < min_std * 1.1)
         bad_col = col_name in col_data.bad_col_names_set
-        if bad_col:
-            y[:,i] = scaling_data.my[i] # 0 here if restore mean offset as added later
+        if tiny_scaling or bad_col:
+            y[:,i] = scaling_data.my[i] # 0 here if restore addition of mean offset later
+        if tiny_scaling and not bad_col:
+            zeroed_cols.append(col_data.expanded_names_output[i])
+    print(f"Zeroed-out due to scaling not blacklist: " + str(zeroed_cols))
 
-    # undo y scaling
-    return (y * scaling_data.sy) # Experimenting again with no mean offset: + my
+    return y
 
 class AnalysisData():
     def __init__(self):
