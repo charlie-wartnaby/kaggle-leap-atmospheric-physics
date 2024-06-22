@@ -46,23 +46,23 @@ import warnings
 
 # Settings
 debug = False
-do_test = False
+do_test = True
 is_rerun = False
-do_analysis = False
-do_train = False
+do_analysis = True
+do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
 model_type = "cnn"
-emit_scaling_stats = True
+emit_scaling_stats = False
 
 
 if debug:
-    max_train_rows = 500
+    max_train_rows = 100
     max_test_rows  = 100
     caboost_batch_size = 100
-    cnn_batch_size = 50
+    cnn_batch_size = 10
     catboost_batch_size = 100
     patience = 4
     train_proportion = 0.8
@@ -1217,7 +1217,7 @@ def unscale_outputs(y, scaling_data, col_data):
             y[:,i] = scaling_data.my[i] # 0 here if restore mean offset as added later
 
     # undo y scaling
-    y = (y * scaling_data.sy) # Experimenting again with no mean offset: + my
+    return (y * scaling_data.sy) # Experimenting again with no mean offset: + my
 
 class AnalysisData():
     def __init__(self):
@@ -1233,8 +1233,8 @@ def analyse_batch(analysis_data, outputs_pred_np, outputs_true_np, col_data, sca
 
     # Return to original output scalings (but with submission weights
     # multiplied in) to match competition metric
-    unscale_outputs(outputs_pred_np, scaling_data, col_data)
-    unscale_outputs(outputs_true_np, scaling_data, col_data)
+    outputs_pred_np = unscale_outputs(outputs_pred_np, scaling_data, col_data)
+    outputs_true_np = unscale_outputs(outputs_true_np, scaling_data, col_data)
 
     # Assuming variance of dataset outputs foudn in training more 
     # representative than variance in this small batch?
@@ -1664,7 +1664,7 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
             xt = catboost_process_input_batch(xt, col_data)
             y_predictions = exec_data.overall_best_model.predict(xt)
 
-        unscale_outputs(y_predictions, scaling_data, col_data)
+        y_predictions = unscale_outputs(y_predictions, scaling_data, col_data)
 
         # We already premultiplied training values by submission weights
         # so predictions should already be scaled the same way
