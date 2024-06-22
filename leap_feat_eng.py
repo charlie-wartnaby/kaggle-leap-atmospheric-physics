@@ -90,7 +90,7 @@ initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
 clear_batch_cache_at_end = False # can save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
-min_std = 1e-12 # TODO suspicious needs investigating
+min_std = 1e-10 # TODO suspicious needs investigating
 np.random.seed(42)
 random.seed(42)
 
