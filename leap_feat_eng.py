@@ -46,16 +46,17 @@ import warnings
 
 # Settings
 debug = False
-do_test = True
+do_test = False
 is_rerun = False
-do_analysis = True
-do_train = True
+do_analysis = False
+do_train = False
 do_feature_knockout = False
 clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
 model_type = "cnn"
-#
+emit_scaling_stats = True
+
 
 if debug:
     max_train_rows = 500
@@ -178,10 +179,13 @@ def main():
         # Everything should already be cached
     else:
         scaling_data = preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights)
-
+    if emit_scaling_stats:
+        write_scaling_stats_to_file(scaling_data, col_data)
+        
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    exec_data, bad_r2_output_names = training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permutations, device)
+    if do_train:
+        exec_data, bad_r2_output_names = training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permutations, device)
 
     if do_test:
         test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device, submission_weights)
@@ -927,6 +931,22 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
 
     return scaling_data
 
+
+def write_scaling_stats_to_file(scaling_data, col_data):
+    x_df = pl.DataFrame()
+    x_df = x_df.with_columns(pl.Series(name="var", values=col_data.unexpanded_input_col_names))
+    x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.xlim[0], (-1)), ["min"]))
+    x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.xlim[1], (-1)), ["max"]))
+    x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.mx, (-1)), ["mean"]))
+    x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.sx, (-1)), ["std"]))
+    y_df = pl.DataFrame()
+    y_df = y_df.with_columns(pl.Series(name="var", values=col_data.expanded_names_output))
+    y_df = y_df.with_columns(pl.from_numpy(scaling_data.ylim[0], ["min"]))
+    y_df = y_df.with_columns(pl.from_numpy(scaling_data.ylim[1], ["max"]))
+    y_df = y_df.with_columns(pl.from_numpy(scaling_data.my, ["mean"]))
+    y_df = y_df.with_columns(pl.from_numpy(scaling_data.sy, ["std"]))
+    tot_df = pl.concat([x_df,y_df])
+    tot_df.write_csv("scaling_stats.csv")
 
 
 class AtmLayerCNN(nn.Module):
