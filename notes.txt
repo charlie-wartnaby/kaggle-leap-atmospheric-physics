@@ -18,11 +18,6 @@ o Analyse which columns contributing most to error metric:
    -- both to do with condensation/evaporation
    -- mass mixing ratio is m(ice/water) / m(dry air) 
 o Prev expts where knocked out half featurs etc bogus because before new ones added
-o Would I do better by just zeroing/averaging some output columns with poor R2?
-  - Should be able to analyse without retraining on best model, extending R2
-    analysis to all validation set and checking if substitute with avg of training
-    output col. But beware train/val overlap if random split not reproducible.
-  - But existing R2 analysis had all R2 > 0, whereas mean would only score 0.
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
 o Try range instead of stdev scaling again now range calc fixed
@@ -36,9 +31,6 @@ o Try other ML techniques apart from NN
  - Use R2 scores from catboost and CNN to decide weighting for each output?
  - q0001 (moistening) and q0002 (cloud liquid ratio) worst from CNN at present but 
    all could do with some help
-o Ensemble method combining independent technique(s) and NN
-o Would it help to remove more old feature columns? Could automate experiment
-  - brief expt removed temperature, bit worse
 o Would it help to group columns differently depending on technique?
 o Train/val split does appear deterministic (random seeds set)
 

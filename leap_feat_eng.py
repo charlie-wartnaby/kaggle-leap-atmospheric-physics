@@ -45,24 +45,24 @@ import warnings
 
 
 # Settings
-debug = False
+debug = True
 do_test = True
-is_rerun = True
+is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = True
-scale_using_range_limits = True
+clear_batch_cache_at_start = False
+scale_using_range_limits = False
 use_float64 = False
 model_type = "cnn"
 emit_scaling_stats = True
 
 
 if debug:
-    max_train_rows = 100
+    max_train_rows = 1000
     max_test_rows  = 100
     caboost_batch_size = 100
-    cnn_batch_size = 10
+    cnn_batch_size = 100
     catboost_batch_size = 100
     patience = 4
     train_proportion = 0.8
@@ -401,15 +401,26 @@ def form_col_data():
     # Form set of names to not compute outputs for according to competition
     # description; may add our own poor ones to this set later
     col_data.bad_col_names_set = set()
+
+    col_data.output_expanded_first_idx_by_name = {}
+    current_idx = 0
     for col_name in col_data.unexpanded_output_col_names:
         col = col_data.unexpanded_cols_by_name[col_name]
+        col_data.output_expanded_first_idx_by_name[col_name] = current_idx
         for i in range(col.first_useful_idx):
             expanded_name = f'{col.name}_{i}'
             col_data.bad_col_names_set.add(expanded_name)
+        current_idx += col.dimension
+
+    col_data.feature_idx_by_name = {}
+    for i, name in enumerate(col_data.unexpanded_input_col_names):
+        col_data.feature_idx_by_name[name] = i
 
     if do_feature_knockout:
         col_data.cnn_input_feature_idx = range(len(col_data.unexpanded_input_col_names))
         col_data.catboost_input_feature_idx = col_data.cnn_input_feature_idx
+        col_data.cnn_subset_idx_by_name = col_data.feature_idx_by_name
+        col_data.catboost_subset_idx_by_name = col_data.feature_idx_by_name
     else:
         # Including most for CNN, eliminated some replaced by derived features:
         current_cnn_knockout_features = set(['pbuf_COSZRS',
@@ -431,10 +442,14 @@ def form_col_data():
         
         col_data.cnn_input_feature_idx = []
         col_data.catboost_input_feature_idx = []
+        col_data.cnn_subset_idx_by_name = {}
+        col_data.catboost_subset_idx_by_name = {}
         for idx, name in enumerate(col_data.unexpanded_input_col_names):
             if name not in current_cnn_knockout_features:
+                col_data.cnn_subset_idx_by_name[name] = len(col_data.cnn_input_feature_idx)
                 col_data.cnn_input_feature_idx.append(idx)
             if name in current_catboost_use_features:
+                col_data.catboost_subset_idx_by_name = len(col_data.catboost_input_feature_idx)
                 col_data.catboost_input_feature_idx.append(idx)
 
     return col_data
@@ -1233,13 +1248,15 @@ def form_row_range_from_block_range(block_indices, num_train_rows, num_blocks, n
 
 
 
-def unscale_outputs(y, scaling_data, col_data):
+def unscale_outputs(y, scaling_data):
     """Undo normalisation to return to true values (but with submission
     weights still multiplied in)"""
 
     # undo y scaling
     y = (y * scaling_data.sy) # Experimenting again with no mean offset: + my
+    return y
 
+def postprocess_predictions(x, y, scaling_data, col_data):
     zeroed_cols = []
     for i in range(scaling_data.sy.shape[0]):
         # CW: still using original threshold although now premultiplying outputs by
@@ -1254,7 +1271,32 @@ def unscale_outputs(y, scaling_data, col_data):
             zeroed_cols.append(col_data.expanded_names_output[i])
     print(f"Zeroed-out due to scaling not blacklist: " + str(zeroed_cols))
 
+    # Trick to predict some difficult tiny-value columns discussed here:
+    # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/502484
+    # The gist of it is that the cloud columns at high altitudes often have zero
+    # values, and if they are non-zero then there is a good chance that the next
+    # point in time (1200 s or 20 min later) will be zero. So we can guess the
+    # tendency per second assuming the next point would be zero, giving the -1200 division.
+    # Looking at first 11 rows of training data, the relationships work well for:
+    # ptend_q0002[i] = state_q0002[i] / -1200   i=[12..30]  cloud ice mixing ratio
+    # ptend_q0003[i] = state_q0003[i] / -1200   i=[12..18]  cloud ice mixing ratio
+    # After that it starts to break down, though mixing some proportion of this guess
+    # into the predicted value might still help.
+    replace_cloud_tendency_trick("state_q0002", "ptend_q0002", 12, 31, x, y, scaling_data, col_data)
+    replace_cloud_tendency_trick("state_q0003", "ptend_q0003", 12, 19, x, y, scaling_data, col_data)
+
     return y
+
+def replace_cloud_tendency_trick(src_name, dest_name, first_idx, last_idx, x, y, scaling_data, col_data):
+    subset_idx_by_name = col_data.cnn_subset_idx_by_name if model_type == "cnn" else col_data.catboost_subset_idx_by_name    
+    src_subset_idx = subset_idx_by_name[src_name]
+    # TODO feature knockout offset by one if necessary
+    src_full_set_idx = col_data.feature_idx_by_name[src_name]
+    scaled_src = x[:, src_subset_idx, first_idx : last_idx]
+    # x was scaled: x = (x - scaling_data.mx) / scaling_data.sx
+    unscaled_src = scaled_src * scaling_data.sx[0, src_full_set_idx, 0] + scaling_data.mx[0, src_full_set_idx, 0]
+    y_base_idx = col_data.output_expanded_first_idx_by_name[dest_name]
+    y[:, y_base_idx + first_idx : y_base_idx + last_idx] = unscaled_src / -1200.0
 
 class AnalysisData():
     def __init__(self):
@@ -1265,13 +1307,15 @@ class AnalysisData():
         self.r2_vec = None
 
 
-def analyse_batch(analysis_data, outputs_pred_np, outputs_true_np, col_data, scaling_data):
+def analyse_batch(analysis_data, inputs_np, outputs_pred_np, outputs_true_np, col_data, scaling_data):
     """Analyse batch of true versus predicted outputs"""
 
     # Return to original output scalings (but with submission weights
     # multiplied in) to match competition metric
-    outputs_pred_np = unscale_outputs(outputs_pred_np, scaling_data, col_data)
-    outputs_true_np = unscale_outputs(outputs_true_np, scaling_data, col_data)
+    outputs_pred_np = unscale_outputs(outputs_pred_np, scaling_data)
+    outputs_true_np = unscale_outputs(outputs_true_np, scaling_data)
+    # Post-model tweaks for tricky columns
+    outputs_pred_np = postprocess_predictions(inputs_np, outputs_pred_np, scaling_data, col_data)
 
     # Assuming variance of dataset outputs foudn in training more 
     # representative than variance in this small batch?
@@ -1395,7 +1439,7 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permu
                 if do_analysis:
                     outputs_pred_np = outputs_pred.cpu().numpy()
                     outputs_true_np = outputs_true.cpu().numpy()
-                    analyse_batch(analysis_data, outputs_pred_np, outputs_true_np, col_data, scaling_data)
+                    analyse_batch(analysis_data, inputs.cpu().numpy(), outputs_pred_np, outputs_true_np, col_data, scaling_data)
 
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Validation batch {batch_idx + 1}')
@@ -1513,7 +1557,7 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
         predicted_y = overall_model.predict(val_x)
         r2_score = sklearn.metrics.r2_score(val_y, predicted_y)
         print(f"Catboost validation batch {batch_idx+1} of {len(val_block_idx)} normalised r2={r2_score}")
-        analyse_batch(analysis_data, predicted_y, val_y, col_data, scaling_data)
+        analyse_batch(analysis_data, val_x, predicted_y, val_y, col_data, scaling_data)
 
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
@@ -1701,7 +1745,8 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
             xt = catboost_process_input_batch(xt, col_data)
             y_predictions = exec_data.overall_best_model.predict(xt)
 
-        y_predictions = unscale_outputs(y_predictions, scaling_data, col_data)
+        y_predictions = unscale_outputs(y_predictions, scaling_data)
+        y_predictions = postprocess_predictions(xt, y_predictions, scaling_data, col_data)
 
         # We already premultiplied training values by submission weights
         # so predictions should already be scaled the same way
