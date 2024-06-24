@@ -73,6 +73,11 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 Submission Results
 ------------------
 
+Hallejulah, back in the game
+submission.csv
+Complete · 5m ago · Commit 164eb773f same model overtrained mainly on 100K rows but with fixes to avg substitutions
+0.65339
+
 Gah what have I done?
 submission.csv
 Complete · 3m ago · Commit ce48b16 R2 validation stats looking sensible now, trying 1 epoch 1M rows having done ~42 in total with only 100K so prob overtrained on that subset
