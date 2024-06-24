@@ -1338,8 +1338,8 @@ def postprocess_predictions(x, y, trick_x, scaling_data, col_data):
     # ptend_q0003[i] = state_q0003[i] / -1200   i=[12..18]  cloud ice mixing ratio
     # After that it starts to break down, though mixing some proportion of this guess
     # into the predicted value might still help.
-    replace_cloud_tendency_trick("state_q0002", "ptend_q0002", 12, 31, x, y, trick_x, scaling_data, col_data)
-    replace_cloud_tendency_trick("state_q0003", "ptend_q0003", 12, 19, x, y, trick_x, scaling_data, col_data)
+    replace_cloud_tendency_trick("state_q0002", "ptend_q0002", 12, 30, x, y, trick_x, scaling_data, col_data)
+    replace_cloud_tendency_trick("state_q0003", "ptend_q0003", 12, 17, x, y, trick_x, scaling_data, col_data)
 
     return y
 
@@ -1391,7 +1391,7 @@ def analyse_batch(analysis_data, inputs_np, outputs_pred_np, outputs_true_np, tr
     analysis_data.r2_raw = factor_prev * analysis_data.r2_raw + factor_new * all_col_r2
     good_cols = r2_metric[np.where(r2_metric > 0.0)]
     good_col_r2_sum = np.sum(good_cols)
-    avg_r2_zeroed_bad_cols = good_col_r2_sum / r2_metric.shape[0]
+    avg_r2_zeroed_bad_cols = good_col_r2_sum / r2_metric.shape[1]
     analysis_data.r2_clean = factor_prev * analysis_data.r2_clean + factor_new * avg_r2_zeroed_bad_cols
     analysis_data.num_rows += num_new_rows
     print(f"Batch all R2={all_col_r2}, bad excl R2={avg_r2_zeroed_bad_cols}")
@@ -1418,7 +1418,7 @@ def calc_output_r2_ranking(col_data, analysis_data):
     ranking_list = []
     for i, col_name in enumerate(col_data.expanded_names_output):
         r2_name = col_name + "_r2"
-        r2_avg = analysis_data.r2_vec[i].mean()
+        r2_avg = analysis_data.r2_vec[0, i].mean()
         if r2_avg <= 0.0:
             # Will use mean for this column instead as prediction worse than that
             bad_r2_names.append(col_name)
