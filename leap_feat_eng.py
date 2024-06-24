@@ -48,11 +48,11 @@ import warnings
 # Settings
 debug = False
 do_test = True
-is_rerun = False
+is_rerun = True
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = True
+clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
 model_type = "cnn"
@@ -1302,6 +1302,8 @@ def unscale_outputs(y, scaling_data, submission_weights_old):
     y = y.astype(np.float64)
 
     # Should now be safe to divide by old submission weights to get correct magnitudes
+    # (New submission weights still present but 0 or 1, and in any case want those
+    # to be part of final target values for submission)
     y = y / submission_weights_old
 
     # undo y scaling
@@ -1367,9 +1369,12 @@ def analyse_batch(analysis_data, inputs_np, outputs_pred_np, outputs_true_np, tr
     # Post-model tweaks for tricky columns
     outputs_pred_np = postprocess_predictions(inputs_np, outputs_pred_np, trick_x_np, scaling_data, col_data)
 
-    # Assuming variance of dataset outputs foudn in training more 
+    # Assuming variance of dataset outputs found in training more 
     # representative than variance in this small batch?
-    true_variance_sqd = scaling_data.stdev_y ** 2 # undo sqrt in stdev
+    true_variance_sqd_scaled = scaling_data.stdev_y ** 2 # undo sqrt in stdev
+    # Those variances were after scaling with old weightings, undo to compare
+    # with values scaled for test output
+    true_variance_sqd_raw = true_variance_sqd_scaled / submission_weights_old ** 2
 
     error_residues = outputs_true_np - outputs_pred_np
     error_variance_sqd = np.square(error_residues)
@@ -1378,7 +1383,7 @@ def analyse_batch(analysis_data, inputs_np, outputs_pred_np, outputs_true_np, tr
     factor_prev = analysis_data.num_rows / new_tot_rows
     factor_new = 1.0 - factor_prev
     avg_error_variance_sqd = np.mean(error_variance_sqd, axis=0)
-    r2_metric = 1.0 - (avg_error_variance_sqd / true_variance_sqd)
+    r2_metric = 1.0 - (avg_error_variance_sqd / true_variance_sqd_raw)
     if analysis_data.num_rows <= 0:
         analysis_data.r2_vec = np.zeros_like(r2_metric)
     analysis_data.r2_vec = factor_prev * analysis_data.r2_vec + factor_new * r2_metric
