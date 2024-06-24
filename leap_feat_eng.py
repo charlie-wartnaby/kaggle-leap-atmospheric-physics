@@ -70,7 +70,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 100000
+    max_train_rows = 1000000
     max_test_rows  = 1000000000
     catboost_batch_size = 20000  # 5000 with pcuk151, 30000 greta
     cnn_batch_size = 5000
@@ -91,7 +91,7 @@ initial_learning_rate = 0.001 # default 0.001
 try_reload_model = is_rerun
 clear_batch_cache_at_end = False # can save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
-min_std = 1e-10 # TODO suspicious needs investigating
+min_std = 1e-30
 np.random.seed(42)
 random.seed(42)
 
@@ -1317,7 +1317,7 @@ def postprocess_predictions(x, y, trick_x, scaling_data, col_data):
         # submission weightings, though does zero out those with zero weights
         # (and some others)
         col_name = col_data.expanded_names_output[i]
-        tiny_scaling = (scaling_data.sy[i] < min_std * 1.1)
+        tiny_scaling = False # (scaling_data.sy[i] < min_std * 1.1)
         bad_col = col_name in col_data.bad_col_names_set
         if tiny_scaling or bad_col:
             y[:,i] = scaling_data.my_weighted[i] # 0 here if restore addition of mean offset later
