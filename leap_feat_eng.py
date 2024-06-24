@@ -70,7 +70,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000
+    max_train_rows = 100000
     max_test_rows  = 1000000000
     catboost_batch_size = 20000  # 5000 with pcuk151, 30000 greta
     cnn_batch_size = 5000
@@ -404,7 +404,7 @@ def form_col_data():
 
     # Form set of names to not compute outputs for according to competition
     # description; may add our own poor ones to this set later
-    col_data.bad_col_names_set = set()
+    col_data.zero_or_bad_cols_by_name = {}
 
     col_data.output_expanded_first_idx_by_name = {}
     current_idx = 0
@@ -413,7 +413,7 @@ def form_col_data():
         col_data.output_expanded_first_idx_by_name[col_name] = current_idx
         for i in range(col.first_useful_idx):
             expanded_name = f'{col.name}_{i}'
-            col_data.bad_col_names_set.add(expanded_name)
+            col_data.zero_or_bad_cols_by_name[expanded_name] = True
         current_idx += col.dimension
 
     col_data.feature_idx_by_name = {}
@@ -1319,13 +1319,13 @@ def postprocess_predictions(x, y, trick_x, scaling_data, col_data):
         # submission weightings, though does zero out those with zero weights
         # (and some others)
         col_name = col_data.expanded_names_output[i]
-        tiny_scaling = False # (scaling_data.sy[i] < min_std * 1.1)
-        bad_col = col_name in col_data.bad_col_names_set
-        if tiny_scaling or bad_col:
-            y[:,i] = scaling_data.my_raw[i] # 0 here if restore addition of mean offset later
-        if tiny_scaling and not bad_col:
-            zeroed_cols.append(col_data.expanded_names_output[i])
-    print(f"Zeroed-out due to scaling not blacklist: " + str(zeroed_cols))
+        if col_name in col_data.zero_or_bad_cols_by_name:
+            if col_data.zero_or_bad_cols_by_name[col_name]:
+                # One we officially zero
+                y[:,i] = 0.0
+            else:
+                # Not one we officially zero so go for mean instead
+                y[:,i] = scaling_data.my_raw[i] # 0 here if restore addition of mean offset later
 
     # Trick to predict some difficult tiny-value columns discussed here:
     # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/502484
@@ -1775,7 +1775,7 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
  
     print("Removing poor R2 cols from those that will be predicted:", bad_r2_output_names)
     for name in bad_r2_output_names:
-        col_data.bad_col_names_set.add(name)
+        col_data.zero_or_bad_cols_by_name[name] = False
 
     base_row_idx = 0
     num_test_rows = min(max_test_rows, len(test_hf))
