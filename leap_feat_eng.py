@@ -25,6 +25,7 @@
 import catboost
 import copy
 import gc
+import io
 import numpy as np
 import os
 import pickle
@@ -45,15 +46,15 @@ import warnings
 
 
 # Settings
-debug = True
+debug = False
 do_test = True
 is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = False
+clear_batch_cache_at_start = True
 scale_using_range_limits = False
-use_float64 = True
+use_float64 = False
 model_type = "cnn"
 emit_scaling_stats = True
 
@@ -69,7 +70,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000
+    max_train_rows = 100000
     max_test_rows  = 1000000000
     catboost_batch_size = 20000  # 5000 with pcuk151, 30000 greta
     cnn_batch_size = 5000
@@ -169,7 +170,7 @@ def main():
     else:
         param_permutations = expand_multitrain_permutations()
 
-    submission_weights = load_submission_weights(col_data)
+    submission_weights_current, submission_weights_old = load_submission_weights(col_data)
 
     # Cache normalisation data needed for any rerun later
     if os.path.exists(scaling_cache_path):
@@ -178,17 +179,18 @@ def main():
             scaling_data = pickle.load(fd)
         # Everything should already be cached
     else:
-        scaling_data = preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights)
+        scaling_data = preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights_current, submission_weights_old)
     if emit_scaling_stats:
         write_scaling_stats_to_file(scaling_data, col_data)
         
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     if do_train:
-        exec_data, bad_r2_output_names = training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permutations, device)
+        exec_data, bad_r2_output_names = training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_weights_old,
+                                                        param_permutations, device)
 
     if do_test:
-        test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device, submission_weights)
+        test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device, submission_weights_current, submission_weights_old)
 
     exit_clean_up()
 
@@ -749,7 +751,7 @@ def minmax_vector_across_samples(sample_tuple_list, is_min):
         return np.max(all_samples, axis=0)
 
 
-def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weights):
+def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weights_current, submission_weights_old):
     vector_dict = vectorise_data(pl_df, col_data)
     add_vector_features(vector_dict)
     # Glue input columns together by rows in batch, then feature, then atm level
@@ -795,10 +797,14 @@ def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weigh
         scaling_data.ymin_sample_raw.append(y_min)
         scaling_data.ymax_sample_raw.append(y_max)
 
-        # Scaling outputs by weights that wil be used anyway for submission, so we get
+        # Scaling outputs by old submission weights, so we get
         # rid of very tiny values that will give very small variances, and will make
         # them suitable hopefully for conversion to float32
-        y = y * submission_weights
+        y = y * submission_weights_old
+
+        # Also by current submission weights (though those are only 0 or 1 now) so we
+        # have target values that match what is required for submission
+        y = y * submission_weights_current
 
         my_weighted = y.mean(axis=0)
         scaling_data.my_sample_weighted.append(my_weighted)
@@ -835,11 +841,32 @@ def load_submission_weights(col_data):
     sample_submission_df = pl.read_csv(submission_template_path, n_rows=1)
 
     # Single row of weights for outputs
-    submission_weights = sample_submission_df[col_data.expanded_names_output].to_numpy().astype(np.float64)
-    return submission_weights
+    submission_weights_current = sample_submission_df[col_data.expanded_names_output].to_numpy().astype(np.float64)
+
+    # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/513193
+    # Pre-18 June submission weights were good for getting values into sensible range for
+    # float32 modelling; as string here so this works on Kaggle without input files available
+    old_sample_submission_top_row = \
+""",sample_id,ptend_t_0,ptend_t_1,ptend_t_2,ptend_t_3,ptend_t_4,ptend_t_5,ptend_t_6,ptend_t_7,ptend_t_8,ptend_t_9,ptend_t_10,ptend_t_11,ptend_t_12,ptend_t_13,ptend_t_14,ptend_t_15,ptend_t_16,ptend_t_17,ptend_t_18,ptend_t_19,ptend_t_20,ptend_t_21,ptend_t_22,ptend_t_23,ptend_t_24,ptend_t_25,ptend_t_26,ptend_t_27,ptend_t_28,ptend_t_29,ptend_t_30,ptend_t_31,ptend_t_32,ptend_t_33,ptend_t_34,ptend_t_35,ptend_t_36,ptend_t_37,ptend_t_38,ptend_t_39,ptend_t_40,ptend_t_41,ptend_t_42,ptend_t_43,ptend_t_44,ptend_t_45,ptend_t_46,ptend_t_47,ptend_t_48,ptend_t_49,ptend_t_50,ptend_t_51,ptend_t_52,ptend_t_53,ptend_t_54,ptend_t_55,ptend_t_56,ptend_t_57,ptend_t_58,ptend_t_59,ptend_q0001_0,ptend_q0001_1,ptend_q0001_2,ptend_q0001_3,ptend_q0001_4,ptend_q0001_5,ptend_q0001_6,ptend_q0001_7,ptend_q0001_8,ptend_q0001_9,ptend_q0001_10,ptend_q0001_11,ptend_q0001_12,ptend_q0001_13,ptend_q0001_14,ptend_q0001_15,ptend_q0001_16,ptend_q0001_17,ptend_q0001_18,ptend_q0001_19,ptend_q0001_20,ptend_q0001_21,ptend_q0001_22,ptend_q0001_23,ptend_q0001_24,ptend_q0001_25,ptend_q0001_26,ptend_q0001_27,ptend_q0001_28,ptend_q0001_29,ptend_q0001_30,ptend_q0001_31,ptend_q0001_32,ptend_q0001_33,ptend_q0001_34,ptend_q0001_35,ptend_q0001_36,ptend_q0001_37,ptend_q0001_38,ptend_q0001_39,ptend_q0001_40,ptend_q0001_41,ptend_q0001_42,ptend_q0001_43,ptend_q0001_44,ptend_q0001_45,ptend_q0001_46,ptend_q0001_47,ptend_q0001_48,ptend_q0001_49,ptend_q0001_50,ptend_q0001_51,ptend_q0001_52,ptend_q0001_53,ptend_q0001_54,ptend_q0001_55,ptend_q0001_56,ptend_q0001_57,ptend_q0001_58,ptend_q0001_59,ptend_q0002_0,ptend_q0002_1,ptend_q0002_2,ptend_q0002_3,ptend_q0002_4,ptend_q0002_5,ptend_q0002_6,ptend_q0002_7,ptend_q0002_8,ptend_q0002_9,ptend_q0002_10,ptend_q0002_11,ptend_q0002_12,ptend_q0002_13,ptend_q0002_14,ptend_q0002_15,ptend_q0002_16,ptend_q0002_17,ptend_q0002_18,ptend_q0002_19,ptend_q0002_20,ptend_q0002_21,ptend_q0002_22,ptend_q0002_23,ptend_q0002_24,ptend_q0002_25,ptend_q0002_26,ptend_q0002_27,ptend_q0002_28,ptend_q0002_29,ptend_q0002_30,ptend_q0002_31,ptend_q0002_32,ptend_q0002_33,ptend_q0002_34,ptend_q0002_35,ptend_q0002_36,ptend_q0002_37,ptend_q0002_38,ptend_q0002_39,ptend_q0002_40,ptend_q0002_41,ptend_q0002_42,ptend_q0002_43,ptend_q0002_44,ptend_q0002_45,ptend_q0002_46,ptend_q0002_47,ptend_q0002_48,ptend_q0002_49,ptend_q0002_50,ptend_q0002_51,ptend_q0002_52,ptend_q0002_53,ptend_q0002_54,ptend_q0002_55,ptend_q0002_56,ptend_q0002_57,ptend_q0002_58,ptend_q0002_59,ptend_q0003_0,ptend_q0003_1,ptend_q0003_2,ptend_q0003_3,ptend_q0003_4,ptend_q0003_5,ptend_q0003_6,ptend_q0003_7,ptend_q0003_8,ptend_q0003_9,ptend_q0003_10,ptend_q0003_11,ptend_q0003_12,ptend_q0003_13,ptend_q0003_14,ptend_q0003_15,ptend_q0003_16,ptend_q0003_17,ptend_q0003_18,ptend_q0003_19,ptend_q0003_20,ptend_q0003_21,ptend_q0003_22,ptend_q0003_23,ptend_q0003_24,ptend_q0003_25,ptend_q0003_26,ptend_q0003_27,ptend_q0003_28,ptend_q0003_29,ptend_q0003_30,ptend_q0003_31,ptend_q0003_32,ptend_q0003_33,ptend_q0003_34,ptend_q0003_35,ptend_q0003_36,ptend_q0003_37,ptend_q0003_38,ptend_q0003_39,ptend_q0003_40,ptend_q0003_41,ptend_q0003_42,ptend_q0003_43,ptend_q0003_44,ptend_q0003_45,ptend_q0003_46,ptend_q0003_47,ptend_q0003_48,ptend_q0003_49,ptend_q0003_50,ptend_q0003_51,ptend_q0003_52,ptend_q0003_53,ptend_q0003_54,ptend_q0003_55,ptend_q0003_56,ptend_q0003_57,ptend_q0003_58,ptend_q0003_59,ptend_u_0,ptend_u_1,ptend_u_2,ptend_u_3,ptend_u_4,ptend_u_5,ptend_u_6,ptend_u_7,ptend_u_8,ptend_u_9,ptend_u_10,ptend_u_11,ptend_u_12,ptend_u_13,ptend_u_14,ptend_u_15,ptend_u_16,ptend_u_17,ptend_u_18,ptend_u_19,ptend_u_20,ptend_u_21,ptend_u_22,ptend_u_23,ptend_u_24,ptend_u_25,ptend_u_26,ptend_u_27,ptend_u_28,ptend_u_29,ptend_u_30,ptend_u_31,ptend_u_32,ptend_u_33,ptend_u_34,ptend_u_35,ptend_u_36,ptend_u_37,ptend_u_38,ptend_u_39,ptend_u_40,ptend_u_41,ptend_u_42,ptend_u_43,ptend_u_44,ptend_u_45,ptend_u_46,ptend_u_47,ptend_u_48,ptend_u_49,ptend_u_50,ptend_u_51,ptend_u_52,ptend_u_53,ptend_u_54,ptend_u_55,ptend_u_56,ptend_u_57,ptend_u_58,ptend_u_59,ptend_v_0,ptend_v_1,ptend_v_2,ptend_v_3,ptend_v_4,ptend_v_5,ptend_v_6,ptend_v_7,ptend_v_8,ptend_v_9,ptend_v_10,ptend_v_11,ptend_v_12,ptend_v_13,ptend_v_14,ptend_v_15,ptend_v_16,ptend_v_17,ptend_v_18,ptend_v_19,ptend_v_20,ptend_v_21,ptend_v_22,ptend_v_23,ptend_v_24,ptend_v_25,ptend_v_26,ptend_v_27,ptend_v_28,ptend_v_29,ptend_v_30,ptend_v_31,ptend_v_32,ptend_v_33,ptend_v_34,ptend_v_35,ptend_v_36,ptend_v_37,ptend_v_38,ptend_v_39,ptend_v_40,ptend_v_41,ptend_v_42,ptend_v_43,ptend_v_44,ptend_v_45,ptend_v_46,ptend_v_47,ptend_v_48,ptend_v_49,ptend_v_50,ptend_v_51,ptend_v_52,ptend_v_53,ptend_v_54,ptend_v_55,ptend_v_56,ptend_v_57,ptend_v_58,ptend_v_59,cam_out_NETSW,cam_out_FLWDS,cam_out_PRECSC,cam_out_PRECC,cam_out_SOLS,cam_out_SOLL,cam_out_SOLSD,cam_out_SOLLD
+0,test_169651,30981.265271661872,22502.432413914863,18894.14713004499,14514.244730542465,10944.348069459196,9065.01072024503,9663.669038687454,12688.557362943708,19890.17226527665,25831.37317235381,33890.367561807274,44122.94111025334,59811.25595068309,79434.07500078829,107358.80916894016,135720.8418348218,149399.8411114814,128492.95185325432,91746.23687305572,72748.76911097553,66531.53596840335,62932.30598423903,56610.26874314136,49473.14369220607,43029.18495420936,36912.67491908133,31486.93117928144,26898.072997215502,23316.638282978325,20459.73133196152,18385.68309639014,17111.405107656312,16337.80991958771,15857.759882318944,15580.902485189716,15497.59045982052,15612.2556996736,15797.88455410361,15974.218740897895,16130.395527176632,16261.310866446129,16371.892401608216,16397.019695140876,16325.463899570548,16228.641108112768,16191.809643436269,16341.207925934068,16645.711351490587,17005.493716683693,17430.29874509864,17907.24023203076,18431.55334008694,19032.471309392287,19701.355113141435,20408.236605392685,20967.20795006453,21194.427318009974,21088.521528526755,19437.91555757985,13677.902713248171,0,0,0,0,0,0,0,0,0,0,0,0,871528441401.8333,1083221770553.0684,147034752676.7702,35556045575.13566,35153369257.41337,46086368691.51654,24689305171.692936,11343276593.440475,5396624651.94418,2449353007.641508,1132225885.703891,579547849.1340877,330219246.7861086,207613930.3131764,144580292.27473342,109933282.92266414,88706603.092171,73819777.54163922,63615988.74519494,57250262.292053565,52976073.06761927,49653169.17819005,46544975.11484598,43167606.9599748,39724375.20499403,36317177.25886468,33057511.80930482,29869089.497658804,26982386.85583376,24416235.17215712,22273651.697369896,20553426.04804544,19216240.03357431,18167694.44812838,17501855.536957663,17169938.630597908,17005382.258644175,16998475.26752617,17082890.987979066,17227982.77516062,17445823.21630204,17757404.421785507,18346092.75160569,19400573.66632694,20506722.48296608,22469648.380506545,23432031.455169585,26204163.40545158,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1000000000000000.0,1000000000000000.0,1000000000000000.0,1000000000000000.0,1000000000000000.0,1000000000000000.0,1000000000000000.0,1000000000000000.0,1000000000000000.0,1000000000000000.0,1000000000000000.0,3673829810926.31,371405570725.2526,14219163611.984406,3001863018.1934915,1432766589.9326108,884599805.0283787,560127980.1033351,386052567.7087711,287331851.051439,222703657.59538063,181069239.6264349,154620864.3164144,138093777.60284117,126605828.89875436,117967840.02553518,111005814.39518328,105186901.20678852,100168133.0295481,95568646.67416307,91457433.39515457,88871610.45308323,88829796.26374224,91398113.73291488,96585131.67000748,104507692.01463065,115895119.998433,131939701.08213414,154492946.00677127,183147918.17086875,215151374.22324687,247158314.6345976,266792879.42215955,279115128.29108113,370541510.87006927,0,0,0,0,0,0,0,0,0,0,0,0,877670509694.7871,1174826943136.8308,1270605570069.038,21727315470.5208,3159456646.5437946,1090653401.282219,727967089.8459107,384399548.9506704,290787296.9451616,232703218.45048887,197467462.7577736,174310890.8025987,160536437.73297343,153567098.77048483,152120124.9453068,153115566.6756177,153955545.42558223,153734675.21565756,154798666.36905554,163346213.58113608,180013139.3707387,200324358.8534948,220754613.1646765,241290935.478592,262868932.2066308,284448910.01847774,305681084.4142859,327605088.8575117,350473296.7263526,373964594.1196182,398396925.8173239,423528355.65716046,450447055.544388,478857006.4973163,508200335.7126168,537309657.5789208,566854568.2904652,594618842.9455439,619715928.2391286,641395460.8414665,663290039.7810476,689274894.631561,718208866.3397261,743951200.8024124,761776104.2945968,772911224.3082078,804001144.8046833,772448774.7758856,0,0,0,0,0,0,0,0,0,0,0,0,4613823.568205323,1999308.9343799097,904636.2296014762,433823.6123842511,207201.39055371704,107836.09164720173,57647.915219220784,40606.52305039815,47739.86647922776,51669.35493930698,56438.19768395407,60447.45665200092,65251.4153955275,71920.88588011517,78529.58115204438,83422.30217897324,87036.98552475807,90389.72631774022,93982.39165674087,97578.0099352472,101428.21366062944,104630.69200130588,105685.04322626138,103962.58423268417,99650.31670632094,94290.49986206587,89514.90144353417,85905.45713126978,82784.9857650212,79152.28707014346,74847.81017353121,70378.81859610273,65420.04643792357,59953.75184604176,54764.28281143022,50362.51288353384,46212.571031725325,41997.52779088816,37692.05148110484,33834.73460995647,31846.09764364542,31934.145655397457,31454.81247448105,30105.4073072481,26957.830283611693,27760.04479210889,29853.374336459365,19133.428743715107,0,0,0,0,0,0,0,0,0,0,0,0,7619940.584531054,3148394.472742347,1308415.0022178134,540515.7720745018,215237.1053603881,102546.7276372816,68453.67122640925,50692.59053608593,51487.52043139844,52104.76838400132,54019.39151917722,55856.02168787862,60347.30240270209,68990.96019017675,79096.88768563846,87574.33453690328,94158.56052476274,101903.63670531697,111746.9753834774,122460.65399236557,132086.69387474353,141041.48571028374,146354.09441287292,145953.09590059065,139496.8007888401,128508.85108217449,116665.51769667884,107458.39706309135,100259.97236694951,94108.98505029618,88439.89456238014,82734.9027659809,77061.08621371102,71333.5319243128,65999.72532130677,61798.9972058361,58237.356419617165,54715.10266341248,50825.84431702935,46059.17688689915,40740.26050401376,36335.80228304863,33981.57568605091,33589.7143390849,33988.88524112733,36272.9364507092,41183.34413717943,29194.12369278645,0.0040536134869726,0.0138824238058072,135129884.5084534,12219717.5342461,0.0090705273332672,0.0085898851680217,0.0215368188774867,0.0336321308942602"""
+    fd = io.StringIO(old_sample_submission_top_row)
+
+    old_submission_df = pl.read_csv(fd)
+    submission_weights_old = old_submission_df[col_data.expanded_names_output].to_numpy().astype(np.float64)
+
+    # "EDIT 2: As @churkinnikita points out, ptend_q0002 12-14 are no longer zeroed out"
+    ptend_q0002_base_idx = col_data.output_expanded_first_idx_by_name["ptend_q0002"]
+    submission_weights_old[0, ptend_q0002_base_idx + 12 : ptend_q0002_base_idx + 15] = \
+                                              submission_weights_old[0, ptend_q0002_base_idx + 15]
+    
+    # As the new submission weights will zero out unwanted columns anyway, but we'll need to
+    # divide by the old weights, turn zeroes to ones to avoid div by zero later
+    submission_weights_old[submission_weights_old == 0.0] = 1.0
+
+    return submission_weights_current, submission_weights_old
 
 
-def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights):
+def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights_current, submission_weights_old):
     # Preprocess entire dataset, gathering statistics for subsequent normalisation along the way
 
     print("No previous scalings so starting afresh")
@@ -866,7 +893,7 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
         if not os.path.exists(postnorm_cache_path) and not os.path.exists(prenorm_cache_path):
             print(f"Building {prenorm_cache_path}...")
             pl_slice_df = train_hf.get_slice(true_file_index, true_file_index + cache_batch_size)
-            cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True, col_data, scaling_data, submission_weights)
+            cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True, col_data, scaling_data, submission_weights_current, submission_weights_old)
             if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
             start_time = time.time()
             with open(prenorm_cache_path, 'wb') as fd:
@@ -1267,13 +1294,21 @@ def form_row_range_from_block_range(block_indices, num_train_rows, num_blocks, n
 
 
 
-def unscale_outputs(y, scaling_data):
+def unscale_outputs(y, scaling_data, submission_weights_old):
     """Undo normalisation to return to true values (but with submission
     weights still multiplied in)"""
 
+    # Return to float64 if not already to cope with tiny output values
+    y = y.astype(np.float64)
+
+    # Should now be safe to divide by old submission weights to get correct magnitudes
+    y = y / submission_weights_old
+
     # undo y scaling
     y = (y * scaling_data.sy) # Experimenting again with no mean offset: + my
+
     return y
+
 
 def postprocess_predictions(x, y, trick_x, scaling_data, col_data):
     zeroed_cols = []
@@ -1321,13 +1356,14 @@ class AnalysisData():
         self.r2_vec = None
 
 
-def analyse_batch(analysis_data, inputs_np, outputs_pred_np, outputs_true_np, trick_x_np, col_data, scaling_data):
+def analyse_batch(analysis_data, inputs_np, outputs_pred_np, outputs_true_np, trick_x_np, col_data, 
+                  scaling_data, submission_weights_old):
     """Analyse batch of true versus predicted outputs"""
 
     # Return to original output scalings (but with submission weights
     # multiplied in) to match competition metric
-    outputs_pred_np = unscale_outputs(outputs_pred_np, scaling_data)
-    outputs_true_np = unscale_outputs(outputs_true_np, scaling_data)
+    outputs_pred_np = unscale_outputs(outputs_pred_np, scaling_data, submission_weights_old)
+    outputs_true_np = unscale_outputs(outputs_true_np, scaling_data, submission_weights_old)
     # Post-model tweaks for tricky columns
     outputs_pred_np = postprocess_predictions(inputs_np, outputs_pred_np, trick_x_np, scaling_data, col_data)
 
@@ -1390,8 +1426,8 @@ def calc_output_r2_ranking(col_data, analysis_data):
     return bad_r2_names
 
 
-def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permutations, train_loader,
-                    val_loader, cnn_dataset, device):
+def do_cnn_training(model_params, exec_data, col_data, scaling_data, submission_weights_old,
+                    param_permutations, train_loader, val_loader, cnn_dataset, device):
     warnings.filterwarnings('ignore', category=FutureWarning)
 
     if is_rerun and os.path.exists(epoch_counter_path):
@@ -1455,7 +1491,8 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permu
                     outputs_pred_np = outputs_pred.cpu().numpy()
                     outputs_true_np = outputs_true.cpu().numpy()
                     _, _, trick_x = cnn_dataset.get_np_block_slice(-1, cnn_batch_size)
-                    analyse_batch(analysis_data, inputs.cpu().numpy(), outputs_pred_np, outputs_true_np, trick_x, col_data, scaling_data)
+                    analyse_batch(analysis_data, inputs.cpu().numpy(), outputs_pred_np, outputs_true_np,
+                                   trick_x, col_data, scaling_data, submission_weights_old)
 
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Validation batch {batch_idx + 1}')
@@ -1514,7 +1551,7 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permu
     return bad_r2_output_names
 
 
-def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block_idx,
+def do_catboost_training(exec_data, col_data, scaling_data, submission_weights_old, dataset, train_block_idx,
                          val_block_idx,
                          iterations=10, depth=8, learning_rate=0.25,
                          border_count=32, l2_leaf_reg=5):
@@ -1573,7 +1610,7 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
         predicted_y = overall_model.predict(val_x)
         r2_score = sklearn.metrics.r2_score(val_y, predicted_y)
         print(f"Catboost validation batch {batch_idx+1} of {len(val_block_idx)} normalised r2={r2_score}")
-        analyse_batch(analysis_data, val_x, predicted_y, val_y, trick_x, col_data, scaling_data)
+        analyse_batch(analysis_data, val_x, predicted_y, val_y, trick_x, col_data, scaling_data, submission_weights_old)
 
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
@@ -1628,7 +1665,7 @@ class ExecData():
         self.best_feature_knockout_idx = 0
         self.feature_knockout_idx = 0
 
-def training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permutations, device):
+def training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_weights_old, param_permutations, device):
     exec_data = ExecData()
     if model_type == "cnn":
         exec_data.overall_best_val_metric = float('inf')
@@ -1706,10 +1743,10 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permut
             fd.write(f'{exec_data.model_save_path}\n')
 
         if model_type == "cnn":
-            bad_r2_output_names = do_cnn_training(model_params, exec_data, col_data, scaling_data, 
+            bad_r2_output_names = do_cnn_training(model_params, exec_data, col_data, scaling_data, submission_weights_old,
                                                   param_permutations, train_loader, val_loader, cnn_dataset, device)
         else:
-            bad_r2_output_names = do_catboost_training(exec_data, col_data, scaling_data, catboost_dataset, train_block_idx,
+            bad_r2_output_names = do_catboost_training(exec_data, col_data, scaling_data, submission_weights_old, catboost_dataset, train_block_idx,
                                                        val_block_idx, **model_params)
 
         if do_feature_knockout:
@@ -1719,7 +1756,8 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permut
     return exec_data, bad_r2_output_names
 
 
-def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device, submission_weights):
+def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device,
+                      submission_weights_current, submission_weights_old):
     print('Loading test HoloFrame...')
     test_hf = HoloFrame(test_path, test_offsets_path)
 
@@ -1742,7 +1780,7 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
         subset_df = test_hf.get_slice(base_row_idx, base_row_idx + num_rows)
         base_row_idx += num_rows
 
-        xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights)
+        xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights_current, submission_weights_old)
         xt, _            = normalise_data(xt_prenorm, None, scaling_data, False)
         x_trick_features = extract_raw_trick_subset(xt_prenorm, col_data)
 
@@ -1764,7 +1802,7 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
             xt = catboost_process_input_batch(xt, col_data)
             y_predictions = exec_data.overall_best_model.predict(xt)
 
-        y_predictions = unscale_outputs(y_predictions, scaling_data)
+        y_predictions = unscale_outputs(y_predictions, scaling_data, submission_weights_old)
         y_predictions = postprocess_predictions(xt, y_predictions, x_trick_features, scaling_data, col_data)
 
         # We already premultiplied training values by submission weights

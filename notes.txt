@@ -9,8 +9,6 @@ level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.252923296945341
 Ideas to progress
 -----------------
 
-o Multiply by old weightings and divide again to make ranges sensible? currently
-  cloud trick not working with tiny numbers
 o Bug if test only currently does validation loops
 o Logarithmic scaling so that reasonable values near 1, extremes not so extreme
 o Went badly deleting hopefully redundant features at b32db7d49, so what is so crucial?
