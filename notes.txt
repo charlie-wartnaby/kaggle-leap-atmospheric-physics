@@ -73,6 +73,11 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 Submission Results
 ------------------
 
+Gah what have I done?
+submission.csv
+Complete · 3m ago · Commit ce48b16 R2 validation stats looking sensible now, trying 1 epoch 1M rows having done ~42 in total with only 100K so prob overtrained on that subset
+-28480891028409900.00000
+
 submission.csv
 Complete · 6h ago · Commit 7598cc73 test with 1M rows after restored use of old weightings and cloud tricks, but local R2 values look like nonesense so probably no good
 0.10532

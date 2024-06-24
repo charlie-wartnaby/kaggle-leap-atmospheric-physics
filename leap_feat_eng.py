@@ -1322,7 +1322,7 @@ def postprocess_predictions(x, y, trick_x, scaling_data, col_data):
         tiny_scaling = False # (scaling_data.sy[i] < min_std * 1.1)
         bad_col = col_name in col_data.bad_col_names_set
         if tiny_scaling or bad_col:
-            y[:,i] = scaling_data.my_weighted[i] # 0 here if restore addition of mean offset later
+            y[:,i] = scaling_data.my_raw[i] # 0 here if restore addition of mean offset later
         if tiny_scaling and not bad_col:
             zeroed_cols.append(col_data.expanded_names_output[i])
     print(f"Zeroed-out due to scaling not blacklist: " + str(zeroed_cols))
@@ -1338,8 +1338,8 @@ def postprocess_predictions(x, y, trick_x, scaling_data, col_data):
     # ptend_q0003[i] = state_q0003[i] / -1200   i=[12..18]  cloud ice mixing ratio
     # After that it starts to break down, though mixing some proportion of this guess
     # into the predicted value might still help.
-    replace_cloud_tendency_trick("state_q0002", "ptend_q0002", 12, 30, x, y, trick_x, scaling_data, col_data)
-    replace_cloud_tendency_trick("state_q0003", "ptend_q0003", 12, 17, x, y, trick_x, scaling_data, col_data)
+    replace_cloud_tendency_trick("state_q0002", "ptend_q0002", 12, 29, x, y, trick_x, scaling_data, col_data)
+#    replace_cloud_tendency_trick("state_q0003", "ptend_q0003", 12, 17, x, y, trick_x, scaling_data, col_data)
 
     return y
 
