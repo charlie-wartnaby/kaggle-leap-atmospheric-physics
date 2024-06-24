@@ -9,6 +9,8 @@ level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.252923296945341
 Ideas to progress
 -----------------
 
+o Multiply by old weightings and divide again to make ranges sensible? currently
+  cloud trick not working with tiny numbers
 o Bug if test only currently does validation loops
 o Logarithmic scaling so that reasonable values near 1, extremes not so extreme
 o Went badly deleting hopefully redundant features at b32db7d49, so what is so crucial?
@@ -22,7 +24,6 @@ o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
 o Try range instead of stdev scaling again now range calc fixed
   - if using range scaling need to still compute stdev for R2 metric
-o Multiply by old weightings and divide again to make ranges sensible?
 o Tried float64 on 1M samples, very slow and convergence oddly seemed worse
 o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?

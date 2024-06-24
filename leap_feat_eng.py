@@ -53,7 +53,7 @@ do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = False
 scale_using_range_limits = False
-use_float64 = False
+use_float64 = True
 model_type = "cnn"
 emit_scaling_stats = True
 
@@ -397,6 +397,8 @@ def form_col_data():
     col_data.unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not col.is_input]
     col_data.unexpanded_output_vector_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension > 1]
     col_data.unexpanded_output_scalar_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension <= 1]
+
+    col_data.input_trick_names = ["state_q0002", "state_q0003"]
 
     # Form set of names to not compute outputs for according to competition
     # description; may add our own poor ones to this set later
@@ -948,10 +950,11 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
 
             x_postnorm, y_postnorm = normalise_data(x_prenorm, y_prenorm,
                                                     scaling_data, True)
+            x_raw_trick_features = extract_raw_trick_subset(x_prenorm, col_data)
             if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
             start_time = time.time()
             with open(postnorm_cache_path, 'wb') as fd:
-                pickle.dump((x_postnorm, y_postnorm), fd)
+                pickle.dump((x_postnorm, y_postnorm, x_raw_trick_features), fd)
                 fd.flush()
                 os.fsync(fd)
             os.remove(prenorm_cache_path)
@@ -973,6 +976,16 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
         print("Saved scalings for next time")
 
     return scaling_data
+
+
+def extract_raw_trick_subset(x_prenorm, col_data):
+    # Cloud tendency trick needs original float64 precision data for relevant features only
+    trick_idx = []
+    for col_name in col_data.input_trick_names:
+        x_idx = col_data.feature_idx_by_name[col_name]
+        trick_idx.append(x_idx)
+    raw_trick_features = x_prenorm[:, trick_idx, :]
+    return raw_trick_features
 
 
 def write_scaling_stats_to_file(scaling_data, col_data):
@@ -1166,6 +1179,7 @@ class HoloDataset(Dataset):
         self.cache_base_idx = -1
         self.cache_np_x = None
         self.cache_np_y = None
+        self.cache_np_trick_features = None
 
     def __len__(self):
         """
@@ -1185,7 +1199,7 @@ class HoloDataset(Dataset):
             if os.path.exists(cache_path):
                 # Preprocessing already done, retrieve from binary cache file
                 with open(cache_path, 'rb') as fd:
-                    (all_np_x, self.cache_np_y) = pickle.load(fd)
+                    (all_np_x, self.cache_np_y, self.cache_np_trick_features) = pickle.load(fd)
                 if show_timings: print(f'HoloDataset slice cache load at row {self.cache_base_idx} took {time.time() - start_time} s')    
             else:
                 print(f"ERROR: cached data not found at row {index}")
@@ -1196,7 +1210,7 @@ class HoloDataset(Dataset):
 
     def __getitem__(self, index):
         """
-        Generate one sample of data.
+        Generate one sample of data for PyTorch as tensors.
         """
         self.ensure_block_loaded(index)
         # Convert the RAM numpy data to tensors when requested
@@ -1210,17 +1224,20 @@ class HoloDataset(Dataset):
                torch.from_numpy(y_np).to(self.device)
     
     def get_np_block_slice(self, block_base_idx, end_idx):
-        row_idx = block_base_idx
+        row_idx = block_base_idx if block_base_idx >= 0 else self.cache_base_idx
         complete_x = None
         complete_y = None
+        complete_tricks = None
         while True:
             self.ensure_block_loaded(row_idx)
             if complete_x is None:
                 complete_x = self.cache_np_x
                 complete_y = self.cache_np_y
+                complete_tricks = self.cache_np_trick_features
             else:
                 complete_x = np.concatenate((complete_x, self.cache_np_x), axis=0)
                 complete_y = np.concatenate((complete_y, self.cache_np_y), axis=0)
+                complete_tricks = np.concatenate((complete_tricks, self.cache_np_trick_features), axis=0)
             row_idx += self.cache_rows
             if row_idx >= end_idx:
                 break
@@ -1229,7 +1246,9 @@ class HoloDataset(Dataset):
         if captured_rows > num_reqd_rows:
             complete_x = complete_x[:num_reqd_rows,:,:]
             complete_y = complete_y[:num_reqd_rows,:,:]
-        return complete_x, complete_y
+            complete_tricks = complete_tricks[:num_reqd_rows,:,:]
+            
+        return complete_x, complete_y, complete_tricks
 
 
 
@@ -1256,7 +1275,7 @@ def unscale_outputs(y, scaling_data):
     y = (y * scaling_data.sy) # Experimenting again with no mean offset: + my
     return y
 
-def postprocess_predictions(x, y, scaling_data, col_data):
+def postprocess_predictions(x, y, trick_x, scaling_data, col_data):
     zeroed_cols = []
     for i in range(scaling_data.sy.shape[0]):
         # CW: still using original threshold although now premultiplying outputs by
@@ -1282,21 +1301,16 @@ def postprocess_predictions(x, y, scaling_data, col_data):
     # ptend_q0003[i] = state_q0003[i] / -1200   i=[12..18]  cloud ice mixing ratio
     # After that it starts to break down, though mixing some proportion of this guess
     # into the predicted value might still help.
-    replace_cloud_tendency_trick("state_q0002", "ptend_q0002", 12, 31, x, y, scaling_data, col_data)
-    replace_cloud_tendency_trick("state_q0003", "ptend_q0003", 12, 19, x, y, scaling_data, col_data)
+    replace_cloud_tendency_trick("state_q0002", "ptend_q0002", 12, 31, x, y, trick_x, scaling_data, col_data)
+    replace_cloud_tendency_trick("state_q0003", "ptend_q0003", 12, 19, x, y, trick_x, scaling_data, col_data)
 
     return y
 
-def replace_cloud_tendency_trick(src_name, dest_name, first_idx, last_idx, x, y, scaling_data, col_data):
-    subset_idx_by_name = col_data.cnn_subset_idx_by_name if model_type == "cnn" else col_data.catboost_subset_idx_by_name    
-    src_subset_idx = subset_idx_by_name[src_name]
-    # TODO feature knockout offset by one if necessary
-    src_full_set_idx = col_data.feature_idx_by_name[src_name]
-    scaled_src = x[:, src_subset_idx, first_idx : last_idx]
-    # x was scaled: x = (x - scaling_data.mx) / scaling_data.sx
-    unscaled_src = scaled_src * scaling_data.sx[0, src_full_set_idx, 0] + scaling_data.mx[0, src_full_set_idx, 0]
+def replace_cloud_tendency_trick(src_name, dest_name, first_idx, last_idx, x, y, trick_x, scaling_data, col_data):
+    src_full_set_idx = col_data.input_trick_names.index(src_name)
+    raw_src_f64 = trick_x[:, src_full_set_idx, first_idx : last_idx].reshape((x.shape[0], 1, -1))
     y_base_idx = col_data.output_expanded_first_idx_by_name[dest_name]
-    y[:, y_base_idx + first_idx : y_base_idx + last_idx] = unscaled_src / -1200.0
+    y[:, y_base_idx + first_idx : y_base_idx + last_idx] = raw_src_f64.reshape((y.shape[0],-1)) / -1200.0
 
 class AnalysisData():
     def __init__(self):
@@ -1307,7 +1321,7 @@ class AnalysisData():
         self.r2_vec = None
 
 
-def analyse_batch(analysis_data, inputs_np, outputs_pred_np, outputs_true_np, col_data, scaling_data):
+def analyse_batch(analysis_data, inputs_np, outputs_pred_np, outputs_true_np, trick_x_np, col_data, scaling_data):
     """Analyse batch of true versus predicted outputs"""
 
     # Return to original output scalings (but with submission weights
@@ -1315,7 +1329,7 @@ def analyse_batch(analysis_data, inputs_np, outputs_pred_np, outputs_true_np, co
     outputs_pred_np = unscale_outputs(outputs_pred_np, scaling_data)
     outputs_true_np = unscale_outputs(outputs_true_np, scaling_data)
     # Post-model tweaks for tricky columns
-    outputs_pred_np = postprocess_predictions(inputs_np, outputs_pred_np, scaling_data, col_data)
+    outputs_pred_np = postprocess_predictions(inputs_np, outputs_pred_np, trick_x_np, scaling_data, col_data)
 
     # Assuming variance of dataset outputs foudn in training more 
     # representative than variance in this small batch?
@@ -1376,7 +1390,8 @@ def calc_output_r2_ranking(col_data, analysis_data):
     return bad_r2_names
 
 
-def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permutations, train_loader, val_loader, device):
+def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permutations, train_loader,
+                    val_loader, cnn_dataset, device):
     warnings.filterwarnings('ignore', category=FutureWarning)
 
     if is_rerun and os.path.exists(epoch_counter_path):
@@ -1439,7 +1454,8 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permu
                 if do_analysis:
                     outputs_pred_np = outputs_pred.cpu().numpy()
                     outputs_true_np = outputs_true.cpu().numpy()
-                    analyse_batch(analysis_data, inputs.cpu().numpy(), outputs_pred_np, outputs_true_np, col_data, scaling_data)
+                    _, _, trick_x = cnn_dataset.get_np_block_slice(-1, cnn_batch_size)
+                    analyse_batch(analysis_data, inputs.cpu().numpy(), outputs_pred_np, outputs_true_np, trick_x, col_data, scaling_data)
 
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Validation batch {batch_idx + 1}')
@@ -1524,7 +1540,7 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
     for batch_idx, block_idx in enumerate(train_block_idx):
         print(f"Catboost training batch {batch_idx+1} of {len(train_block_idx)}")
         block_base_row_idx = block_idx * catboost_batch_size
-        train_x, train_y = dataset.get_np_block_slice(block_base_row_idx, block_base_row_idx + catboost_batch_size)
+        train_x, train_y, trick_x = dataset.get_np_block_slice(block_base_row_idx, block_base_row_idx + catboost_batch_size)
         train_x = catboost_process_input_batch(train_x, col_data)
         small_random_col = random_generator.random(catboost_batch_size).reshape((catboost_batch_size,1))
         small_random_col *= 1e-20
@@ -1552,12 +1568,12 @@ def do_catboost_training(exec_data, col_data, scaling_data, dataset, train_block
     
     for batch_idx, block_idx in enumerate(val_block_idx):
         block_base_row_idx = block_idx * catboost_batch_size
-        val_x, val_y = dataset.get_np_block_slice(block_base_row_idx, block_base_row_idx + catboost_batch_size)
+        val_x, val_y, trick_x = dataset.get_np_block_slice(block_base_row_idx, block_base_row_idx + catboost_batch_size)
         val_x = catboost_process_input_batch(val_x, col_data)
         predicted_y = overall_model.predict(val_x)
         r2_score = sklearn.metrics.r2_score(val_y, predicted_y)
         print(f"Catboost validation batch {batch_idx+1} of {len(val_block_idx)} normalised r2={r2_score}")
-        analyse_batch(analysis_data, val_x, predicted_y, val_y, col_data, scaling_data)
+        analyse_batch(analysis_data, val_x, predicted_y, val_y, trick_x, col_data, scaling_data)
 
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
@@ -1690,7 +1706,8 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, param_permut
             fd.write(f'{exec_data.model_save_path}\n')
 
         if model_type == "cnn":
-            bad_r2_output_names = do_cnn_training(model_params, exec_data, col_data, scaling_data, param_permutations, train_loader, val_loader, device)
+            bad_r2_output_names = do_cnn_training(model_params, exec_data, col_data, scaling_data, 
+                                                  param_permutations, train_loader, val_loader, cnn_dataset, device)
         else:
             bad_r2_output_names = do_catboost_training(exec_data, col_data, scaling_data, catboost_dataset, train_block_idx,
                                                        val_block_idx, **model_params)
@@ -1725,8 +1742,10 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
         subset_df = test_hf.get_slice(base_row_idx, base_row_idx + num_rows)
         base_row_idx += num_rows
 
-        xt_prenorm, _ = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights)
-        xt, _         = normalise_data(xt_prenorm, None, scaling_data, False)
+        xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights)
+        xt, _            = normalise_data(xt_prenorm, None, scaling_data, False)
+        x_trick_features = extract_raw_trick_subset(xt_prenorm, col_data)
+
         if do_feature_knockout:
             # Would never really do test run with single feature knocked out, but supporting anyway
             xt = np.delete(xt, exec_data.best_feature_knockout_idx, axis=1)
@@ -1746,7 +1765,7 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, devi
             y_predictions = exec_data.overall_best_model.predict(xt)
 
         y_predictions = unscale_outputs(y_predictions, scaling_data)
-        y_predictions = postprocess_predictions(xt, y_predictions, scaling_data, col_data)
+        y_predictions = postprocess_predictions(xt, y_predictions, x_trick_features, scaling_data, col_data)
 
         # We already premultiplied training values by submission weights
         # so predictions should already be scaled the same way
