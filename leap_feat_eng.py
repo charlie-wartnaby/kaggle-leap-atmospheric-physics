@@ -1578,7 +1578,7 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, submission_
 
 def do_catboost_training(exec_data, col_data, scaling_data, submission_weights_old, dataset, train_block_idx,
                          val_block_idx,
-                         iterations=4, depth=8, learning_rate=0.25,
+                         iterations=400, depth=8, learning_rate=0.25,
                          border_count=32, l2_leaf_reg=5):
 
     cat_params = {
