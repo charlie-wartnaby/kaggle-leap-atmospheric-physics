@@ -73,6 +73,10 @@ Found layer normalisation and SiLU best in experiment 26May2024 though little in
 Submission Results
 ------------------
 
+submission.csv
+Complete · 3m ago · Commit fa7e995a8 CNN baseline on all 10M rows only 7 epochs so far and not converged yet, submitting as sanity check
+0.69652
+
 Hallejulah, back in the game
 submission.csv
 Complete · 5m ago · Commit 164eb773f same model overtrained mainly on 100K rows but with fixes to avg substitutions

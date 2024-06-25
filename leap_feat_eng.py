@@ -52,11 +52,11 @@ is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = True
+clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
-model_type = "cnn"
-emit_scaling_stats = True
+model_type = "catboost"
+emit_scaling_stats = False
 
 
 if debug:
@@ -70,9 +70,9 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000000
+    max_train_rows = 1000000
     max_test_rows  = 1000000000
-    catboost_batch_size = 20000  # 5000 with pcuk151, 30000 greta
+    catboost_batch_size = 5000
     cnn_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
