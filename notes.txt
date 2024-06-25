@@ -74,6 +74,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 4m ago · Commit a9baf2a 1M row catboost sanity check run but inadvertently left batch size small at 5K
+0.32939
+
+submission.csv
 Complete · 3m ago · Commit fa7e995a8 CNN baseline on all 10M rows only 7 epochs so far and not converged yet, submitting as sanity check
 0.69652
 

@@ -70,9 +70,9 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000
+    max_train_rows = 800000
     max_test_rows  = 1000000000
-    catboost_batch_size = 5000
+    catboost_batch_size = 20000
     cnn_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
@@ -440,9 +440,17 @@ def form_col_data():
                                             'state_t', 'cam_in_LANDFRAC', 'diffuse_lw_absorb',
                                             'abs_momentum', 'direct_sw_absorb','buoyancy',
                                             'up_integ_tot_cloud', 'cam_in_ALDIR', 'recip_rel_humidity',
-                                            'state_q0001', 'cam_in_OCNFRAC', 'pbuf_LHFLX', 'pbuf_CH4',
+                                            'state_q0001', 'cam_in_OCNFRAC', 'pbuf_LHFLX', #'pbuf_CH4',
                                             'state_ps', 'cam_in_ICEFRAC', 'pressure', 'pbuf_COSZRS',
-                                            'density'])
+                                            'density',
+                                            # Trying a few more, just short of memory exhaustion
+                                            'state_u', 'pbuf_TAUX', 'pbuf_TAUY',
+                                            'recip_density', 'recip_ice_cloud', 'recip_water_cloud',
+                                            'total_cloud_density', 'sensible_flux_gwp_prod',
+                                            'up_lw_flux_gwp_prod', 'abs_wind', 'abs_momentum', 'abs_stress',
+                                            'down_integ_tot_cloud', 'lat_heat_div_density',
+                                            'vert_insolation', 'diffuse_sw_absorb', 'direct_lw_absorb',
+                                            ])
         
         col_data.cnn_input_feature_idx = []
         col_data.catboost_input_feature_idx = []
@@ -1558,7 +1566,7 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, submission_
 
 def do_catboost_training(exec_data, col_data, scaling_data, submission_weights_old, dataset, train_block_idx,
                          val_block_idx,
-                         iterations=10, depth=8, learning_rate=0.25,
+                         iterations=400, depth=8, learning_rate=0.25,
                          border_count=32, l2_leaf_reg=5):
     # Catboost, mutually exclusive to start with
 
