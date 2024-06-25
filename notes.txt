@@ -74,6 +74,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 2h ago · Commit 867b3ea4a reference catboost run with 1M rows
+0.44679
+
+submission.csv
 Complete · 4m ago · Commit a9baf2a 1M row catboost sanity check run but inadvertently left batch size small at 5K
 0.32939
 

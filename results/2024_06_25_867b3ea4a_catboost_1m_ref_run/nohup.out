@@ -1,0 +1,274 @@
+Loading training HoloFrame...
+Loading submission weights...
+Opening previous scalings...
+Starting training loop...
+Catboost training batch 1 of 36
+0:	learn: 15.5669851	total: 2.37s	remaining: 15m 46s
+399:	learn: 6.8633510	total: 14m 24s	remaining: 0us
+Catboost training batch 2 of 36
+0:	learn: 15.1651863	total: 2.58s	remaining: 17m 9s
+399:	learn: 6.6126545	total: 14m 33s	remaining: 0us
+Catboost training batch 3 of 36
+0:	learn: 18.6826698	total: 2.28s	remaining: 15m 11s
+399:	learn: 8.1556074	total: 13m 27s	remaining: 0us
+Catboost training batch 4 of 36
+0:	learn: 18.4726798	total: 2.69s	remaining: 17m 52s
+399:	learn: 8.0481178	total: 14m 11s	remaining: 0us
+Catboost training batch 5 of 36
+0:	learn: 17.1169434	total: 2.32s	remaining: 15m 26s
+399:	learn: 7.4609182	total: 13m 53s	remaining: 0us
+Catboost training batch 6 of 36
+0:	learn: 15.6665025	total: 2.45s	remaining: 16m 17s
+399:	learn: 6.8586863	total: 14m 19s	remaining: 0us
+Catboost training batch 7 of 36
+0:	learn: 18.1269909	total: 2.05s	remaining: 13m 36s
+399:	learn: 8.1333715	total: 14m 7s	remaining: 0us
+Catboost training batch 8 of 36
+0:	learn: 15.4472522	total: 2.77s	remaining: 18m 24s
+399:	learn: 6.9609873	total: 14m 24s	remaining: 0us
+Catboost training batch 9 of 36
+0:	learn: 15.9024393	total: 2.2s	remaining: 14m 37s
+399:	learn: 7.1992550	total: 14m 8s	remaining: 0us
+Catboost training batch 10 of 36
+0:	learn: 27.9584039	total: 2.24s	remaining: 14m 52s
+399:	learn: 8.9302848	total: 13m 33s	remaining: 0us
+Catboost training batch 11 of 36
+0:	learn: 18.3537013	total: 2.37s	remaining: 15m 43s
+399:	learn: 7.8963255	total: 14m 6s	remaining: 0us
+Catboost training batch 12 of 36
+0:	learn: 15.5561692	total: 2.38s	remaining: 15m 49s
+399:	learn: 6.9166204	total: 14m 25s	remaining: 0us
+Catboost training batch 13 of 36
+0:	learn: 15.5526758	total: 2.81s	remaining: 18m 41s
+399:	learn: 7.0952339	total: 14m 25s	remaining: 0us
+Catboost training batch 14 of 36
+0:	learn: 17.5279591	total: 2.94s	remaining: 19m 32s
+399:	learn: 7.8737955	total: 14m 25s	remaining: 0us
+Catboost training batch 15 of 36
+0:	learn: 16.9608269	total: 2.22s	remaining: 14m 45s
+399:	learn: 7.0649794	total: 13m 45s	remaining: 0us
+Catboost training batch 16 of 36
+0:	learn: 19.8274103	total: 2.21s	remaining: 14m 42s
+399:	learn: 8.3223896	total: 14m 2s	remaining: 0us
+Catboost training batch 17 of 36
+0:	learn: 15.9366708	total: 2.62s	remaining: 17m 24s
+399:	learn: 7.0454278	total: 14m 9s	remaining: 0us
+Catboost training batch 18 of 36
+0:	learn: 15.2003585	total: 2.7s	remaining: 17m 56s
+399:	learn: 6.8190725	total: 14m 31s	remaining: 0us
+Catboost training batch 19 of 36
+0:	learn: 15.8287010	total: 2.77s	remaining: 18m 25s
+399:	learn: 6.9030204	total: 14m 18s	remaining: 0us
+Catboost training batch 20 of 36
+0:	learn: 19.0659953	total: 2.5s	remaining: 16m 36s
+399:	learn: 8.4969167	total: 13m 58s	remaining: 0us
+Catboost training batch 21 of 36
+0:	learn: 17.3974912	total: 3.06s	remaining: 20m 20s
+399:	learn: 7.8846580	total: 14m 26s	remaining: 0us
+Catboost training batch 22 of 36
+0:	learn: 15.9959182	total: 2.77s	remaining: 18m 24s
+399:	learn: 7.0469328	total: 14m 24s	remaining: 0us
+Catboost training batch 23 of 36
+0:	learn: 27.5012372	total: 1.4s	remaining: 9m 18s
+399:	learn: 9.0417770	total: 13m 21s	remaining: 0us
+Catboost training batch 24 of 36
+0:	learn: 19.4183676	total: 2.03s	remaining: 13m 30s
+399:	learn: 7.9001891	total: 14m 6s	remaining: 0us
+Catboost training batch 25 of 36
+0:	learn: 15.6833343	total: 2.42s	remaining: 16m 6s
+399:	learn: 6.9511015	total: 14m 13s	remaining: 0us
+Catboost training batch 26 of 36
+0:	learn: 19.1876197	total: 2.5s	remaining: 16m 37s
+399:	learn: 8.0999703	total: 14m 14s	remaining: 0us
+Catboost training batch 27 of 36
+0:	learn: 17.9695534	total: 2.28s	remaining: 15m 11s
+399:	learn: 8.1668997	total: 13m 57s	remaining: 0us
+Catboost training batch 28 of 36
+0:	learn: 20.6521815	total: 1.74s	remaining: 11m 35s
+399:	learn: 8.5171030	total: 13m 55s	remaining: 0us
+Catboost training batch 29 of 36
+0:	learn: 15.0002833	total: 2.46s	remaining: 16m 22s
+399:	learn: 6.7745929	total: 14m 36s	remaining: 0us
+Catboost training batch 30 of 36
+0:	learn: 19.1514960	total: 2.22s	remaining: 14m 46s
+399:	learn: 8.2076622	total: 13m 49s	remaining: 0us
+Catboost training batch 31 of 36
+0:	learn: 15.3342607	total: 2.14s	remaining: 14m 12s
+399:	learn: 7.0976457	total: 14m 25s	remaining: 0us
+Catboost training batch 32 of 36
+0:	learn: 15.9994812	total: 2.72s	remaining: 18m 5s
+399:	learn: 7.3758991	total: 14m 18s	remaining: 0us
+Catboost training batch 33 of 36
+0:	learn: 14.6625211	total: 2.75s	remaining: 18m 18s
+399:	learn: 6.5701213	total: 14m 29s	remaining: 0us
+Catboost training batch 34 of 36
+0:	learn: 15.6025262	total: 3s	remaining: 19m 56s
+399:	learn: 7.0398693	total: 14m 48s	remaining: 0us
+Catboost training batch 35 of 36
+0:	learn: 19.0657232	total: 2.35s	remaining: 15m 38s
+399:	learn: 8.3387563	total: 14m 25s	remaining: 0us
+Catboost training batch 36 of 36
+0:	learn: 17.1159991	total: 2.27s	remaining: 15m 7s
+399:	learn: 7.5158358	total: 14m 10s	remaining: 0us
+Catboost validation batch 1 of 4 normalised r2=-3.07932359156826e+27
+Batch all R2=0.42539589205573786, bad excl R2=0.4979157168920096
+Catboost validation batch 2 of 4 normalised r2=-1.2606723885859843e+30
+Batch all R2=0.5132006541491968, bad excl R2=0.5356930221976801
+Catboost validation batch 3 of 4 normalised r2=-3.0747499391360296e+30
+Batch all R2=0.5713261023527422, bad excl R2=0.5733109553271384
+Catboost validation batch 4 of 4 normalised r2=-1.0485903303287126e+18
+Batch all R2=0.3113095702904428, bad excl R2=0.4297553893381233
+Final validation R2=0.45530805471202995, bad excl R2=0.5091687709387379
+Best model so far model.pkl
+Loading test HoloFrame...
+Using model model.pkl for test run and submission
+Removing poor R2 cols from those that will be predicted: ['ptend_t_19', 'ptend_q0001_15', 'ptend_q0001_16', 'ptend_q0001_18', 'ptend_q0003_20', 'ptend_q0003_21', 'ptend_q0003_22', 'ptend_q0003_23', 'ptend_q0003_24', 'ptend_q0003_25', 'ptend_q0003_26', 'ptend_q0003_27', 'ptend_q0003_28', 'ptend_q0003_29', 'ptend_u_12', 'ptend_u_13', 'ptend_u_14', 'ptend_u_15', 'ptend_u_16', 'ptend_v_12', 'ptend_v_13']
+Processing submission from row 0
+Processing submission from row 5000
+Processing submission from row 10000
+Processing submission from row 15000
+Processing submission from row 20000
+Processing submission from row 25000
+Processing submission from row 30000
+Processing submission from row 35000
+Processing submission from row 40000
+Processing submission from row 45000
+Processing submission from row 50000
+Processing submission from row 55000
+Processing submission from row 60000
+Processing submission from row 65000
+Processing submission from row 70000
+Processing submission from row 75000
+Processing submission from row 80000
+Processing submission from row 85000
+Processing submission from row 90000
+Processing submission from row 95000
+Processing submission from row 100000
+Processing submission from row 105000
+Processing submission from row 110000
+Processing submission from row 115000
+Processing submission from row 120000
+Processing submission from row 125000
+Processing submission from row 130000
+Processing submission from row 135000
+Processing submission from row 140000
+Processing submission from row 145000
+Processing submission from row 150000
+Processing submission from row 155000
+Processing submission from row 160000
+Processing submission from row 165000
+Processing submission from row 170000
+Processing submission from row 175000
+Processing submission from row 180000
+Processing submission from row 185000
+Processing submission from row 190000
+Processing submission from row 195000
+Processing submission from row 200000
+Processing submission from row 205000
+Processing submission from row 210000
+Processing submission from row 215000
+Processing submission from row 220000
+Processing submission from row 225000
+Processing submission from row 230000
+Processing submission from row 235000
+Processing submission from row 240000
+Processing submission from row 245000
+Processing submission from row 250000
+Processing submission from row 255000
+Processing submission from row 260000
+Processing submission from row 265000
+Processing submission from row 270000
+Processing submission from row 275000
+Processing submission from row 280000
+Processing submission from row 285000
+Processing submission from row 290000
+Processing submission from row 295000
+Processing submission from row 300000
+Processing submission from row 305000
+Processing submission from row 310000
+Processing submission from row 315000
+Processing submission from row 320000
+Processing submission from row 325000
+Processing submission from row 330000
+Processing submission from row 335000
+Processing submission from row 340000
+Processing submission from row 345000
+Processing submission from row 350000
+Processing submission from row 355000
+Processing submission from row 360000
+Processing submission from row 365000
+Processing submission from row 370000
+Processing submission from row 375000
+Processing submission from row 380000
+Processing submission from row 385000
+Processing submission from row 390000
+Processing submission from row 395000
+Processing submission from row 400000
+Processing submission from row 405000
+Processing submission from row 410000
+Processing submission from row 415000
+Processing submission from row 420000
+Processing submission from row 425000
+Processing submission from row 430000
+Processing submission from row 435000
+Processing submission from row 440000
+Processing submission from row 445000
+Processing submission from row 450000
+Processing submission from row 455000
+Processing submission from row 460000
+Processing submission from row 465000
+Processing submission from row 470000
+Processing submission from row 475000
+Processing submission from row 480000
+Processing submission from row 485000
+Processing submission from row 490000
+Processing submission from row 495000
+Processing submission from row 500000
+Processing submission from row 505000
+Processing submission from row 510000
+Processing submission from row 515000
+Processing submission from row 520000
+Processing submission from row 525000
+Processing submission from row 530000
+Processing submission from row 535000
+Processing submission from row 540000
+Processing submission from row 545000
+Processing submission from row 550000
+Processing submission from row 555000
+Processing submission from row 560000
+Processing submission from row 565000
+Processing submission from row 570000
+Processing submission from row 575000
+Processing submission from row 580000
+Processing submission from row 585000
+Processing submission from row 590000
+Processing submission from row 595000
+Processing submission from row 600000
+Processing submission from row 605000
+Processing submission from row 610000
+Processing submission from row 615000
+Processing submission from row 620000
+submission_df: shape: (9, 370)
+┌───────────┬───────────┬───────────┬───────────┬───┬───────────┬───────────┬───────────┬──────────┐
+│ statistic ┆ sample_id ┆ ptend_t_0 ┆ ptend_t_1 ┆ … ┆ cam_out_S ┆ cam_out_S ┆ cam_out_S ┆ cam_out_ │
+│ ---       ┆ ---       ┆ ---       ┆ ---       ┆   ┆ OLS       ┆ OLL       ┆ OLSD      ┆ SOLLD    │
+│ str       ┆ str       ┆ f64       ┆ f64       ┆   ┆ ---       ┆ ---       ┆ ---       ┆ ---      │
+│           ┆           ┆           ┆           ┆   ┆ f64       ┆ f64       ┆ f64       ┆ f64      │
+╞═══════════╪═══════════╪═══════════╪═══════════╪═══╪═══════════╪═══════════╪═══════════╪══════════╡
+│ count     ┆ 625000    ┆ 625000.0  ┆ 625000.0  ┆ … ┆ 625000.0  ┆ 625000.0  ┆ 625000.0  ┆ 625000.0 │
+│ null_coun ┆ 0         ┆ 0.0       ┆ 0.0       ┆ … ┆ 0.0       ┆ 0.0       ┆ 0.0       ┆ 0.0      │
+│ t         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆          │
+│ mean      ┆ null      ┆ 0.000012  ┆ -0.000008 ┆ … ┆ 61.425605 ┆ 66.516887 ┆ 32.635217 ┆ 17.03461 │
+│           ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 4        │
+│ std       ┆ null      ┆ 0.000023  ┆ 0.000033  ┆ … ┆ 100.76037 ┆ 105.35399 ┆ 38.933311 ┆ 22.19085 │
+│           ┆           ┆           ┆           ┆   ┆ 1         ┆ 2         ┆           ┆ 3        │
+│ min       ┆ test_0    ┆ -0.000038 ┆ -0.000077 ┆ … ┆ -63.46801 ┆ -64.42134 ┆ -14.87004 ┆ -11.5072 │
+│           ┆           ┆           ┆           ┆   ┆ 5         ┆ 6         ┆ 9         ┆ 82       │
+│ 25%       ┆ null      ┆ -0.00001  ┆ -0.000037 ┆ … ┆ -1.448627 ┆ -1.100072 ┆ 0.471521  ┆ -0.06635 │
+│           ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 9        │
+│ 50%       ┆ null      ┆ 0.000005  ┆ -0.000018 ┆ … ┆ 6.851279  ┆ 8.899887  ┆ 10.872027 ┆ 6.674261 │
+│ 75%       ┆ null      ┆ 0.000036  ┆ 0.000025  ┆ … ┆ 93.583291 ┆ 105.87358 ┆ 62.825382 ┆ 30.39842 │
+│           ┆           ┆           ┆           ┆   ┆           ┆ 5         ┆           ┆ 8        │
+│ max       ┆ test_9999 ┆ 0.000076  ┆ 0.000118  ┆ … ┆ 460.21849 ┆ 482.77586 ┆ 180.30890 ┆ 119.7935 │
+│           ┆ 8         ┆           ┆           ┆   ┆ 8         ┆ 7         ┆ 9         ┆ 58       │
+└───────────┴───────────┴───────────┴───────────┴───┴───────────┴───────────┴───────────┴──────────┘
