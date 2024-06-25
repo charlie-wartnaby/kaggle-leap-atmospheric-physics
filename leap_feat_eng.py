@@ -47,7 +47,7 @@ import warnings
 
 # Settings
 debug = False
-do_test = True
+do_test = True  
 is_rerun = False
 do_analysis = True
 do_train = True
@@ -58,6 +58,12 @@ use_float64 = False
 model_type = "catboost"
 emit_scaling_stats = False
 
+pretrained_model_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/model.pt"
+pretrained_metrics_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/cnn_analysis.data.pkl"
+pretrained_model_path_catboost = "small_catboost_eg/model.pkl"
+pretrained_metrics_path_catboost = "small_catboost_eg/catboost_analysis_data.pkl"
+# pretrained_model_path_catboost = "results/2024_06_25_867b3ea4a_catboost_1m_ref_run/model.pkl"
+# pretrained_metrics_path_catboost = "results/2024_06_25_867b3ea4a_catboost_1m_ref_run/catboost_analysis_data.pkl"
 
 if debug:
     max_train_rows = 1000
@@ -70,7 +76,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 800000
+    max_train_rows = 600000
     max_test_rows  = 1000000000
     catboost_batch_size = 20000
     cnn_batch_size = 5000
@@ -78,7 +84,7 @@ else:
     train_proportion = 0.9
     max_epochs = 50
 
-subset_base_row = 0
+subset_base_row = 9000000
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
@@ -188,9 +194,12 @@ def main():
     if do_train:
         exec_data, bad_r2_output_names = training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_weights_old,
                                                         param_permutations, device)
+    else:
+        exec_data = ExecData()
+        bad_r2_output_names = []
 
     if do_test:
-        test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device, submission_weights_current, submission_weights_old)
+        test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, param_permutations[0], device, submission_weights_current, submission_weights_old)
 
     exit_clean_up()
 
@@ -1561,14 +1570,16 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, submission_
     with open(cnn_analysis_data_path, 'wb') as fd:
         pickle.dump(analysis_data, fd)
 
+    del analysis_data, model
+    gc.collect()
+
     return bad_r2_output_names
 
 
 def do_catboost_training(exec_data, col_data, scaling_data, submission_weights_old, dataset, train_block_idx,
                          val_block_idx,
-                         iterations=400, depth=8, learning_rate=0.25,
+                         iterations=4, depth=8, learning_rate=0.25,
                          border_count=32, l2_leaf_reg=5):
-    # Catboost, mutually exclusive to start with
 
     cat_params = {
                     'iterations': iterations, 
@@ -1610,8 +1621,7 @@ def do_catboost_training(exec_data, col_data, scaling_data, submission_weights_o
         del block_model
         gc.collect()
 
-    with open(exec_data.model_save_path, "wb") as fd:
-        pickle.dump(overall_model, fd)
+    overall_model.save_model(exec_data.model_save_path)
 
     # Validation step
     analysis_data = AnalysisData()
@@ -1646,6 +1656,9 @@ def do_catboost_training(exec_data, col_data, scaling_data, submission_weights_o
 
     with open(catboost_analysis_data_path, 'wb') as fd:
         pickle.dump(analysis_data, fd)
+
+    del overall_model
+    gc.collect()
 
     return  bad_r2_output_names
 
@@ -1748,9 +1761,9 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_w
                 suffix += f"_{key}_{param_permutation[key]}"
         exec_data.model_save_path = model_root_path + suffix
         if model_type == "cnn":
-            exec_data.model_save_path += ".pt"
+            exec_data.model_save_path += ".pt"  # PyTorch
         else:
-            exec_data.model_save_path += ".pkl"
+            exec_data.model_save_path += ".cbm" # Catboost binary model
 
         with open(loss_log_path, 'a') as fd:
             fd.write(f'{exec_data.model_save_path}\n')
@@ -1769,21 +1782,41 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_w
     return exec_data, bad_r2_output_names
 
 
-def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, device,
+def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, model_params, device,
                       submission_weights_current, submission_weights_old):
     print('Loading test HoloFrame...')
     test_hf = HoloFrame(test_path, test_offsets_path)
 
     submission_df = None
 
-    print(f'Using model {exec_data.overall_best_model_name} for test run and submission')
-    if model_type == "cnn":
-        exec_data.overall_best_model.load_state_dict(exec_data.overall_best_model_state)
-        exec_data.overall_best_model.eval()
- 
-    print("Removing poor R2 cols from those that will be predicted:", bad_r2_output_names)
-    for name in bad_r2_output_names:
-        col_data.zero_or_bad_cols_by_name[name] = False
+    if do_train:
+        print(f'Using model {exec_data.overall_best_model_name} for test run and submission')
+        if model_type == "cnn":
+            exec_data.overall_best_model.load_state_dict(exec_data.overall_best_model_state)
+            exec_data.overall_best_model.eval()
+    else:
+        assert(len(model_params.keys()) == 0)
+        cnn_model = AtmLayerCNN(col_data, **model_params).to(device)
+        print('Attempting to reload CNN model from disk...')
+        cnn_model.load_state_dict(torch.load(pretrained_model_path_cnn))
+        print('Attempting to reload catboost model from disk...')
+        catboost_model = catboost.CatBoostRegressor()
+        catboost_model.load_model(pretrained_model_path_catboost)
+        print("Loading CNN analysis data from disk")
+        with open(pretrained_metrics_path_cnn, "rb") as fd:
+            analysis_data_cnn = pickle.load(fd)
+        print("Loading catboost analysis data from disk")
+        with open(pretrained_metrics_path_cnn, "rb") as fd:
+            analysis_data_catboost = pickle.load(fd)
+
+    if do_train:
+        print("Removing poor R2 cols from those that will be predicted:", bad_r2_output_names)
+        for name in bad_r2_output_names:
+            col_data.zero_or_bad_cols_by_name[name] = False
+    else:
+        # Figure out weightings to use for model types depending on validation quality,
+        # or use neither if both bad
+        pass
 
     base_row_idx = 0
     num_test_rows = min(max_test_rows, len(test_hf))
