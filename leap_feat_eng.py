@@ -49,8 +49,8 @@ import warnings
 debug = False
 do_test = True  
 is_rerun = False
-do_analysis = True
-do_train = True
+do_analysis = False
+do_train = False
 do_feature_knockout = False
 clear_batch_cache_at_start = False
 scale_using_range_limits = False
@@ -58,12 +58,10 @@ use_float64 = False
 model_type = "catboost"
 emit_scaling_stats = False
 
-pretrained_model_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/model.pt"
-pretrained_metrics_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/cnn_analysis.data.pkl"
-pretrained_model_path_catboost = "small_catboost_eg/model.pkl"
-pretrained_metrics_path_catboost = "small_catboost_eg/catboost_analysis_data.pkl"
-# pretrained_model_path_catboost = "results/2024_06_25_867b3ea4a_catboost_1m_ref_run/model.pkl"
-# pretrained_metrics_path_catboost = "results/2024_06_25_867b3ea4a_catboost_1m_ref_run/catboost_analysis_data.pkl"
+previous_submission_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/submission.csv"
+previous_metrics_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/cnn_analysis.data.pkl"
+previous_submission_path_catboost = "results/2024_06_25_867b3ea4a_catboost_800k_ref_run/submission.csv"
+previous_metrics_path_catboost = "results/2024_06_25_867b3ea4a_catboost_800k_ref_run/catboost_analysis_data.pkl"
 
 if debug:
     max_train_rows = 1000
@@ -264,7 +262,36 @@ def entry_clean_up():
 class HoloFrame:
     """Manage data extraction from large .csv file with random access
     using precomputed byte offsets of each text row"""
-    def __init__(self, csv_path, offsets_path):
+    def __init__(self, csv_path, offsets_path=""):
+        if len(offsets_path) <= 1:
+            # Need to scan for offsets if not specified
+            directory, filename = os.path.split(csv_path)
+            fileroot, ext = os.path.splitext(filename)
+            if offsets_path == ".":
+                # For Kaggle handy to use current directory, can't write to dataset source dirs
+                directory = "."
+            fileroot += "_offsets"
+            ext = ".pkl"
+            offsets_path = os.path.join(directory, fileroot + ext)
+            already_done = False
+            if os.path.exists(offsets_path):
+                offsets_mod_time = os.path.getmtime(offsets_path)
+                csv_mod_time = os.path.getmtime(csv_path)
+                already_done = (offsets_mod_time > csv_mod_time)
+            if not already_done:
+                print(f'Reading file to get line offsets: {csv_path}')
+                eol_byte_offsets = []
+                with open(csv_path, 'rb') as fd: # in text mode file.tell() gives strange numbers apparently
+                    for line in fd:
+                        offset_now = fd.tell()
+                        eol_byte_offsets.append(offset_now)
+                if len(eol_byte_offsets) > 0:
+                    eol_byte_offsets.pop() # Don't want off-end-of-file offset for 'next' row
+                with open(offsets_path, 'wb') as fd:
+                    pickle.dump(eol_byte_offsets, fd)
+                    print(f"... file line offsets written to {offsets_path}")
+
+        # Now have either provided or created offsets to work with
         with open(offsets_path, 'rb') as offsets_fd:
             self.offset = pickle.load(offsets_fd)
         self.csv_fd = open(csv_path, 'rb')
@@ -1621,6 +1648,10 @@ def do_catboost_training(exec_data, col_data, scaling_data, submission_weights_o
         del block_model
         gc.collect()
 
+    # Saving here but actually models > 2GB do not load again
+    # https://github.com/catboost/catboost/issues/842
+    # Default pickle dump/load cycle didn't work either, maybe could with
+    # different options
     overall_model.save_model(exec_data.model_save_path)
 
     # Validation step
@@ -1794,29 +1825,18 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, mode
         if model_type == "cnn":
             exec_data.overall_best_model.load_state_dict(exec_data.overall_best_model_state)
             exec_data.overall_best_model.eval()
-    else:
-        assert(len(model_params.keys()) == 0)
-        cnn_model = AtmLayerCNN(col_data, **model_params).to(device)
-        print('Attempting to reload CNN model from disk...')
-        cnn_model.load_state_dict(torch.load(pretrained_model_path_cnn))
-        print('Attempting to reload catboost model from disk...')
-        catboost_model = catboost.CatBoostRegressor()
-        catboost_model.load_model(pretrained_model_path_catboost)
-        print("Loading CNN analysis data from disk")
-        with open(pretrained_metrics_path_cnn, "rb") as fd:
-            analysis_data_cnn = pickle.load(fd)
-        print("Loading catboost analysis data from disk")
-        with open(pretrained_metrics_path_cnn, "rb") as fd:
-            analysis_data_catboost = pickle.load(fd)
-
-    if do_train:
         print("Removing poor R2 cols from those that will be predicted:", bad_r2_output_names)
         for name in bad_r2_output_names:
             col_data.zero_or_bad_cols_by_name[name] = False
     else:
         # Figure out weightings to use for model types depending on validation quality,
         # or use neither if both bad
-        pass
+        prev_submission_cnn_hf = HoloFrame(previous_submission_path_cnn)
+        prev_submission_catboost_hf = HoloFrame(previous_submission_path_catboost)
+        with open(previous_metrics_path_cnn, "rb") as fd:
+            prev_analysis_data_cnn = pickle.load(fd)
+        with open(previous_metrics_path_catboost, "rb") as fd:
+            prev_analysis_data_catboost = pickle.load(fd)
 
     base_row_idx = 0
     num_test_rows = min(max_test_rows, len(test_hf))
@@ -1824,35 +1844,41 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, mode
         print(f'Processing submission from row {base_row_idx}')
         num_rows = min(len(test_hf) - base_row_idx, test_batch_size)
         subset_df = test_hf.get_slice(base_row_idx, base_row_idx + num_rows)
-        base_row_idx += num_rows
 
-        xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights_current, submission_weights_old)
-        xt, _            = normalise_data(xt_prenorm, None, scaling_data, False)
-        x_trick_features = extract_raw_trick_subset(xt_prenorm, col_data)
+        if do_train:
+            xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights_current, submission_weights_old)
+            xt, _            = normalise_data(xt_prenorm, None, scaling_data, False)
+            x_trick_features = extract_raw_trick_subset(xt_prenorm, col_data)
 
-        if do_feature_knockout:
-            # Would never really do test run with single feature knocked out, but supporting anyway
-            xt = np.delete(xt, exec_data.best_feature_knockout_idx, axis=1)
+            if do_feature_knockout:
+                # Would never really do test run with single feature knocked out, but supporting anyway
+                xt = np.delete(xt, exec_data.best_feature_knockout_idx, axis=1)
 
-        if model_type == "cnn":
-            # Convert the current slice of xt to a PyTorch tensor
-            xt = xt[:, col_data.cnn_input_feature_idx, :]
-            inputs = torch.from_numpy(xt).to(device)
+            if model_type == "cnn":
+                # Convert the current slice of xt to a PyTorch tensor
+                xt = xt[:, col_data.cnn_input_feature_idx, :]
+                inputs = torch.from_numpy(xt).to(device)
 
-            # No need to track gradients for inference
-            with torch.no_grad():
-                outputs_pred = exec_data.overall_best_model(inputs)
-                y_predictions = outputs_pred.cpu().numpy()
+                # No need to track gradients for inference
+                with torch.no_grad():
+                    outputs_pred = exec_data.overall_best_model(inputs)
+                    y_predictions = outputs_pred.cpu().numpy()
+            else:
+                xt = xt[:, col_data.catboost_input_feature_idx, :]
+                xt = catboost_process_input_batch(xt, col_data)
+                y_predictions = exec_data.overall_best_model.predict(xt)
+
+            y_predictions = unscale_outputs(y_predictions, scaling_data, submission_weights_old)
+            y_predictions = postprocess_predictions(xt, y_predictions, x_trick_features, scaling_data, col_data)
+        
         else:
-            xt = xt[:, col_data.catboost_input_feature_idx, :]
-            xt = catboost_process_input_batch(xt, col_data)
-            y_predictions = exec_data.overall_best_model.predict(xt)
-
-        y_predictions = unscale_outputs(y_predictions, scaling_data, submission_weights_old)
-        y_predictions = postprocess_predictions(xt, y_predictions, x_trick_features, scaling_data, col_data)
-
-        # We already premultiplied training values by submission weights
-        # so predictions should already be scaled the same way
+            # Use weighted combination of previous CNN and catboost submissions
+            submission_subset_cnn_df      = prev_submission_cnn_hf.get_slice(base_row_idx, base_row_idx + num_rows)
+            submission_subset_catboost_df = prev_submission_catboost_hf.get_slice(base_row_idx, base_row_idx + num_rows)
+            y_predictions = form_weighted_submission(submission_subset_cnn_df, submission_subset_catboost_df, 
+                                                     prev_analysis_data_cnn, prev_analysis_data_catboost, scaling_data)
+        
+        base_row_idx += num_rows
 
         # Lose everything apart from sample ID:
         submission_subset_df = subset_df.select('sample_id')
@@ -1869,6 +1895,35 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, mode
     print("submission_df:", submission_df.describe())
 
     submission_df.write_csv("submission.csv")
+
+
+def form_weighted_submission(submission_subset_cnn_df, submission_subset_catboost_df, 
+                             prev_analysis_data_cnn, prev_analysis_data_catboost, scaling_data):
+    col_idx = 0
+    while col_idx < len(submission_subset_cnn_df.columns):
+        col_name = submission_subset_cnn_df.columns[col_idx]
+        if not col_name or col_name == 'sample_id':
+            col_idx += 1
+        else:
+            break
+    # Remaining columns are expanded outputs
+    cnn_submission_np = submission_subset_cnn_df[: , col_idx : ]
+    catboost_submission_np = submission_subset_catboost_df[: , col_idx : ]
+    cnn_r2 = np.maximum(prev_analysis_data_cnn.r2_vec, 0.0)
+    catboost_r2 = np.maximum(prev_analysis_data_catboost.r2_vec, 0.0)
+    r2_sum = cnn_r2 + catboost_r2
+    
+    # Might experiment here with different types of weighting...
+    cnn_weights = cnn_r2 / r2_sum
+    catboost_weights = catboost_r2 / r2_sum
+
+    training_mean = scaling_data.my_raw
+    predictions = np.zeros_like(cnn_submission_np, dtype=np.float64)
+    predictions = cnn_weights * catboost_submission_np + catboost_weights * catboost_submission_np
+    no_preds = (cnn_weights <= 0.0) & (catboost_weights <= 0.0)
+    predictions = np.where(no_preds, training_mean, predictions)
+    return predictions
+
 
 def exit_clean_up():
     if clear_batch_cache_at_end:
