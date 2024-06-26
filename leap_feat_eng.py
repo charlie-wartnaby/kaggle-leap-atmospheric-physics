@@ -48,14 +48,14 @@ import warnings
 # Settings
 debug = False
 do_test = True  
-is_rerun = False
-do_analysis = False
-do_train = False
+is_rerun = True
+do_analysis = True
+do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = False
 scale_using_range_limits = False
 use_float64 = False
-model_type = "catboost"
+model_type = "cnn"
 emit_scaling_stats = False
 
 previous_submission_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/submission.csv"
@@ -74,7 +74,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 600000
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
     catboost_batch_size = 20000
     cnn_batch_size = 5000
@@ -82,7 +82,7 @@ else:
     train_proportion = 0.9
     max_epochs = 50
 
-subset_base_row = 9000000
+subset_base_row = 0
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
@@ -1912,7 +1912,7 @@ def form_weighted_submission(submission_subset_cnn_df, submission_subset_catboos
     cnn_r2 = np.maximum(prev_analysis_data_cnn.r2_vec, 0.0)
     catboost_r2 = np.maximum(prev_analysis_data_catboost.r2_vec, 0.0)
     r2_sum = cnn_r2 + catboost_r2
-    
+
     # Might experiment here with different types of weighting...
     cnn_weights = cnn_r2 / r2_sum
     catboost_weights = catboost_r2 / r2_sum
