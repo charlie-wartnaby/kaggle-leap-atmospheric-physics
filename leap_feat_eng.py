@@ -48,9 +48,9 @@ import warnings
 # Settings
 debug = False
 do_test = True  
-is_rerun = True
-do_analysis = True
-do_train = True
+is_rerun = False
+do_analysis = False
+do_train = False
 do_feature_knockout = False
 clear_batch_cache_at_start = False
 scale_using_range_limits = False
@@ -1919,7 +1919,7 @@ def form_weighted_submission(submission_subset_cnn_df, submission_subset_catboos
 
     training_mean = scaling_data.my_raw
     predictions = np.zeros_like(cnn_submission_np, dtype=np.float64)
-    predictions = cnn_weights * catboost_submission_np + catboost_weights * catboost_submission_np
+    predictions = cnn_weights * cnn_submission_np + catboost_weights * catboost_submission_np
     no_preds = (cnn_weights <= 0.0) & (catboost_weights <= 0.0)
     predictions = np.where(no_preds, training_mean, predictions)
     return predictions
