@@ -1913,13 +1913,13 @@ def form_weighted_submission(submission_subset_cnn_df, submission_subset_catboos
     catboost_r2 = np.maximum(prev_analysis_data_catboost.r2_vec, 0.0)
 
     # Might experiment here with different types of weighting...
-    # cnn_weights = cnn_r2 ** 2
-    # catboost_weights = catboost_r2 ** 2
-    # weights_sum = cnn_weights + catboost_weights
-    # cnn_weights /= weights_sum
-    # catboost_weights /= weights_sum
-    cnn_weights = (cnn_r2 >= catboost_r2) # just choosing better
-    catboost_weights = 1.0 - cnn_weights
+    cnn_weights = cnn_r2 ** 4
+    catboost_weights = catboost_r2 ** 4
+    weights_sum = cnn_weights + catboost_weights
+    cnn_weights /= weights_sum
+    catboost_weights /= weights_sum
+    # cnn_weights = (cnn_r2 >= catboost_r2) # just choosing better
+    # catboost_weights = 1.0 - cnn_weights
 
     training_mean = scaling_data.my_raw
     predictions = np.zeros_like(cnn_submission_np, dtype=np.float64)
