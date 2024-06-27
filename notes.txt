@@ -74,6 +74,26 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 11h ago · Commit 8a50b544 current CNN over all 10M rows resumed and left for 33 epochs, validation R2=0.729
+0.71705
+
+submission.csv
+Complete · 1d ago · Commit 6b46658 with R2^4-weighted CNN and catboost contributions
+0.68357
+
+submission.csv
+Complete · 1d ago · Commit b713d09 choosing max R2 CNN and catboost contributions
+0.68306
+
+submission.csv
+Complete · 1d ago · Commit 1dbed19fb with squared R2-weighted CNN and catboost contributions
+0.67852
+
+submission.csv
+Complete · 1d ago · Commit 2d3f0e47 with linearly R2-weighted CNN and catboost contributions
+0.66874
+
+submission.csv
 Complete · 2h ago · Commit 867b3ea4a reference catboost run with 1M rows
 0.44679
 

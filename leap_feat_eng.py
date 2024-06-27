@@ -46,16 +46,17 @@ import warnings
 
 
 # Settings
-debug = False
+debug = True
 do_test = True  
 is_rerun = False
-do_analysis = False
-do_train = False
+do_analysis = True
+do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = False
 scale_using_range_limits = False
+do_save_outputs_as_features = True
 use_float64 = False
-model_type = "cnn"
+model_type = "catboost"
 emit_scaling_stats = False
 
 previous_submission_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/submission.csv"
@@ -66,7 +67,6 @@ previous_metrics_path_catboost = "results/2024_06_25_867b3ea4a_catboost_800k_ref
 if debug:
     max_train_rows = 1000
     max_test_rows  = 100
-    caboost_batch_size = 100
     cnn_batch_size = 100
     catboost_batch_size = 100
     patience = 4
@@ -86,7 +86,7 @@ subset_base_row = 0
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {}
+multitrain_params = {"iterations" : [4]}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -196,6 +196,10 @@ def main():
         exec_data = ExecData()
         bad_r2_output_names = []
 
+    if do_save_outputs_as_features:
+        save_outputs_as_features(train_hf, num_train_rows, col_data, scaling_data, submission_weights_old,
+                                                     param_permutations, device)
+
     if do_test:
         test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, param_permutations[0], device, submission_weights_current, submission_weights_old)
 
@@ -273,28 +277,29 @@ class HoloFrame:
             fileroot += "_offsets"
             ext = ".pkl"
             offsets_path = os.path.join(directory, fileroot + ext)
-            already_done = False
-            if os.path.exists(offsets_path):
-                offsets_mod_time = os.path.getmtime(offsets_path)
-                csv_mod_time = os.path.getmtime(csv_path)
-                already_done = (offsets_mod_time > csv_mod_time)
-            if not already_done:
-                print(f'Reading file to get line offsets: {csv_path}')
-                eol_byte_offsets = []
-                with open(csv_path, 'rb') as fd: # in text mode file.tell() gives strange numbers apparently
-                    for line in fd:
-                        offset_now = fd.tell()
-                        eol_byte_offsets.append(offset_now)
-                if len(eol_byte_offsets) > 0:
-                    eol_byte_offsets.pop() # Don't want off-end-of-file offset for 'next' row
-                with open(offsets_path, 'wb') as fd:
-                    pickle.dump(eol_byte_offsets, fd)
-                    print(f"... file line offsets written to {offsets_path}")
+        already_done = False
+        if os.path.exists(offsets_path):
+            offsets_mod_time = os.path.getmtime(offsets_path)
+            csv_mod_time = os.path.getmtime(csv_path)
+            already_done = (offsets_mod_time > csv_mod_time)
+        if not already_done:
+            print(f'Reading file to get line offsets: {csv_path}')
+            eol_byte_offsets = []
+            with open(csv_path, 'rb') as fd: # in text mode file.tell() gives strange numbers apparently
+                for line in fd:
+                    offset_now = fd.tell()
+                    eol_byte_offsets.append(offset_now)
+            if len(eol_byte_offsets) > 0:
+                eol_byte_offsets.pop() # Don't want off-end-of-file offset for 'next' row
+            with open(offsets_path, 'wb') as fd:
+                pickle.dump(eol_byte_offsets, fd)
+                print(f"... file line offsets written to {offsets_path}")
 
         # Now have either provided or created offsets to work with
         with open(offsets_path, 'rb') as offsets_fd:
             self.offset = pickle.load(offsets_fd)
         self.csv_fd = open(csv_path, 'rb')
+        # Assuming first line is headings:
         self.raw_headings = self.csv_fd.read(self.offset[0])
         pass        
 
@@ -1475,7 +1480,7 @@ def calc_output_r2_ranking(col_data, analysis_data):
     return bad_r2_names
 
 
-def do_cnn_training(model_params, exec_data, col_data, scaling_data, submission_weights_old,
+def train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_weights_old,
                     param_permutations, train_loader, val_loader, cnn_dataset, device):
     warnings.filterwarnings('ignore', category=FutureWarning)
 
@@ -1603,7 +1608,7 @@ def do_cnn_training(model_params, exec_data, col_data, scaling_data, submission_
     return bad_r2_output_names
 
 
-def do_catboost_training(exec_data, col_data, scaling_data, submission_weights_old, dataset, train_block_idx,
+def train_catboost_model(exec_data, col_data, scaling_data, submission_weights_old, dataset, train_block_idx,
                          val_block_idx,
                          iterations=400, depth=8, learning_rate=0.25,
                          border_count=32, l2_leaf_reg=5):
@@ -1650,9 +1655,10 @@ def do_catboost_training(exec_data, col_data, scaling_data, submission_weights_o
 
     # Saving here but actually models > 2GB do not load again
     # https://github.com/catboost/catboost/issues/842
-    # Default pickle dump/load cycle didn't work either, maybe could with
-    # different options
-    overall_model.save_model(exec_data.model_save_path)
+    # Default pickle dump/load cycle didn't work either, but
+    # did in smaller experiments later so writing it just in case
+    with open(exec_data.model_save_path, "wb") as fd:
+        pickle.dump(overall_model, fd, protocol=5)
 
     # Validation step
     analysis_data = AnalysisData()
@@ -1794,16 +1800,16 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_w
         if model_type == "cnn":
             exec_data.model_save_path += ".pt"  # PyTorch
         else:
-            exec_data.model_save_path += ".cbm" # Catboost binary model
+            exec_data.model_save_path += ".pkl" # Found .cbm didn't reload if >2GB
 
         with open(loss_log_path, 'a') as fd:
             fd.write(f'{exec_data.model_save_path}\n')
 
         if model_type == "cnn":
-            bad_r2_output_names = do_cnn_training(model_params, exec_data, col_data, scaling_data, submission_weights_old,
+            bad_r2_output_names = train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_weights_old,
                                                   param_permutations, train_loader, val_loader, cnn_dataset, device)
         else:
-            bad_r2_output_names = do_catboost_training(exec_data, col_data, scaling_data, submission_weights_old, catboost_dataset, train_block_idx,
+            bad_r2_output_names = train_catboost_model(exec_data, col_data, scaling_data, submission_weights_old, catboost_dataset, train_block_idx,
                                                        val_block_idx, **model_params)
 
         if do_feature_knockout:
@@ -1811,6 +1817,15 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_w
                 fd.write(f"{exec_data.feature_knockout_idx},{exec_data.overall_best_val_metric},{exec_data.feature_knockout_name},{exec_data.feature_knockout_description}\n")
 
     return exec_data, bad_r2_output_names
+
+
+def save_outputs_as_features(train_hf, num_train_rows, col_data, scaling_data, submission_weights_old,
+                                                     param_permutations, device):
+    """Go through whole training dataset and save predicted outputs from one
+    model, to later use as synthetic input features for another type of model,
+    effectively running the two models in series"""
+
+    pass
 
 
 def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, model_params, device,
@@ -1829,6 +1844,8 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, mode
         for name in bad_r2_output_names:
             col_data.zero_or_bad_cols_by_name[name] = False
     else:
+        # Experimented here with using weighted combination of submissions from different
+        # model types, but was no better than just using CNN
         # Figure out weightings to use for model types depending on validation quality,
         # or use neither if both bad
         prev_submission_cnn_hf = HoloFrame(previous_submission_path_cnn)
