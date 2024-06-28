@@ -47,17 +47,17 @@ import warnings
 
 # Settings
 debug = False
-do_test = True
+do_test = False
 is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = False
+clear_batch_cache_at_start = debug
 scale_using_range_limits = False
-do_save_outputs_as_features = False
-do_use_outputs_as_features = False # not do_save_outputs_as_features
+do_save_outputs_as_features = True
+do_use_outputs_as_features = not do_save_outputs_as_features
 use_float64 = False
-model_type = "cnn" # if do_use_outputs_as_features else "catboost"
+model_type = "cnn" if do_use_outputs_as_features else "catboost"
 emit_scaling_stats = False
 
 if debug:
@@ -70,15 +70,15 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 100000
+    max_train_rows = 200000
     max_test_rows  = 1000000000
-    catboost_batch_size = 10000
+    catboost_batch_size = 20000
     cnn_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 50
 
-subset_base_row = 8000000
+subset_base_row = 0
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
@@ -157,6 +157,7 @@ catboost_analysis_data_path = 'catboost_analysis_data.pkl'
 cache_batch_size = min(cnn_batch_size, catboost_batch_size)
 test_batch_size = cache_batch_size
 
+
 def main():
     entry_clean_up()
 
@@ -206,7 +207,7 @@ def main():
         test_hf = prepare_prediction(col_data, bad_r2_output_names)
 
     if do_save_outputs_as_features:
-        save_outputs_as_features(train_hf, "train", max_train_rows, 
+        save_outputs_as_features(train_hf, "train", 100000000, # predict for all rows now
                                  col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old)
         save_outputs_as_features(test_hf, "test", max_test_rows,
                                  col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old)
@@ -1907,10 +1908,7 @@ def save_outputs_as_features(src_hf, short_name, max_rows,
         vector_dict = vectorise_data(pl_df, col_data, True)
         y_matrix = glue_vector_features_into_matrix(vector_dict, col_data.unexpanded_output_col_names, True)
 
-        true_file_idx = base_row_idx
-        if short_name == "train": true_file_idx += subset_base_row
-
-        filename = f"{short_name}_{true_file_idx}.pkl"
+        filename = f"{short_name}_{base_row_idx}.pkl"
         path = os.path.join(output_features_dir, filename)
         print(f"Writing output features to {path}")
         with open(path, "wb") as fd:
