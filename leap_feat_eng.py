@@ -54,7 +54,7 @@ do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = debug
 scale_using_range_limits = False
-do_save_outputs_as_features = True
+do_save_outputs_as_features = False
 do_use_outputs_as_features = not do_save_outputs_as_features
 use_float64 = False
 model_type = "cnn" if do_use_outputs_as_features else "catboost"
@@ -70,7 +70,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 200000
+    max_train_rows = 1000000000
     max_test_rows  = 1000000000
     catboost_batch_size = 20000
     cnn_batch_size = 5000
