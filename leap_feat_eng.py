@@ -57,7 +57,7 @@ scale_using_range_limits = False
 do_save_outputs_as_features = False
 do_use_outputs_as_features = False # not do_save_outputs_as_features
 use_float64 = False
-model_type = "cnn" if do_use_outputs_as_features else "catboost"
+model_type = "cnn" # if do_use_outputs_as_features else "catboost"
 emit_scaling_stats = False
 
 if debug:
