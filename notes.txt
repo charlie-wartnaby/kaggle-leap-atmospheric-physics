@@ -9,6 +9,7 @@ level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.252923296945341
 Ideas to progress
 -----------------
 
+o Should predict for entire training in catboost though using smaller subset to train it
 o Getting local R2 values very close to 1 in error currently
 o Bug if test only currently does validation loops
 o Logarithmic scaling so that reasonable values near 1, extremes not so extreme
@@ -33,9 +34,8 @@ o Try other ML techniques apart from NN
    all could do with some help
 o Would it help to group columns differently depending on technique?
 o Train/val split does appear deterministic (random seeds set)
+o Would catboost work for more iterations with smaller batches (thought not could revisit)
 
-With min_std=1e-12: Zeroed-out due to scaling not blacklist: ['ptend_q0001_13', 'ptend_q0002_12', 'ptend_q0002_13', 'ptend_q0002_14', 'ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23', 'ptend_q0002_24', 'ptend_q0002_25', 'ptend_q0002_26', 'ptend_q0003_13', 'ptend_q0003_14']
-With min_std=1e-10: Zeroed-out due to scaling not blacklist: ['ptend_q0001_12', 'ptend_q0001_13', 'ptend_q0001_14', 'ptend_q0001_15', 'ptend_q0001_16', 'ptend_q0001_17', 'ptend_q0001_18', 'ptend_q0001_19', 'ptend_q0002_12', 'ptend_q0002_13', 'ptend_q0002_14', 'ptend_q0002_15', 'ptend_q0002_16', 'ptend_q0002_17', 'ptend_q0002_18', 'ptend_q0002_19', 'ptend_q0002_20', 'ptend_q0002_21', 'ptend_q0002_22', 'ptend_q0002_23', 'ptend_q0002_24', 'ptend_q0002_25', 'ptend_q0002_26', 'ptend_q0002_27', 'ptend_q0002_28', 'ptend_q0003_12', 'ptend_q0003_13', 'ptend_q0003_14', 'ptend_q0003_15']
 
 Scoring and why predictions zeroed for low-variance cols in example
 -------------------------------------------------------------------
