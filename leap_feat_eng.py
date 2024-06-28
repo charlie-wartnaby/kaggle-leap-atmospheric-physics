@@ -46,7 +46,7 @@ import warnings
 
 
 # Settings
-debug = False
+debug = True
 do_test = True
 is_rerun = False
 do_analysis = True
@@ -58,11 +58,6 @@ do_save_outputs_as_features = True
 use_float64 = False
 model_type = "catboost"
 emit_scaling_stats = False
-
-previous_submission_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/submission.csv"
-previous_metrics_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/cnn_analysis.data.pkl"
-previous_submission_path_catboost = "results/2024_06_25_867b3ea4a_catboost_800k_ref_run/submission.csv"
-previous_metrics_path_catboost = "results/2024_06_25_867b3ea4a_catboost_800k_ref_run/catboost_analysis_data.pkl"
 
 if debug:
     max_train_rows = 1000
@@ -86,7 +81,7 @@ subset_base_row = 8000000
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {}
+multitrain_params = {'iterations' : [3]}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -98,6 +93,12 @@ max_analysis_output_rows = 10000
 min_std = 1e-30
 np.random.seed(42)
 random.seed(42)
+
+# From attempt at using R2-weighted average of different model types' output, didn't help though:
+previous_submission_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/submission.csv"
+previous_metrics_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/cnn_analysis.data.pkl"
+previous_submission_path_catboost = "results/2024_06_25_867b3ea4a_catboost_800k_ref_run/submission.csv"
+previous_metrics_path_catboost = "results/2024_06_25_867b3ea4a_catboost_800k_ref_run/catboost_analysis_data.pkl"
 
 machine = socket.gethostname()
 is_kaggle = re.match(r"[a-f0-9]{12}", machine) # Kaggle e.g. machine "1e5e4ffe5117"
@@ -196,14 +197,28 @@ def main():
         exec_data = ExecData()
         bad_r2_output_names = []
 
+    if do_train and (do_save_outputs_as_features or do_test):
+        test_hf = prepare_prediction(col_data, bad_r2_output_names)
+
     if do_save_outputs_as_features:
-        save_outputs_as_features(train_hf, num_train_rows, col_data, scaling_data, submission_weights_old,
-                                                     param_permutations, device)
+        save_outputs_as_features(train_hf, "train", max_train_rows, 
+                                 col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old)
+        save_outputs_as_features(test_hf, "test", max_test_rows,
+                                 col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old)
 
     if do_test:
-        test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, param_permutations[0], device, submission_weights_current, submission_weights_old)
+        test_submission(test_hf, 
+                        col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old)
 
     exit_clean_up()
+
+def prepare_prediction(col_data, bad_r2_output_names):
+    print('Loading test HoloFrame...')
+    test_hf = HoloFrame(test_path, test_offsets_path)
+    print("Removing poor R2 cols from those that will be predicted:", bad_r2_output_names)
+    for name in bad_r2_output_names:
+        col_data.zero_or_bad_cols_by_name[name] = False
+    return test_hf
 
 
 def expand_multitrain_permutations():
@@ -933,24 +948,24 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
     scaling_data.ymax_sample_weighted = []
 
     for true_file_index in range(subset_base_row, subset_base_row + num_train_rows, cache_batch_size):
-                        # Process slice of large dataframe corresponding to batch
+        # Process slice of large dataframe corresponding to batch
         prenorm_cache_filename = f'{true_file_index}_prenorm.pkl'
         prenorm_cache_path = os.path.join(batch_cache_dir, prenorm_cache_filename)
         postnorm_cache_filename = f'{true_file_index}.pkl'
         postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
 
-        if not os.path.exists(postnorm_cache_path) and not os.path.exists(prenorm_cache_path):
-            print(f"Building {prenorm_cache_path}...")
-            pl_slice_df = train_hf.get_slice(true_file_index, true_file_index + cache_batch_size)
-            cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True, col_data, scaling_data, submission_weights_current, submission_weights_old)
-            if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
-            start_time = time.time()
-            with open(prenorm_cache_path, 'wb') as fd:
-                pickle.dump((cache_np_x, cache_np_y), fd)
-                fd.flush() # Attempting to avoid random Ubuntu resets
-                os.fsync(fd)
-            del cache_np_x, cache_np_y
-            gc.collect()
+        # Doing unconditionally as need scaling data across all samples, rebuild everything or nothing
+        print(f"Building {prenorm_cache_path}...")
+        pl_slice_df = train_hf.get_slice(true_file_index, true_file_index + cache_batch_size)
+        cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True, col_data, scaling_data, submission_weights_current, submission_weights_old)
+        if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
+        start_time = time.time()
+        with open(prenorm_cache_path, 'wb') as fd:
+            pickle.dump((cache_np_x, cache_np_y), fd)
+            fd.flush() # Attempting to avoid random Ubuntu resets
+            os.fsync(fd)
+        del cache_np_x, cache_np_y
+        gc.collect()
 
     # Mean of means gives us overall mean for each quantity (whole vectors for inputs,
     # individual columns for outputs with their differing submission weightings)
@@ -977,18 +992,17 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
         postnorm_cache_filename = f'{true_file_index}.pkl'
         postnorm_cache_path = os.path.join(batch_cache_dir, postnorm_cache_filename)
 
-        if not os.path.exists(postnorm_cache_path):
-            print(f"Getting variances from {prenorm_cache_path}...")
-            with open(prenorm_cache_path, 'rb') as fd:
-                (x_prenorm, y_prenorm) = pickle.load(fd)
-            x_diffs_sqd = (x_prenorm - scaling_data.mx) ** 2
-            x_sum_sqs = x_diffs_sqd.sum(axis=(0,2)) # sum over batch rows and over atm layers to leave num vector features
-            x_sumsq_sample.append(x_sum_sqs)
-            y_diffs_sqd = (y_prenorm - scaling_data.my_weighted) ** 2
-            y_sum_sqs = y_diffs_sqd.sum(axis=0)
-            y_sumsq_sample.append(y_sum_sqs)
-            del x_prenorm, y_prenorm, x_diffs_sqd, y_diffs_sqd
-            gc.collect() # Had a couple of spontaneous Ubuntu reboots here previously
+        print(f"Getting variances from {prenorm_cache_path}...")
+        with open(prenorm_cache_path, 'rb') as fd:
+            (x_prenorm, y_prenorm) = pickle.load(fd)
+        x_diffs_sqd = (x_prenorm - scaling_data.mx) ** 2
+        x_sum_sqs = x_diffs_sqd.sum(axis=(0,2)) # sum over batch rows and over atm layers to leave num vector features
+        x_sumsq_sample.append(x_sum_sqs)
+        y_diffs_sqd = (y_prenorm - scaling_data.my_weighted) ** 2
+        y_sum_sqs = y_diffs_sqd.sum(axis=0)
+        y_sumsq_sample.append(y_sum_sqs)
+        del x_prenorm, y_prenorm, x_diffs_sqd, y_diffs_sqd
+        gc.collect() # Had a couple of spontaneous Ubuntu reboots here previously
 
         # Now normalise whole dataset using statistics gathered during preprocessing
         # Using scaling found in training data; though could use test data if big enough?
@@ -1656,7 +1670,9 @@ def train_catboost_model(exec_data, col_data, scaling_data, submission_weights_o
     # Saving here but actually models > 2GB do not load again
     # https://github.com/catboost/catboost/issues/842
     # Default pickle dump/load cycle didn't work either, but
-    # did in smaller experiments later so writing it just in case
+    # did in smaller experiments later so writing it just in case.
+    # Get same error with pickle and protocol=5
+    # "Flatbuffers model verification failed"
     with open(exec_data.model_save_path, "wb") as fd:
         pickle.dump(overall_model, fd, protocol=5)
     # Giving catboost format a go too just in case
@@ -1823,19 +1839,26 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_w
     return exec_data, bad_r2_output_names
 
 
-def save_outputs_as_features(train_hf, num_train_rows, col_data, scaling_data, submission_weights_old,
-                                                     param_permutations, device):
-    """Go through whole training dataset and save predicted outputs from one
+def save_outputs_as_features(src_hf, short_name, max_rows,
+                             col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old):
+    """Go through whole training and test datasets and save predicted outputs from one
     model, to later use as synthetic input features for another type of model,
     effectively running the two models in series"""
+
+    
+    base_row_idx = 0
+    num_file_rows = min(max_rows, len(src_hf))
+    while base_row_idx < num_file_rows:
+        num_batch_rows = min(len(src_hf) - base_row_idx, test_batch_size)
+        subset_df = src_hf.get_slice(base_row_idx, base_row_idx + num_batch_rows)
+        y_predictions = form_predictions(col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old, subset_df)
+        base_row_idx += num_batch_rows
 
     pass
 
 
-def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, model_params, device,
+def test_submission(test_hf, col_data, scaling_data, exec_data, device,
                       submission_weights_current, submission_weights_old):
-    print('Loading test HoloFrame...')
-    test_hf = HoloFrame(test_path, test_offsets_path)
 
     submission_df = None
 
@@ -1844,9 +1867,6 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, mode
         if model_type == "cnn":
             exec_data.overall_best_model.load_state_dict(exec_data.overall_best_model_state)
             exec_data.overall_best_model.eval()
-        print("Removing poor R2 cols from those that will be predicted:", bad_r2_output_names)
-        for name in bad_r2_output_names:
-            col_data.zero_or_bad_cols_by_name[name] = False
     else:
         # Experimented here with using weighted combination of submissions from different
         # model types, but was no better than just using CNN
@@ -1867,31 +1887,7 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, mode
         subset_df = test_hf.get_slice(base_row_idx, base_row_idx + num_rows)
 
         if do_train:
-            xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights_current, submission_weights_old)
-            xt, _            = normalise_data(xt_prenorm, None, scaling_data, False)
-            x_trick_features = extract_raw_trick_subset(xt_prenorm, col_data)
-
-            if do_feature_knockout:
-                # Would never really do test run with single feature knocked out, but supporting anyway
-                xt = np.delete(xt, exec_data.best_feature_knockout_idx, axis=1)
-
-            if model_type == "cnn":
-                # Convert the current slice of xt to a PyTorch tensor
-                xt = xt[:, col_data.cnn_input_feature_idx, :]
-                inputs = torch.from_numpy(xt).to(device)
-
-                # No need to track gradients for inference
-                with torch.no_grad():
-                    outputs_pred = exec_data.overall_best_model(inputs)
-                    y_predictions = outputs_pred.cpu().numpy()
-            else:
-                xt = xt[:, col_data.catboost_input_feature_idx, :]
-                xt = catboost_process_input_batch(xt, col_data)
-                y_predictions = exec_data.overall_best_model.predict(xt)
-
-            y_predictions = unscale_outputs(y_predictions, scaling_data, submission_weights_old)
-            y_predictions = postprocess_predictions(xt, y_predictions, x_trick_features, scaling_data, col_data)
-        
+            y_predictions = form_predictions(col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old, subset_df)
         else:
             # Use weighted combination of previous CNN and catboost submissions
             submission_subset_cnn_df      = prev_submission_cnn_hf.get_slice(base_row_idx, base_row_idx + num_rows)
@@ -1916,6 +1912,35 @@ def test_submission(col_data, scaling_data, exec_data, bad_r2_output_names, mode
     print("submission_df:", submission_df.describe())
 
     submission_df.write_csv("submission.csv")
+
+
+def form_predictions(col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old, subset_df):
+    xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights_current, submission_weights_old)
+    xt, _            = normalise_data(xt_prenorm, None, scaling_data, False)
+    x_trick_features = extract_raw_trick_subset(xt_prenorm, col_data)
+
+    if do_feature_knockout:
+                # Would never really do test run with single feature knocked out, but supporting anyway
+        xt = np.delete(xt, exec_data.best_feature_knockout_idx, axis=1)
+
+    if model_type == "cnn":
+                # Convert the current slice of xt to a PyTorch tensor
+        xt = xt[:, col_data.cnn_input_feature_idx, :]
+        inputs = torch.from_numpy(xt).to(device)
+
+                # No need to track gradients for inference
+        with torch.no_grad():
+            outputs_pred = exec_data.overall_best_model(inputs)
+            y_predictions = outputs_pred.cpu().numpy()
+    else:
+        xt = xt[:, col_data.catboost_input_feature_idx, :]
+        xt = catboost_process_input_batch(xt, col_data)
+        y_predictions = exec_data.overall_best_model.predict(xt)
+
+    y_predictions = unscale_outputs(y_predictions, scaling_data, submission_weights_old)
+    y_predictions = postprocess_predictions(xt, y_predictions, x_trick_features, scaling_data, col_data)
+
+    return y_predictions
 
 
 def form_weighted_submission(submission_subset_cnn_df, submission_subset_catboost_df, 

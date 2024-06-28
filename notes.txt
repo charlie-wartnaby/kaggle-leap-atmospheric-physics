@@ -64,14 +64,14 @@ o Latent heat flux: +ve for condensation on surface, -ve for evaporation from su
 Performance
 -----------
 
-At a17aae4 on greta scaling and model saved at 03:10 first cache 11:55 so ~3hr15 for 20 epochs, batch size 30000
-On pcuk151 first cache 21:12, epoch 10 finishing 05:50 so ~8hr40 for 10 epochs, batch size 5000
-Though validation loss looking better so far on pcuk151, maybe batches too big?
-
 Found layer normalisation and SiLU best in experiment 26May2024 though little in it
 
 Submission Results
 ------------------
+
+submission.csv
+Complete · 19m ago · Commit ace4e2fa modest 300K rows catboost, wasn't intending to submit but local R2=0.566 looking oddly better
+0.44540
 
 submission.csv
 Complete · 11h ago · Commit 8a50b544 current CNN over all 10M rows resumed and left for 33 epochs, validation R2=0.729
