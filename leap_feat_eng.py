@@ -54,7 +54,7 @@ do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = False
 scale_using_range_limits = False
-do_save_outputs_as_features = True
+do_save_outputs_as_features = False
 do_use_outputs_as_features = not do_save_outputs_as_features
 use_float64 = False
 model_type = "cnn" if do_use_outputs_as_features else "catboost"
@@ -1906,7 +1906,24 @@ def save_outputs_as_features(src_hf, short_name, max_rows,
 
         base_row_idx += num_batch_rows
 
-    pass
+def get_output_features_for_test_slice(first_row_idx, last_row_idx):
+    
+    row_idx = first_row_idx
+    x_features = None
+    while row_idx < last_row_idx:
+        filename = f"test_{row_idx}.pkl"
+        path = os.path.join(output_features_dir, filename)
+        with open(path, "rb") as fd:
+            x_chunk = pickle.load(fd)
+        if x_features is None:
+            x_features = x_chunk
+        else:
+            x_features = np.concatenate((x_features, x_chunk), axis=0)
+        row_idx += test_batch_size
+    reqd_length = last_row_idx - first_row_idx
+    if x_features.shape[0] > reqd_length:
+        x_features = x_features[:reqd_length, :, :]
+    return x_features
 
 
 def test_submission(test_hf, col_data, scaling_data, exec_data, device,
@@ -1939,7 +1956,10 @@ def test_submission(test_hf, col_data, scaling_data, exec_data, device,
         subset_df = test_hf.get_slice(base_row_idx, base_row_idx + num_rows)
 
         if do_train:
-            y_predictions = form_predictions(col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old, subset_df)
+            x_output_features = get_output_features_for_test_slice(base_row_idx, base_row_idx + num_rows)
+            y_predictions = form_predictions(col_data, scaling_data, exec_data, device,
+                                              submission_weights_current, submission_weights_old, 
+                                              subset_df, x_output_features)
         else:
             # Use weighted combination of previous CNN and catboost submissions
             submission_subset_cnn_df      = prev_submission_cnn_hf.get_slice(base_row_idx, base_row_idx + num_rows)
@@ -1966,10 +1986,14 @@ def test_submission(test_hf, col_data, scaling_data, exec_data, device,
     submission_df.write_csv("submission.csv")
 
 
-def form_predictions(col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old, subset_df):
+def form_predictions(col_data, scaling_data, exec_data, device, submission_weights_current, 
+                     submission_weights_old, subset_df, x_outputs):
     xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights_current, submission_weights_old)
     xt, _            = normalise_data(xt_prenorm, None, scaling_data)
     x_trick_features = extract_raw_trick_subset(xt_prenorm, col_data)
+    if x_outputs is not None:
+        # Tag on other-model outputs used as input features
+        xt = np.concatenate((xt, x_outputs), axis=1)
 
     if do_feature_knockout:
                 # Would never really do test run with single feature knocked out, but supporting anyway
