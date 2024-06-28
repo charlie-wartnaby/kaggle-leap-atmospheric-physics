@@ -46,7 +46,7 @@ import warnings
 
 
 # Settings
-debug = True
+debug = False
 do_test = True
 is_rerun = False
 do_analysis = True
@@ -54,7 +54,7 @@ do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = False
 scale_using_range_limits = False
-do_save_outputs_as_features = False
+do_save_outputs_as_features = True
 do_use_outputs_as_features = not do_save_outputs_as_features
 use_float64 = False
 model_type = "cnn" if do_use_outputs_as_features else "catboost"
@@ -70,9 +70,9 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 300000
+    max_train_rows = 100000
     max_test_rows  = 1000000000
-    catboost_batch_size = 20000
+    catboost_batch_size = 10000
     cnn_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
@@ -461,12 +461,17 @@ def form_col_data():
     unexpanded_col_list.append(ColumnInfo(True, 'direct_lw_absorb',     'direct longwave absorbance',             1, 'W/m2'       ))
     unexpanded_col_list.append(ColumnInfo(True, 'diffuse_lw_absorb',    'diffuse longwave absorbance',            1, 'W/m2'       ))
 
-
     col_data = ColumnMetadata()
+    col_data.unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not col.is_input]
+
+    if do_use_outputs_as_features:
+        for output_name in col_data.unexpanded_output_col_names:
+            unexpanded_col_list.append(ColumnInfo(True,  'op_' + output_name, 'other model output', num_atm_levels))
+
     unexpanded_col_names = [col.name for col in unexpanded_col_list]
     col_data.unexpanded_cols_by_name = dict(zip(unexpanded_col_names, unexpanded_col_list))
     col_data.unexpanded_input_col_names = [col.name for col in unexpanded_col_list if col.is_input]
-    col_data.unexpanded_output_col_names = [col.name for col in unexpanded_col_list if not col.is_input]
+    col_data.unexpanded_non_output_input_col_names = [name for name in col_data.unexpanded_input_col_names if not name.startswith('op_')]
     col_data.unexpanded_output_vector_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension > 1]
     col_data.unexpanded_output_scalar_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension <= 1]
 
@@ -788,6 +793,8 @@ def vectorise_data(pl_df, col_data, processing_output_features):
         if matcher:
             # Element in vector column
             col_name = matcher.group(1) # now without indexing
+            if processing_output_features:
+                col_name = "op_" + col_name
             idx_str = matcher.group(2)
             idx = int(idx_str)
             if idx != 0:
@@ -799,6 +806,8 @@ def vectorise_data(pl_df, col_data, processing_output_features):
         else:
             # Scalar column
             row_vector = pl_df[: , col_name].to_numpy()
+            if processing_output_features:
+                col_name = "op_" + col_name
             row_vector = row_vector.reshape(len(row_vector), 1)
             col_info = col_data.unexpanded_cols_by_name.get(col_name)
             if not processing_output_features and col_info and not col_info.is_input and col_info.dimension <= 1:
@@ -836,7 +845,7 @@ def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weigh
     add_vector_features(vector_dict)
     # Glue input columns together by rows in batch, then feature, then atm level
     # (Works with torch.nn.Conv1d)
-    x = glue_vector_features_into_matrix(vector_dict, col_data.unexpanded_input_col_names)
+    x = glue_vector_features_into_matrix(vector_dict, col_data.unexpanded_non_output_input_col_names)
 
     if has_outputs:
         # Leaving y-data expanded, model has to expand outputs to match
@@ -892,8 +901,10 @@ def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weigh
 
     return x, y
 
-def glue_vector_features_into_matrix(vector_dict, col_names):
+def glue_vector_features_into_matrix(vector_dict, col_names, prepend_output_names=False):
     for i, col_name in enumerate(col_names):
+        if prepend_output_names:
+            col_name = 'op_' + col_name
         if i == 0:
             x = vector_dict[col_name]
             (rows,cols) = x.shape
@@ -1878,7 +1889,8 @@ def save_outputs_as_features(src_hf, short_name, max_rows,
     while base_row_idx < num_file_rows:
         num_batch_rows = min(len(src_hf) - base_row_idx, test_batch_size)
         subset_df = src_hf.get_slice(base_row_idx, base_row_idx + num_batch_rows)
-        y_predictions = form_predictions(col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old, subset_df)
+        y_predictions = form_predictions(col_data, scaling_data, exec_data, device, 
+                                         submission_weights_current, submission_weights_old, subset_df, None)
 
         # Ape steps used for training data
         y_predictions *= submission_weights_old
@@ -1893,7 +1905,7 @@ def save_outputs_as_features(src_hf, short_name, max_rows,
         # Letting it form vectors of scalar y features here suitable for CNN input,
         # will probably never do reverse thing of using CNN outputs as input to catboost
         vector_dict = vectorise_data(pl_df, col_data, True)
-        y_matrix = glue_vector_features_into_matrix(vector_dict, col_data.unexpanded_output_col_names)
+        y_matrix = glue_vector_features_into_matrix(vector_dict, col_data.unexpanded_output_col_names, True)
 
         true_file_idx = base_row_idx
         if short_name == "train": true_file_idx += subset_base_row
