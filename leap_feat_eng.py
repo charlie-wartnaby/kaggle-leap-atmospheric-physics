@@ -52,7 +52,7 @@ is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = False
+clear_batch_cache_at_start = True
 scale_using_range_limits = False
 do_save_outputs_as_features = True
 use_float64 = False
@@ -134,11 +134,13 @@ if debug:
     epoch_counter_path = 'epochs_debug.txt'
     loss_log_path = 'loss_log_debug.csv'
     batch_cache_dir = 'batch_cache_debug'
+    output_features_dir = 'output_features_debug'
 else:
     model_root_path = 'model'
     epoch_counter_path = 'epochs.txt'
     loss_log_path = 'loss_log.csv'
     batch_cache_dir = 'batch_cache'
+    output_features_dir = 'output_features'
 scaling_cache_filename = 'scaling_normalisation.pkl'
 scaling_cache_path = os.path.join(batch_cache_dir, scaling_cache_filename)
 
@@ -264,6 +266,11 @@ def entry_clean_up():
         os.remove(epoch_counter_path)
     if not is_rerun and os.path.exists(loss_log_path):
         os.remove(loss_log_path)
+    if do_save_outputs_as_features:
+        if os.path.isdir(output_features_dir):
+            shutil.rmtree(output_features_dir)
+        os.mkdir(output_features_dir)
+
     if clear_batch_cache_at_start and os.path.exists(batch_cache_dir):
         if save_backup_cache:
             # From times I've regretted deleting cache data...
@@ -762,7 +769,7 @@ def add_vector_features(vector_dict):
 
 re_vector_heading = re.compile('([A-Za-z0-9_]+?)_([0-9]+)')
 
-def vectorise_data(pl_df, col_data):
+def vectorise_data(pl_df, col_data, leave_y_scalars):
     vector_dict = {}
     col_idx = 0
     while col_idx < len(pl_df.columns):
@@ -787,7 +794,7 @@ def vectorise_data(pl_df, col_data):
             row_vector = pl_df[: , col_name].to_numpy().astype(np.float64)
             row_vector = row_vector.reshape(len(row_vector), 1)
             col_info = col_data.unexpanded_cols_by_name.get(col_name)
-            if col_info and not col_info.is_input and col_info.dimension <= 1:
+            if leave_y_scalars and col_info and not col_info.is_input and col_info.dimension <= 1:
                 # Leave output scalars as they are
                 row_level_matrix = row_vector
             else:
@@ -816,17 +823,11 @@ def minmax_vector_across_samples(sample_tuple_list, is_min):
 
 
 def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weights_current, submission_weights_old):
-    vector_dict = vectorise_data(pl_df, col_data)
+    vector_dict = vectorise_data(pl_df, col_data, True)
     add_vector_features(vector_dict)
     # Glue input columns together by rows in batch, then feature, then atm level
     # (Works with torch.nn.Conv1d)
-    for i, col_name in enumerate(col_data.unexpanded_input_col_names):
-        if i == 0:
-            x = vector_dict[col_name]
-            (rows,cols) = x.shape
-            x = x.reshape(rows, 1, cols)
-        else:
-            x = np.concatenate((x, vector_dict[col_name].reshape(rows, 1, cols)), axis=1)
+    x = glue_vector_features_into_matrix(vector_dict, col_data.unexpanded_input_col_names)
 
     if has_outputs:
         # Leaving y-data expanded, model has to expand outputs to match
@@ -882,15 +883,26 @@ def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weigh
 
     return x, y
 
+def glue_vector_features_into_matrix(vector_dict, col_names):
+    for i, col_name in enumerate(col_names):
+        if i == 0:
+            x = vector_dict[col_name]
+            (rows,cols) = x.shape
+            x = x.reshape(rows, 1, cols)
+        else:
+            x = np.concatenate((x, vector_dict[col_name].reshape(rows, 1, cols)), axis=1)
+    return x
 
-def normalise_data(x, y, scaling_data, has_outputs):
 
-    # Original had mx.reshape(1,-1) to go from 1D row vector to 2D array with
-    # one row but seems unnecessary
-    x = (x - scaling_data.mx) / scaling_data.sx
-    if not use_float64: x = x.astype(np.float32)
+def normalise_data(x, y, scaling_data):
 
-    if has_outputs:
+    if x is not None:
+        # Original had mx.reshape(1,-1) to go from 1D row vector to 2D array with
+        # one row but seems unnecessary
+        x = (x - scaling_data.mx) / scaling_data.sx
+        if not use_float64: x = x.astype(np.float32)
+
+    if y is not None:
         y = y / scaling_data.sy # Again experimenting with not using mean offset in y: (y - my) / sy
         if not use_float64: y = y.astype(np.float32)
     else:
@@ -1039,7 +1051,7 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
                 (x_prenorm, y_prenorm) = pickle.load(fd)
 
             x_postnorm, y_postnorm = normalise_data(x_prenorm, y_prenorm,
-                                                    scaling_data, True)
+                                                    scaling_data)
             x_raw_trick_features = extract_raw_trick_subset(x_prenorm, col_data)
             if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
             start_time = time.time()
@@ -1613,6 +1625,7 @@ def train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_
             exec_data.stop_requested = True
             break
 
+    del analysis_data.df # Otherwise big file
     with open(cnn_analysis_data_path, 'wb') as fd:
         pickle.dump(analysis_data, fd)
 
@@ -1845,13 +1858,34 @@ def save_outputs_as_features(src_hf, short_name, max_rows,
     model, to later use as synthetic input features for another type of model,
     effectively running the two models in series"""
 
-    
     base_row_idx = 0
     num_file_rows = min(max_rows, len(src_hf))
     while base_row_idx < num_file_rows:
         num_batch_rows = min(len(src_hf) - base_row_idx, test_batch_size)
         subset_df = src_hf.get_slice(base_row_idx, base_row_idx + num_batch_rows)
         y_predictions = form_predictions(col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old, subset_df)
+
+        # Ape steps used for training data
+        y_predictions *= submission_weights_old
+        y_predictions *= submission_weights_current
+
+        # Using scalings extracted from training provided outputs rather than learning new
+        # scaling for these features
+        _, y_predictions = normalise_data(None, y_predictions, scaling_data)
+
+        # Reusing previous dataframe-based machinery, won't do this often so not worth optimising
+        pl_df = pl.from_numpy(y_predictions, col_data.expanded_names_output)
+        # Letting it form vectors of scalar y features here suitable for CNN input,
+        # will probably never do reverse thing of using CNN outputs as input to catboost
+        vector_dict = vectorise_data(pl_df, col_data, False)
+        y_matrix = glue_vector_features_into_matrix(vector_dict, col_data.unexpanded_output_col_names)
+
+        filename = f"{short_name}_{base_row_idx}.pkl"
+        path = os.path.join(output_features_dir, filename)
+        print(f"Writing output features to {path}")
+        with open(path, "wb") as fd:
+            pickle.dump(y_matrix, fd)
+
         base_row_idx += num_batch_rows
 
     pass
@@ -1916,7 +1950,7 @@ def test_submission(test_hf, col_data, scaling_data, exec_data, device,
 
 def form_predictions(col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old, subset_df):
     xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights_current, submission_weights_old)
-    xt, _            = normalise_data(xt_prenorm, None, scaling_data, False)
+    xt, _            = normalise_data(xt_prenorm, None, scaling_data)
     x_trick_features = extract_raw_trick_subset(xt_prenorm, col_data)
 
     if do_feature_knockout:
