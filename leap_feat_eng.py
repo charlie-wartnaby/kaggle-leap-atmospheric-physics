@@ -52,11 +52,12 @@ is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
-clear_batch_cache_at_start = True
+clear_batch_cache_at_start = False
 scale_using_range_limits = False
 do_save_outputs_as_features = True
+do_use_outputs_as_features = not do_save_outputs_as_features
 use_float64 = False
-model_type = "catboost"
+model_type = "cnn" if do_use_outputs_as_features else "catboost"
 emit_scaling_stats = False
 
 if debug:
@@ -81,7 +82,9 @@ subset_base_row = 8000000
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {'iterations' : [3]}
+multitrain_params = {}
+if debug and model_type == "catboost":
+    multitrain_params = {'iterations' : [4]} # Otherwise too slow
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -268,7 +271,11 @@ def entry_clean_up():
         os.remove(loss_log_path)
     if do_save_outputs_as_features:
         if os.path.isdir(output_features_dir):
-            shutil.rmtree(output_features_dir)
+            backup_output_features_dir = output_features_dir + '_bak'
+            if os.path.exists(backup_output_features_dir):
+                shutil.rmtree(backup_output_features_dir)
+            print(f'Saving old output feature files to {backup_output_features_dir} just in case...')
+            os.rename(output_features_dir, backup_output_features_dir)
         os.mkdir(output_features_dir)
 
     if clear_batch_cache_at_start and os.path.exists(batch_cache_dir):
@@ -769,7 +776,7 @@ def add_vector_features(vector_dict):
 
 re_vector_heading = re.compile('([A-Za-z0-9_]+?)_([0-9]+)')
 
-def vectorise_data(pl_df, col_data, leave_y_scalars):
+def vectorise_data(pl_df, col_data, processing_output_features):
     vector_dict = {}
     col_idx = 0
     while col_idx < len(pl_df.columns):
@@ -787,19 +794,21 @@ def vectorise_data(pl_df, col_data, leave_y_scalars):
                 print(f"Error: expected zeroth element first, got {idx}")
                 sys.exit(1)
             df_level_subset = pl_df[: , col_idx : col_idx + num_atm_levels]
-            row_level_matrix = df_level_subset.to_numpy().astype(np.float64)
+            row_level_matrix = df_level_subset.to_numpy()
             col_idx += num_atm_levels
         else:
             # Scalar column
-            row_vector = pl_df[: , col_name].to_numpy().astype(np.float64)
+            row_vector = pl_df[: , col_name].to_numpy()
             row_vector = row_vector.reshape(len(row_vector), 1)
             col_info = col_data.unexpanded_cols_by_name.get(col_name)
-            if leave_y_scalars and col_info and not col_info.is_input and col_info.dimension <= 1:
+            if not processing_output_features and col_info and not col_info.is_input and col_info.dimension <= 1:
                 # Leave output scalars as they are
                 row_level_matrix = row_vector
             else:
                row_level_matrix = np.tile(row_vector, (1,num_atm_levels))
             col_idx += 1
+        if not processing_output_features:
+            row_level_matrix = row_level_matrix.astype(np.float64)
         vector_dict[col_name] = row_level_matrix
 
     return vector_dict
@@ -823,7 +832,7 @@ def minmax_vector_across_samples(sample_tuple_list, is_min):
 
 
 def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weights_current, submission_weights_old):
-    vector_dict = vectorise_data(pl_df, col_data, True)
+    vector_dict = vectorise_data(pl_df, col_data, False)
     add_vector_features(vector_dict)
     # Glue input columns together by rows in batch, then feature, then atm level
     # (Works with torch.nn.Conv1d)
@@ -1306,6 +1315,12 @@ class HoloDataset(Dataset):
             else:
                 print(f"ERROR: cached data not found at row {index}")
                 sys.exit(1)
+            if do_use_outputs_as_features:
+                filename = f"train_{true_file_idx}.pkl"
+                path = os.path.join(output_features_dir, filename)
+                with open(path, 'rb') as fd:
+                    x_outputs = pickle.load(fd)
+                all_np_x = np.concatenate((all_np_x, x_outputs), axis=1)
             # Unwanted features removed only when used here so different model types with
             # different feature subsets can share cached disk data with all features
             self.cache_np_x = all_np_x[:, self.x_col_idx_list, :]
@@ -1877,10 +1892,13 @@ def save_outputs_as_features(src_hf, short_name, max_rows,
         pl_df = pl.from_numpy(y_predictions, col_data.expanded_names_output)
         # Letting it form vectors of scalar y features here suitable for CNN input,
         # will probably never do reverse thing of using CNN outputs as input to catboost
-        vector_dict = vectorise_data(pl_df, col_data, False)
+        vector_dict = vectorise_data(pl_df, col_data, True)
         y_matrix = glue_vector_features_into_matrix(vector_dict, col_data.unexpanded_output_col_names)
 
-        filename = f"{short_name}_{base_row_idx}.pkl"
+        true_file_idx = base_row_idx
+        if short_name == "train": true_file_idx += subset_base_row
+
+        filename = f"{short_name}_{true_file_idx}.pkl"
         path = os.path.join(output_features_dir, filename)
         print(f"Writing output features to {path}")
         with open(path, "wb") as fd:
