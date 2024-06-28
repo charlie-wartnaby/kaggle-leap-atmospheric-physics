@@ -46,8 +46,8 @@ import warnings
 
 
 # Settings
-debug = True
-do_test = True  
+debug = False
+do_test = True
 is_rerun = False
 do_analysis = True
 do_train = True
@@ -74,7 +74,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000000
+    max_train_rows = 300000
     max_test_rows  = 1000000000
     catboost_batch_size = 20000
     cnn_batch_size = 5000
@@ -82,11 +82,11 @@ else:
     train_proportion = 0.9
     max_epochs = 50
 
-subset_base_row = 0
+subset_base_row = 8000000
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {"iterations" : [4]}
+multitrain_params = {}
 
 show_timings = False # debug
 batch_report_interval = 10
@@ -1659,6 +1659,10 @@ def train_catboost_model(exec_data, col_data, scaling_data, submission_weights_o
     # did in smaller experiments later so writing it just in case
     with open(exec_data.model_save_path, "wb") as fd:
         pickle.dump(overall_model, fd, protocol=5)
+    # Giving catboost format a go too just in case
+    root_name, _ = os.path.splitext(exec_data.model_save_path)
+    cbm_name = root_name + ".cbm"
+    overall_model.save_model(cbm_name)
 
     # Validation step
     analysis_data = AnalysisData()
