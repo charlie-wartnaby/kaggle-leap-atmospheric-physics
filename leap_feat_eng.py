@@ -47,7 +47,7 @@ import warnings
 
 # Settings
 debug = True
-do_test = False
+do_test = True
 is_rerun = False
 do_analysis = True
 do_train = True
@@ -79,7 +79,7 @@ else:
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size = 20000
     cnn_batch_size = 5000
-    patience = 3 # was 5 but saving GPU quota
+    patience = 5 # was 5 but saving GPU quota
     train_proportion = 0.9
     max_epochs = 50
 
