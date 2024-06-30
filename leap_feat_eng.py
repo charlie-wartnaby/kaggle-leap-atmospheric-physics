@@ -46,7 +46,7 @@ import warnings
 
 
 # Settings
-debug = True
+debug = False
 do_test = True
 is_rerun = False
 do_analysis = True
@@ -54,8 +54,8 @@ do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = debug
 scale_using_range_limits = False
-do_save_outputs_as_features = True
-do_use_outputs_as_features = False # not do_save_outputs_as_features
+do_save_outputs_as_features = False
+do_use_outputs_as_features = True # not do_save_outputs_as_features
 do_merge_outputs_early = False
 do_merge_outputs_late = True
 use_float64 = False
@@ -1275,7 +1275,7 @@ class AtmLayerCNN(nn.Module):
         x = self.dropout_layer_1(x)
         if do_use_outputs_as_features and do_merge_outputs_late:
             # Bring in catboost-predicted outputs as additional input late in the game
-            x = torch.cat((x, input_x[:, -len(self.col_data.unexpanded_output_col_names), :]), dim=1)
+            x = torch.cat((x, input_x[:, -len(self.col_data.unexpanded_output_col_names) : , :]), dim=1)
         x = self.conv_layer_2(x)
         x = self.layernorm_2(x)
         x = self.activation_layer_2(x)
