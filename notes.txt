@@ -58,6 +58,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 4m ago · Commit 917f41b3 full CNN run with catboost output features as early inputs, not looking any better, 24 epochs final validation R2=0.726
+0.71349
+
+submission.csv
 Complete · 19m ago · Commit ace4e2fa modest 300K rows catboost, wasn't intending to submit but local R2=0.566 looking oddly better
 0.44540
 

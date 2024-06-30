@@ -46,7 +46,7 @@ import warnings
 
 
 # Settings
-debug = False
+debug = True
 do_test = False
 is_rerun = False
 do_analysis = True
@@ -54,15 +54,19 @@ do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = debug
 scale_using_range_limits = False
-do_save_outputs_as_features = False
-do_use_outputs_as_features = not do_save_outputs_as_features
+do_save_outputs_as_features = True
+do_use_outputs_as_features = False # not do_save_outputs_as_features
+do_merge_outputs_early = False
+do_merge_outputs_late = True
 use_float64 = False
-model_type = "cnn" if do_use_outputs_as_features else "catboost"
+model_type = "cnn" if not do_save_outputs_as_features else "catboost"
 emit_scaling_stats = False
+excess_number_of_rows = 1000000000 # i.e. do all
 
 if debug:
     max_train_rows = 1000
     max_test_rows  = 100
+    max_output_feature_train_rows = max_train_rows
     cnn_batch_size = 100
     catboost_batch_size = 100
     patience = 4
@@ -70,8 +74,9 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000000
-    max_test_rows  = 1000000000
+    max_train_rows = excess_number_of_rows
+    max_test_rows  = excess_number_of_rows
+    max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size = 20000
     cnn_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
@@ -207,7 +212,7 @@ def main():
         test_hf = prepare_prediction(col_data, bad_r2_output_names)
 
     if do_save_outputs_as_features:
-        save_outputs_as_features(train_hf, "train", 100000000, # predict for all rows now
+        save_outputs_as_features(train_hf, "train", max_output_feature_train_rows,
                                  col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old)
         save_outputs_as_features(test_hf, "test", max_test_rows,
                                  col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old)
@@ -1147,6 +1152,10 @@ class AtmLayerCNN(nn.Module):
         self.poly_degree = poly_degree
 
         num_input_feature_chans = len(col_data.cnn_input_feature_idx)
+        if do_use_outputs_as_features and not do_merge_outputs_early:
+            # Will ingest output features only near top of network
+            num_input_feature_chans -= len(col_data.unexpanded_output_col_names)
+        
         if do_feature_knockout:
             num_input_feature_chans -= 1
 
@@ -1185,6 +1194,10 @@ class AtmLayerCNN(nn.Module):
         self.dropout_layer_1 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
+        if do_use_outputs_as_features and do_merge_outputs_late:
+            # Bring in catboost-predicted outputs as additional input late in the game
+            input_size += len(col_data.unexpanded_output_col_names)
+
         self.last_conv_depth = gen_conv_depth
         output_size = col_data.num_all_outputs_as_vectors * self.last_conv_depth
         self.conv_layer_2 = nn.Conv1d(input_size, output_size, gen_conv_width,
@@ -1241,7 +1254,12 @@ class AtmLayerCNN(nn.Module):
                     sys.exit(1)
 
 
-    def forward(self, x):
+    def forward(self, input_x):
+        if do_use_outputs_as_features and not do_merge_outputs_early:
+            # Slice off catboost output features for now
+            x = input_x[:, : -len(self.col_data.unexpanded_output_col_names), :]
+        else:
+            x = input_x
         if self.init_1x1:
             x = self.conv_layer_1x1(x)
             x = self.layernorm_1x1(x)
@@ -1255,6 +1273,9 @@ class AtmLayerCNN(nn.Module):
         x = self.layernorm_1(x)
         x = self.activation_layer_1(x)
         x = self.dropout_layer_1(x)
+        if do_use_outputs_as_features and do_merge_outputs_late:
+            # Bring in catboost-predicted outputs as additional input late in the game
+            x = torch.cat((x, input_x[:, -len(self.col_data.unexpanded_output_col_names), :]), dim=1)
         x = self.conv_layer_2(x)
         x = self.layernorm_2(x)
         x = self.activation_layer_2(x)
