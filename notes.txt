@@ -1,16 +1,9 @@
-Feature engineering
--------------------
-Would like to derive variables e.g. density, momentum from known data
-See load-grid-info.py to get pressures at altitude levels
-
-# Altitude levels in hPa from ClimSim-main\grid_info\ClimSim_low-res_grid-info.nc
-level_pressure_hpa = [0.07834781133863082, 0.1411083184744011, 0.2529232969453412, 0.4492506351686618, 0.7863461614709879, 1.3473557602677517, 2.244777286900205, 3.6164314830257718, 5.615836425337344, 8.403253219853443, 12.144489352066294, 17.016828024303006, 23.21079811610005, 30.914346261995327, 40.277580662953575, 51.37463234765765, 64.18922841394662, 78.63965761131159, 94.63009200213703, 112.09127353988006, 130.97780378937776, 151.22131809551237, 172.67390465199267, 195.08770981962772, 218.15593476138105, 241.60037901222947, 265.2585152868483, 289.12232222921756, 313.31208711045167, 338.0069992368819, 363.37349177951705, 389.5233382784413, 416.5079218282233, 444.3314120123719, 472.9572063769364, 502.2919169181905, 532.1522731583445, 562.2393924639011, 592.1492760575118, 621.4328411158061, 649.689897132655, 676.6564846051039, 702.2421877859194, 726.4985894989197, 749.5376452869328, 771.4452171682528, 792.2342599534793, 811.8566751313328, 830.2596431972574, 847.4506530638328, 863.5359020075301, 878.7158746040692, 893.2460179738746, 907.3852125876941, 921.3543974831824, 935.3167171670306, 949.3780562075774, 963.5995994020714, 978.013432382012, 992.6355435925217]
-
 Ideas to progress
 -----------------
 
+o Try feeding catboost output features into top of CNN as alternative/addition
 o Bug if test only currently does validation loops
-o Logarithmic scaling so that reasonable values near 1, extremes not so extreme
+o Logarithmic scaling so that reasonable values near 1, extremes not so extreme?
 o Went badly deleting hopefully redundant features at b32db7d49, so what is so crucial?
 o Analyse which columns contributing most to error metric:
    - ptend_q0001 moistening tendency low indices >=12, then higher ~45
@@ -26,14 +19,11 @@ o Tried float64 on 1M samples, very slow and convergence oddly seemed worse
 o Understand physics of each target col better
 o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
 o Deeper/alternative network structures
-o Try other ML techniques apart from NN
- - Use R2 scores from catboost and CNN to decide weighting for each output?
- - q0001 (moistening) and q0002 (cloud liquid ratio) worst from CNN at present but 
-   all could do with some help
 o Would it help to group columns differently depending on technique?
 o Train/val split does appear deterministic (random seeds set)
 o Would catboost work for more iterations with smaller batches (thought not could revisit)
-
+o When training subset (e.g. for catboost output features) should draw random samples
+  from whole training dataset, not one clump
 
 Scoring and why predictions zeroed for low-variance cols in example
 -------------------------------------------------------------------
@@ -62,7 +52,7 @@ o Latent heat flux: +ve for condensation on surface, -ve for evaporation from su
 Performance
 -----------
 
-Found layer normalisation and SiLU best in experiment 26May2024 though little in it
+Found layer (not batch) normalisation and SiLU best in experiment 26May2024 though little in it
 
 Submission Results
 ------------------
