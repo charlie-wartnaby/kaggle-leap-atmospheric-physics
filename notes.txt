@@ -58,6 +58,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 2h ago · Commit 74824dca additional push with last dregs of training data, total 29 epochs
+0.72527
+
+submission.csv
 Complete · 6m ago · Commit 5ff4fbec3 CNN with late injection of catboost outputs, full 10M rows, first 20 epochs, best local R2=0.725
 0.71048
 
