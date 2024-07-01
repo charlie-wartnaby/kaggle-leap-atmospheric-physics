@@ -48,7 +48,7 @@ import warnings
 # Settings
 debug = False
 do_test = True
-is_rerun = False
+is_rerun = True
 do_analysis = True
 do_train = True
 do_feature_knockout = False
@@ -80,7 +80,7 @@ else:
     catboost_batch_size = 20000
     cnn_batch_size = 5000
     patience = 5 # was 5 but saving GPU quota
-    train_proportion = 0.9
+    train_proportion = 0.99
     max_epochs = 50
 
 subset_base_row = 0
@@ -99,8 +99,9 @@ try_reload_model = is_rerun
 clear_batch_cache_at_end = False # can save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
 min_std = 1e-30
-np.random.seed(42)
-random.seed(42)
+random_seed = 57 # was 42
+np.random.seed(random_seed)
+random.seed(random_seed)
 
 # From attempt at using R2-weighted average of different model types' output, didn't help though:
 previous_submission_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/submission.csv"

@@ -58,6 +58,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 6m ago · Commit 5ff4fbec3 CNN with late injection of catboost outputs, full 10M rows, first 20 epochs, best local R2=0.725
+0.71048
+
+submission.csv
 Complete · 4m ago · Commit 917f41b3 full CNN run with catboost output features as early inputs, not looking any better, 24 epochs final validation R2=0.726
 0.71349
 
