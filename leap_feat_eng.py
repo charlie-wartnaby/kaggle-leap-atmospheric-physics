@@ -87,7 +87,7 @@ subset_base_row = 0
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {'poly_degree' : [4, 3, 2, 0]}
+multitrain_params = {'poly_degree' : [4, 3, 2, 1, 0]}
 if debug and model_type == "catboost":
     multitrain_params = {'iterations' : [4]} # Otherwise too slow
 
@@ -1229,7 +1229,7 @@ class AtmLayerCNN(nn.Module):
 
     def create_coeff_param_list(self, vector_shape):
         coeffs = []
-        for i in range(2, self.poly_degree + 1):
+        for i in range(0, self.poly_degree + 1):
             coeffs_this_degree = nn.Parameter(torch.randn(vector_shape, dtype=torch.float32))
             coeffs.append(coeffs_this_degree)
         return nn.ParameterList(coeffs) # to register properly as parameters
@@ -1289,30 +1289,41 @@ class AtmLayerCNN(nn.Module):
         scalar_harvest = self.linear_scalar_harvest(scalars_flattened)
         vector_harvest = self.conv_vector_harvest(vector_subset)
         # Polynomial output an attempt to deal with wide-ranging outlier values
-        if (self.poly_degree < 2):
+        if (self.poly_degree < 1):
             scalars_polynomial = scalar_harvest
             vectors_polynomial = vector_harvest
+        elif (self.poly_degree == 1):
+            scalars_polynomial = (self.scalar_poly_coeffs[0] +
+                                  self.scalar_poly_coeffs[1] * scalar_harvest)
+            vectors_polynomial = (self.vector_poly_coeffs[0] +
+                                  self.vector_poly_coeffs[1] * vector_harvest)
         elif (self.poly_degree == 2):
-            scalars_polynomial = (scalar_harvest + 
-                                  (self.scalar_poly_coeffs[0] * 0.1) * scalar_harvest ** 2)
-            vectors_polynomial = (vector_harvest + 
-                                  (self.vector_poly_coeffs[0] * 0.1) * vector_harvest ** 2)
+            scalars_polynomial = (self.scalar_poly_coeffs[0] +
+                                  self.scalar_poly_coeffs[1] * scalar_harvest +
+                                  (self.scalar_poly_coeffs[2] * 0.1) * scalar_harvest ** 2)
+            vectors_polynomial = (self.vector_poly_coeffs[0] +
+                                  self.vector_poly_coeffs[1] * vector_harvest + 
+                                  (self.vector_poly_coeffs[2] * 0.1) * vector_harvest ** 2)
         elif (self.poly_degree == 3):
-            scalars_polynomial = (scalar_harvest + 
-                                  (self.scalar_poly_coeffs[0] * 0.1 ) * scalar_harvest ** 2 +
-                                  (self.scalar_poly_coeffs[1] * 0.05) * scalar_harvest ** 3)
-            vectors_polynomial = (vector_harvest + 
-                                  (self.vector_poly_coeffs[0] * 0.1 ) * vector_harvest ** 2 +
-                                  (self.vector_poly_coeffs[1] * 0.05) * vector_harvest ** 3)
+            scalars_polynomial = (self.scalar_poly_coeffs[0] +
+                                  self.scalar_poly_coeffs[1] * scalar_harvest +
+                                  (self.scalar_poly_coeffs[2] * 0.1 ) * scalar_harvest ** 2 +
+                                  (self.scalar_poly_coeffs[3] * 0.05) * scalar_harvest ** 3)
+            vectors_polynomial = (self.vector_poly_coeffs[0] +
+                                  self.vector_poly_coeffs[1] * vector_harvest + 
+                                  (self.vector_poly_coeffs[2] * 0.1 ) * vector_harvest ** 2 +
+                                  (self.vector_poly_coeffs[3] * 0.05) * vector_harvest ** 3)
         elif (self.poly_degree == 4):
-            scalars_polynomial = (scalar_harvest + 
-                                  (self.scalar_poly_coeffs[0] * 0.1 ) * scalar_harvest ** 2 +
-                                  (self.scalar_poly_coeffs[1] * 0.05) * scalar_harvest ** 3 +
-                                  (self.scalar_poly_coeffs[2] * 0.01) * scalar_harvest ** 4)
-            vectors_polynomial = (vector_harvest + 
-                                  (self.vector_poly_coeffs[0] * 0.1 ) * vector_harvest ** 2 +
-                                  (self.vector_poly_coeffs[1] * 0.05) * vector_harvest ** 3 +
-                                  (self.vector_poly_coeffs[2] * 0.01) * vector_harvest ** 4)
+            scalars_polynomial = (self.scalar_poly_coeffs[0] +
+                                  self.scalar_poly_coeffs[1] * scalar_harvest +
+                                  (self.scalar_poly_coeffs[2] * 0.1 ) * scalar_harvest ** 2 +
+                                  (self.scalar_poly_coeffs[3] * 0.05) * scalar_harvest ** 3 +
+                                  (self.scalar_poly_coeffs[4] * 0.01) * scalar_harvest ** 4)
+            vectors_polynomial = (self.vector_poly_coeffs[0] +
+                                  self.vector_poly_coeffs[1] * vector_harvest + 
+                                  (self.vector_poly_coeffs[2] * 0.1 ) * vector_harvest ** 2 +
+                                  (self.vector_poly_coeffs[3] * 0.05) * vector_harvest ** 3 +
+                                  (self.vector_poly_coeffs[4] * 0.01) * vector_harvest ** 4)
         else:
             sys.exit(1)
         vectors_flattened = self.vector_flatten(vectors_polynomial)
