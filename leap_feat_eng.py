@@ -48,18 +48,18 @@ import warnings
 # Settings
 debug = False
 do_test = True
-is_rerun = True
+is_rerun = False
 do_analysis = True
 do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = debug
 scale_using_range_limits = False
 do_save_outputs_as_features = False
-do_use_outputs_as_features = True # not do_save_outputs_as_features
+do_use_outputs_as_features = False # not do_save_outputs_as_features
 do_merge_outputs_early = False
 do_merge_outputs_late = True
 use_float64 = False
-model_type = "cnn" if not do_save_outputs_as_features else "catboost"
+model_type = "cnn" # if not do_save_outputs_as_features else "catboost"
 emit_scaling_stats = False
 excess_number_of_rows = 1000000000 # i.e. do all
 
@@ -74,20 +74,20 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = excess_number_of_rows
+    max_train_rows = 1000000 # excess_number_of_rows
     max_test_rows  = excess_number_of_rows
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size = 20000
     cnn_batch_size = 5000
-    patience = 5 # was 5 but saving GPU quota
-    train_proportion = 0.99
+    patience = 2 # was 5 but saving GPU quota
+    train_proportion = 0.8
     max_epochs = 50
 
 subset_base_row = 0
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {}
+multitrain_params = {'poly_degree' : [4, 3, 2, 0]}
 if debug and model_type == "catboost":
     multitrain_params = {'iterations' : [4]} # Otherwise too slow
 
@@ -1294,16 +1294,25 @@ class AtmLayerCNN(nn.Module):
             vectors_polynomial = vector_harvest
         elif (self.poly_degree == 2):
             scalars_polynomial = (scalar_harvest + 
-                                  (self.scalar_poly_coeffs[0] * 0.05) * scalar_harvest ** 2)
+                                  (self.scalar_poly_coeffs[0] * 0.1) * scalar_harvest ** 2)
             vectors_polynomial = (vector_harvest + 
-                                  (self.vector_poly_coeffs[0] * 0.05) * vector_harvest ** 2)
+                                  (self.vector_poly_coeffs[0] * 0.1) * vector_harvest ** 2)
         elif (self.poly_degree == 3):
             scalars_polynomial = (scalar_harvest + 
-                                  (self.scalar_poly_coeffs[0] * 0.05 ) * scalar_harvest ** 2 +
-                                  (self.scalar_poly_coeffs[1] * 0.005) * scalar_harvest ** 3)
+                                  (self.scalar_poly_coeffs[0] * 0.1 ) * scalar_harvest ** 2 +
+                                  (self.scalar_poly_coeffs[1] * 0.05) * scalar_harvest ** 3)
             vectors_polynomial = (vector_harvest + 
-                                  (self.vector_poly_coeffs[0] * 0.05 ) * vector_harvest ** 2 +
-                                  (self.vector_poly_coeffs[1] * 0.005) * vector_harvest ** 3)
+                                  (self.vector_poly_coeffs[0] * 0.1 ) * vector_harvest ** 2 +
+                                  (self.vector_poly_coeffs[1] * 0.05) * vector_harvest ** 3)
+        elif (self.poly_degree == 4):
+            scalars_polynomial = (scalar_harvest + 
+                                  (self.scalar_poly_coeffs[0] * 0.1 ) * scalar_harvest ** 2 +
+                                  (self.scalar_poly_coeffs[1] * 0.05) * scalar_harvest ** 3 +
+                                  (self.scalar_poly_coeffs[2] * 0.01) * scalar_harvest ** 4)
+            vectors_polynomial = (vector_harvest + 
+                                  (self.vector_poly_coeffs[0] * 0.1 ) * vector_harvest ** 2 +
+                                  (self.vector_poly_coeffs[1] * 0.05) * vector_harvest ** 3 +
+                                  (self.vector_poly_coeffs[2] * 0.01) * vector_harvest ** 4)
         else:
             sys.exit(1)
         vectors_flattened = self.vector_flatten(vectors_polynomial)
