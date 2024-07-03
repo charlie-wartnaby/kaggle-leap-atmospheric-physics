@@ -54,12 +54,12 @@ do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = debug
 scale_using_range_limits = False
-do_save_outputs_as_features = False
+do_save_outputs_as_features = True
 do_use_outputs_as_features = False # not do_save_outputs_as_features
 do_merge_outputs_early = False
 do_merge_outputs_late = True
 use_float64 = False
-model_type = "cnn" # if not do_save_outputs_as_features else "catboost"
+model_type = "cnn" if not do_save_outputs_as_features else "catboost"
 emit_scaling_stats = False
 excess_number_of_rows = 1000000000 # i.e. do all
 
@@ -74,20 +74,20 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000 # excess_number_of_rows
+    max_train_rows = 2000000 # excess_number_of_rows
     max_test_rows  = excess_number_of_rows
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size = 20000
     cnn_batch_size = 5000
     patience = 2 # was 5 but saving GPU quota
-    train_proportion = 0.8
+    train_proportion = 0.9
     max_epochs = 50
 
-subset_base_row = 0
+subset_base_row = 8000000
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {'poly_degree' : [4, 3, 2, 1, 0]}
+multitrain_params = {'iterations' : [499]}
 if debug and model_type == "catboost":
     multitrain_params = {'iterations' : [4]} # Otherwise too slow
 
@@ -99,11 +99,13 @@ try_reload_model = is_rerun
 clear_batch_cache_at_end = False # can save Kaggle quota by deleting there?
 max_analysis_output_rows = 10000
 min_std = 1e-30
-random_seed = 57 # was 42
+random_seed = 42 # 42 original value for consistent comparisons
 np.random.seed(random_seed)
 random.seed(random_seed)
 
-# From attempt at using R2-weighted average of different model types' output, didn't help though:
+# From attempt at using R2-weighted average of different model types' output, didn't help though,
+# see 26 Jun 2024 submissions; tried linear weighting by R2, or **2, **3, **4, but pure CNN submission
+# was always better than any of them:
 previous_submission_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/submission.csv"
 previous_metrics_path_cnn = "results/2024_06_25_fa7e995a8_full_cnn_good_first_7_epochs/cnn_analysis.data.pkl"
 previous_submission_path_catboost = "results/2024_06_25_867b3ea4a_catboost_800k_ref_run/submission.csv"
@@ -1222,14 +1224,12 @@ class AtmLayerCNN(nn.Module):
         # range of some outputs, initialising close to straight-through linear
         # though
         # https://pytorch.org/tutorials/beginner/examples_nn/polynomial_module.html
-        # Cubic probably a bit ambitious?
-        # No 'a' offset because last layer will have own learnt bias
         self.vector_poly_coeffs = self.create_coeff_param_list((col_data.num_pure_vector_outputs,1))
         self.scalar_poly_coeffs = self.create_coeff_param_list((col_data.num_scalar_outputs))
 
     def create_coeff_param_list(self, vector_shape):
         coeffs = []
-        for i in range(0, self.poly_degree + 1):
+        for i in range(2, self.poly_degree + 1):
             coeffs_this_degree = nn.Parameter(torch.randn(vector_shape, dtype=torch.float32))
             coeffs.append(coeffs_this_degree)
         return nn.ParameterList(coeffs) # to register properly as parameters
@@ -1288,44 +1288,43 @@ class AtmLayerCNN(nn.Module):
         scalars_flattened = self.scalar_flatten(scalars_pooled)
         scalar_harvest = self.linear_scalar_harvest(scalars_flattened)
         vector_harvest = self.conv_vector_harvest(vector_subset)
+
         # Polynomial output an attempt to deal with wide-ranging outlier values
-        if (self.poly_degree < 1):
+        # Code still here but experiments found it only made things worse, see e.g.
+        #   results/2024_07_02_1ca4a85_poly_output_more_degrees_worse
+        #   results/2024_07_02_6fa93abe_poly_output_with_0_1_coeffs_still_worse
+        # No 0th order offset because last layer will have own learnt bias
+        # No 1st order scaling because last layer has own learnt weights
+        # (In case that reasoning wrong did try 0th and 1st terms, didn't help)
+        # Using fixed scaling factors on coefficients in an attempt to keep their
+        # contributions "reasonable" if they have similar magnitudes and learning deltas
+        if (self.poly_degree < 2):
             scalars_polynomial = scalar_harvest
             vectors_polynomial = vector_harvest
-        elif (self.poly_degree == 1):
-            scalars_polynomial = (self.scalar_poly_coeffs[0] +
-                                  self.scalar_poly_coeffs[1] * scalar_harvest)
-            vectors_polynomial = (self.vector_poly_coeffs[0] +
-                                  self.vector_poly_coeffs[1] * vector_harvest)
         elif (self.poly_degree == 2):
-            scalars_polynomial = (self.scalar_poly_coeffs[0] +
-                                  self.scalar_poly_coeffs[1] * scalar_harvest +
-                                  (self.scalar_poly_coeffs[2] * 0.1) * scalar_harvest ** 2)
-            vectors_polynomial = (self.vector_poly_coeffs[0] +
-                                  self.vector_poly_coeffs[1] * vector_harvest + 
-                                  (self.vector_poly_coeffs[2] * 0.1) * vector_harvest ** 2)
+            scalars_polynomial = (scalar_harvest + 
+                                  (self.scalar_poly_coeffs[0] * 0.1) * scalar_harvest ** 2)
+            vectors_polynomial = (vector_harvest + 
+                                  (self.vector_poly_coeffs[0] * 0.1) * vector_harvest ** 2)
         elif (self.poly_degree == 3):
-            scalars_polynomial = (self.scalar_poly_coeffs[0] +
-                                  self.scalar_poly_coeffs[1] * scalar_harvest +
-                                  (self.scalar_poly_coeffs[2] * 0.1 ) * scalar_harvest ** 2 +
-                                  (self.scalar_poly_coeffs[3] * 0.05) * scalar_harvest ** 3)
-            vectors_polynomial = (self.vector_poly_coeffs[0] +
-                                  self.vector_poly_coeffs[1] * vector_harvest + 
-                                  (self.vector_poly_coeffs[2] * 0.1 ) * vector_harvest ** 2 +
-                                  (self.vector_poly_coeffs[3] * 0.05) * vector_harvest ** 3)
+            scalars_polynomial = (scalar_harvest + 
+                                  (self.scalar_poly_coeffs[0] * 0.1 ) * scalar_harvest ** 2 +
+                                  (self.scalar_poly_coeffs[1] * 0.05) * scalar_harvest ** 3)
+            vectors_polynomial = (vector_harvest + 
+                                  (self.vector_poly_coeffs[0] * 0.1 ) * vector_harvest ** 2 +
+                                  (self.vector_poly_coeffs[1] * 0.05) * vector_harvest ** 3)
         elif (self.poly_degree == 4):
-            scalars_polynomial = (self.scalar_poly_coeffs[0] +
-                                  self.scalar_poly_coeffs[1] * scalar_harvest +
-                                  (self.scalar_poly_coeffs[2] * 0.1 ) * scalar_harvest ** 2 +
-                                  (self.scalar_poly_coeffs[3] * 0.05) * scalar_harvest ** 3 +
-                                  (self.scalar_poly_coeffs[4] * 0.01) * scalar_harvest ** 4)
-            vectors_polynomial = (self.vector_poly_coeffs[0] +
-                                  self.vector_poly_coeffs[1] * vector_harvest + 
-                                  (self.vector_poly_coeffs[2] * 0.1 ) * vector_harvest ** 2 +
-                                  (self.vector_poly_coeffs[3] * 0.05) * vector_harvest ** 3 +
-                                  (self.vector_poly_coeffs[4] * 0.01) * vector_harvest ** 4)
+            scalars_polynomial = (scalar_harvest + 
+                                  (self.scalar_poly_coeffs[0] * 0.1 ) * scalar_harvest ** 2 +
+                                  (self.scalar_poly_coeffs[1] * 0.05) * scalar_harvest ** 3 +
+                                  (self.scalar_poly_coeffs[2] * 0.01) * scalar_harvest ** 4)
+            vectors_polynomial = (vector_harvest + 
+                                  (self.vector_poly_coeffs[0] * 0.1 ) * vector_harvest ** 2 +
+                                  (self.vector_poly_coeffs[1] * 0.05) * vector_harvest ** 3 +
+                                  (self.vector_poly_coeffs[2] * 0.01) * vector_harvest ** 4)
         else:
             sys.exit(1)
+
         vectors_flattened = self.vector_flatten(vectors_polynomial)
         expanded_outputs = torch.cat((vectors_flattened, scalars_polynomial), dim=1)
         return expanded_outputs
@@ -1415,8 +1414,8 @@ class HoloDataset(Dataset):
         num_reqd_rows = end_idx - block_base_idx
         captured_rows = complete_x.shape[0] 
         if captured_rows > num_reqd_rows:
-            complete_x = complete_x[:num_reqd_rows,:,:]
-            complete_y = complete_y[:num_reqd_rows,:,:]
+            complete_x = complete_x[: num_reqd_rows, : , :]
+            complete_y = complete_y[: num_reqd_rows, :]
             complete_tricks = complete_tricks[:num_reqd_rows,:,:]
             
         return complete_x, complete_y, complete_tricks
