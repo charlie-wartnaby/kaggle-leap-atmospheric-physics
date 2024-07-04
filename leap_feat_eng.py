@@ -74,7 +74,7 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 2000000 # excess_number_of_rows
+    max_train_rows = 1000000 # excess_number_of_rows
     max_test_rows  = excess_number_of_rows
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size = 20000
