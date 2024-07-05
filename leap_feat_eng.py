@@ -46,7 +46,7 @@ import warnings
 
 
 # Settings
-debug = False
+debug = True
 do_test = True
 is_rerun = False
 do_analysis = True
@@ -54,8 +54,8 @@ do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = debug
 scale_using_range_limits = False
-do_save_outputs_as_features = False
-do_use_outputs_as_features = not do_save_outputs_as_features
+do_save_outputs_as_features = True
+do_use_outputs_as_features = False # not do_save_outputs_as_features
 do_merge_outputs_early = False
 do_merge_outputs_late = False
 use_float64 = False
@@ -66,7 +66,7 @@ excess_number_of_rows = 1000000000 # i.e. do all
 if debug:
     max_train_rows = 1000
     max_test_rows  = 100
-    max_output_feature_train_rows = max_train_rows
+    max_output_feature_train_rows = excess_number_of_rows
     cnn_batch_size = 100
     catboost_batch_size = 100
     patience = 4
@@ -83,14 +83,13 @@ else:
     train_proportion = 0.9
     max_epochs = 30
 
-subset_base_row = 9000000
+subset_base_row = 2000
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {'num_midlayers' : [4,3,2,1,0],
-                     'gen_conv_depth' : [11]} # temp saving GPU RAM
+multitrain_params = {} # temp saving GPU RAM
 if debug and model_type == "catboost":
-    multitrain_params = {'iterations' : [4]} # Otherwise too slow
+    multitrain_params = {'iterations' : [2]} # Otherwise too slow
 
 show_timings = False # debug
 batch_report_interval = 10
