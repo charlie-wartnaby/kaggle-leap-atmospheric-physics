@@ -57,7 +57,7 @@ scale_using_range_limits = False
 do_save_outputs_as_features = False
 do_use_outputs_as_features = not do_save_outputs_as_features
 do_merge_outputs_early = False
-do_merge_outputs_late = True
+do_merge_outputs_late = False
 use_float64 = False
 model_type = "cnn" if not do_save_outputs_as_features else "catboost"
 emit_scaling_stats = False
@@ -79,15 +79,16 @@ else:
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size = 20000
     cnn_batch_size = 5000
-    patience = 2 # was 5 but saving GPU quota
+    patience = 3 # was 5 but saving GPU quota
     train_proportion = 0.9
-    max_epochs = 50
+    max_epochs = 30
 
-subset_base_row = 8000000
+subset_base_row = 9000000
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {'iterations' : [499]}
+multitrain_params = {'num_midlayers' : [4,3,2,1,0],
+                     'gen_conv_depth' : [11]} # temp saving GPU RAM
 if debug and model_type == "catboost":
     multitrain_params = {'iterations' : [4]} # Otherwise too slow
 
@@ -1139,8 +1140,9 @@ def write_scaling_stats_to_file(scaling_data, col_data):
 
 
 class AtmLayerCNN(nn.Module):
-    def __init__(self, col_data, gen_conv_width=7, gen_conv_depth=15, init_1x1=True, 
-                 norm_type="layer", activation_type="silu", poly_degree=0):
+    def __init__(self, col_data, gen_conv_width=7, gen_conv_depth=15, init_1x1=True,
+                 norm_type="layer", activation_type="silu", poly_degree=0,
+                 num_midlayers=2):
         super().__init__()
         
         if use_float64:
@@ -1153,6 +1155,12 @@ class AtmLayerCNN(nn.Module):
         self.norm_type = norm_type
         self.activation_type = activation_type
         self.poly_degree = poly_degree
+        self.num_midlayers = num_midlayers
+
+        self.midlayer_conv = nn.ModuleList()
+        self.midlayer_norm = nn.ModuleList()
+        self.midlayer_activation = nn.ModuleList()
+        self.midlayer_dropout = nn.ModuleList()
 
         num_input_feature_chans = len(col_data.cnn_input_feature_idx)
         if do_use_outputs_as_features and not do_merge_outputs_early:
@@ -1180,21 +1188,14 @@ class AtmLayerCNN(nn.Module):
             # No initial unit width layer
             output_size = input_size
 
-        input_size = output_size
-        output_size = num_input_feature_chans * gen_conv_depth
-        self.conv_layer_0 = nn.Conv1d(input_size, output_size, gen_conv_width,
-                                padding='same', dtype=dtype)
-        self.layernorm_0 = self.norm_layer(output_size, num_atm_levels, dtype=dtype)
-        self.activation_layer_0 = self.activation_layer(dtype=dtype)
-        self.dropout_layer_0 = nn.Dropout(p=dropout_p)
-
-        input_size = output_size
-        output_size = num_input_feature_chans * gen_conv_depth
-        self.conv_layer_1 = nn.Conv1d(input_size, output_size, gen_conv_width,
-                                padding='same', dtype=dtype)
-        self.layernorm_1 = self.norm_layer(output_size, num_atm_levels, dtype=dtype)
-        self.activation_layer_1 = self.activation_layer(dtype=dtype)
-        self.dropout_layer_1 = nn.Dropout(p=dropout_p)
+        for i in range(self.num_midlayers):
+            input_size = output_size
+            output_size = num_input_feature_chans * gen_conv_depth
+            self.midlayer_conv.append(nn.Conv1d(input_size, output_size, gen_conv_width,
+                                      padding='same', dtype=dtype))
+            self.midlayer_norm.append(self.norm_layer(output_size, num_atm_levels, dtype=dtype))
+            self.midlayer_activation.append(self.activation_layer(dtype=dtype))
+            self.midlayer_dropout.append(nn.Dropout(p=dropout_p))
 
         input_size = output_size
         if do_use_outputs_as_features and do_merge_outputs_late:
@@ -1266,14 +1267,13 @@ class AtmLayerCNN(nn.Module):
             x = self.layernorm_1x1(x)
             x = self.activation_layer_1x1(x)
             x = self.dropout_layer_1x1(x)
-        x = self.conv_layer_0(x)
-        x = self.layernorm_0(x)
-        x = self.activation_layer_0(x)
-        x = self.dropout_layer_0(x)
-        x = self.conv_layer_1(x)
-        x = self.layernorm_1(x)
-        x = self.activation_layer_1(x)
-        x = self.dropout_layer_1(x)
+
+        for i in range(self.num_midlayers):
+            x = self.midlayer_conv[i](x)
+            x = self.midlayer_norm[i](x)
+            x = self.midlayer_activation[i](x)
+            x = self.midlayer_dropout[i](x)
+
         if do_use_outputs_as_features and do_merge_outputs_late:
             # Bring in catboost-predicted outputs as additional input late in the game
             x = torch.cat((x, input_x[:, -len(self.col_data.unexpanded_output_col_names) : , :]), dim=1)
