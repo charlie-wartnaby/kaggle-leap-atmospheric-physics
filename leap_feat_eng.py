@@ -46,7 +46,7 @@ import warnings
 
 
 # Settings
-debug = True
+debug = False
 do_test = True
 is_rerun = False
 do_analysis = True
@@ -54,10 +54,10 @@ do_train = True
 do_feature_knockout = False
 clear_batch_cache_at_start = debug
 scale_using_range_limits = False
-do_save_outputs_as_features = True
-do_use_outputs_as_features = False # not do_save_outputs_as_features
+do_save_outputs_as_features = False
+do_use_outputs_as_features = not do_save_outputs_as_features
 do_merge_outputs_early = False
-do_merge_outputs_late = False
+do_merge_outputs_late = True
 use_float64 = False
 model_type = "cnn" if not do_save_outputs_as_features else "catboost"
 emit_scaling_stats = False
@@ -74,16 +74,16 @@ if debug:
     max_epochs = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = 1000000 # excess_number_of_rows
+    max_train_rows = excess_number_of_rows # excess_number_of_rows
     max_test_rows  = excess_number_of_rows
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size = 20000
     cnn_batch_size = 5000
     patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.9
+    train_proportion = 0.95
     max_epochs = 30
 
-subset_base_row = 2000
+subset_base_row = 0
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
@@ -1141,7 +1141,7 @@ def write_scaling_stats_to_file(scaling_data, col_data):
 class AtmLayerCNN(nn.Module):
     def __init__(self, col_data, gen_conv_width=7, gen_conv_depth=15, init_1x1=True,
                  norm_type="layer", activation_type="silu", poly_degree=0,
-                 num_midlayers=2):
+                 num_midlayers=3):
         super().__init__()
         
         if use_float64:
