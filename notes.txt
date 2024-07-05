@@ -56,6 +56,10 @@ Found layer (not batch) normalisation and SiLU best in experiment 26May2024 thou
 Submission Results
 ------------------
 
+submission.csv - actually no better than 400 iterations
+Complete · 4m ago · Commit a86308a9 1M catboost rows offset from 8M, with 499 iterations instead of 400, to hopefully build better CNN input features
+0.44262
+
 submission.csv
 Complete · 2h ago · Commit 74824dca additional push with last dregs of training data, total 29 epochs
 0.72527
