@@ -48,7 +48,7 @@ import warnings
 # Settings
 debug                       = False
 do_test                     = True
-is_rerun                    = False
+is_rerun                    = True
 do_analysis                 = True
 do_train                    = True
 do_feature_knockout         = False
@@ -76,7 +76,7 @@ if debug:
     max_epochs                    = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows                = 100000 # excess_number_of_rows
+    max_train_rows                = excess_number_of_rows
     max_test_rows                 = excess_number_of_rows
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size           = 20000
