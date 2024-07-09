@@ -46,44 +46,45 @@ import warnings
 
 
 # Settings
-debug = False
-do_test = True
-is_rerun = False
-do_analysis = True
-do_train = True
-do_feature_knockout = False
-clear_batch_cache_at_start = debug
-scale_using_range_limits = False
+debug                       = True
+do_test                     = True
+is_rerun                    = False
+do_analysis                 = True
+do_train                    = True
+do_feature_knockout         = False
+clear_batch_cache_at_start  = debug
+scale_using_range_limits    = False
 do_save_outputs_as_features = False
-do_use_outputs_as_features = not do_save_outputs_as_features
-do_merge_outputs_early = False
-do_merge_outputs_late = False
-use_float64 = False
-model_type = "cnn" if not do_save_outputs_as_features else "catboost"
-emit_scaling_stats = False
-excess_number_of_rows = 1000000000 # i.e. do all
+do_use_outputs_as_features  = not do_save_outputs_as_features
+do_merge_outputs_early      = False
+do_merge_outputs_late       = False
+use_hu_cloud_partition      = True
+use_float64                 = False
+model_type                  = "cnn" if not do_save_outputs_as_features else "catboost"
+emit_scaling_stats          = False
+excess_number_of_rows       = 1000000000 # i.e. do all
+subset_base_row             = 0
 
 if debug:
-    max_train_rows = 1000
-    max_test_rows  = 100
+    max_train_rows                = 1000
+    max_test_rows                 = 100
     max_output_feature_train_rows = excess_number_of_rows
-    cnn_batch_size = 100
-    catboost_batch_size = 100
-    patience = 4
-    train_proportion = 0.8
-    max_epochs = 1
+    cnn_batch_size                = 100
+    catboost_batch_size           = 100
+    patience                      = 4
+    train_proportion              = 0.8
+    max_epochs                    = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows = excess_number_of_rows # excess_number_of_rows
-    max_test_rows  = excess_number_of_rows
+    max_train_rows                = excess_number_of_rows # excess_number_of_rows
+    max_test_rows                 = excess_number_of_rows
     max_output_feature_train_rows = excess_number_of_rows
-    catboost_batch_size = 20000
-    cnn_batch_size = 5000
-    patience = 3 # was 5 but saving GPU quota
-    train_proportion = 0.95
-    max_epochs = 30
+    catboost_batch_size           = 20000
+    cnn_batch_size                = 5000
+    patience                      = 3
+    train_proportion              = 0.95
+    max_epochs                    = 30
 
-subset_base_row = 0
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
@@ -485,7 +486,8 @@ def form_col_data():
     col_data.unexpanded_output_scalar_col_names = [col.name for col in unexpanded_col_list if not col.is_input and col.dimension <= 1]
 
     col_data.input_trick_names = ["state_q0002", "state_q0003"]
-
+    col_data.unexpanded_cloud_output_col_names = ["ptend_q0002", "ptend_q0003"]
+    
     # Form set of names to not compute outputs for according to competition
     # description; may add our own poor ones to this set later
     col_data.zero_or_bad_cols_by_name = {}
@@ -861,9 +863,32 @@ def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weigh
         for i, col_name in enumerate(col_data.unexpanded_output_col_names):
             if i == 0:
                 y = vector_dict[col_name]
+            elif use_hu_cloud_partition and col_name in col_data.unexpanded_cloud_output_col_names:
+                if col_name != col_data.unexpanded_cloud_output_col_names[0]:
+                    # Already dealt with these two cols when first one encountered
+                    continue
+                else:
+                    # Substitute the two dcloud/dt columns with the total cloud, will partition into
+                    # ice and water later during postprocessing
+                    d_cloud_liquid = vector_dict[col_name]
+                    d_cloud_ice    = vector_dict[col_data.unexpanded_cloud_output_col_names[1]]
+                    if col_data.sub_weights_old_liquid is None:
+                        expanded_idx = i * num_atm_levels # Know cloud outputs before any scalars
+                        col_data.sub_weights_old_liquid = submission_weights_old[:, expanded_idx : expanded_idx + num_atm_levels]
+                        expanded_idx += num_atm_levels
+                        col_data.sub_weights_old_ice    = submission_weights_old[:, expanded_idx : expanded_idx + num_atm_levels]
+                        # Using min of two weights so we don't generate v large output numbers
+                        col_data.sub_weights_old_merged = np.minimum(col_data.sub_weights_old_liquid, col_data.sub_weights_old_ice)
+                    d_cloud_liquid_raw = d_cloud_liquid.astype(np.float64) / col_data.sub_weights_old_liquid
+                    d_cloud_ice_raw = d_cloud_ice.astype(np.float64) / col_data.sub_weights_old_ice
+                    d_cloud_total_raw = d_cloud_liquid_raw + d_cloud_ice_raw
+                    d_cloud_total_scaled = (d_cloud_total_raw * col_data.sub_weights_old_merged)
+                    if not use_float64:
+                        d_cloud_total_scaled = d_cloud_total_scaled.astype(np.float32)
+                    y_add = d_cloud_total_scaled
             else:
                 y_add = vector_dict[col_name]
-                y = np.concatenate((y, y_add), axis=1)
+                y = np.concatenate((y, y_add), axis=1) # Just stacking sideways hence expanded
     else:
         y = None
 
@@ -1455,7 +1480,7 @@ def unscale_outputs(y, scaling_data, submission_weights_old):
 
 
 def postprocess_predictions(x, y, trick_x, scaling_data, col_data):
-    zeroed_cols = []
+
     for i in range(scaling_data.sy.shape[0]):
         # CW: still using original threshold although now premultiplying outputs by
         # submission weightings, though does zero out those with zero weights
