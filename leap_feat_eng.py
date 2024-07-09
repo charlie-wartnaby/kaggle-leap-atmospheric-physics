@@ -190,7 +190,7 @@ def main():
     else:
         param_permutations = expand_multitrain_permutations()
 
-    submission_weights_current, submission_weights_old = load_submission_weights(col_data)
+    weights_data = load_submission_weights(col_data)
 
     # Cache normalisation data needed for any rerun later
     if os.path.exists(scaling_cache_path):
@@ -199,14 +199,14 @@ def main():
             scaling_data = pickle.load(fd)
         # Everything should already be cached
     else:
-        scaling_data = preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights_current, submission_weights_old)
+        scaling_data = preprocess_training_data(train_hf, num_train_rows, col_data, weights_data)
     if emit_scaling_stats:
         write_scaling_stats_to_file(scaling_data, col_data)
         
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     if do_train:
-        exec_data, bad_r2_output_names = training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_weights_old,
+        exec_data, bad_r2_output_names = training_loop(train_hf, num_train_rows, col_data, scaling_data, weights_data,
                                                         param_permutations, device)
     else:
         exec_data = ExecData()
@@ -217,13 +217,13 @@ def main():
 
     if do_save_outputs_as_features:
         save_outputs_as_features(train_hf, "train", max_output_feature_train_rows,
-                                 col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old)
+                                 col_data, scaling_data, exec_data, device, weights_data)
         save_outputs_as_features(test_hf, "test", max_test_rows,
-                                 col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old)
+                                 col_data, scaling_data, exec_data, device, weights_data)
 
     if do_test:
         test_submission(test_hf, 
-                        col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old)
+                        col_data, scaling_data, exec_data, device, weights_data)
 
     exit_clean_up()
 
@@ -851,7 +851,7 @@ def minmax_vector_across_samples(sample_tuple_list, is_min):
         return np.max(all_samples, axis=0)
 
 
-def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weights_current, submission_weights_old):
+def preprocess_data(pl_df, has_outputs, col_data, scaling_data, weights_data):
     vector_dict = vectorise_data(pl_df, col_data, False)
     add_vector_features(vector_dict)
     # Glue input columns together by rows in batch, then feature, then atm level
@@ -863,31 +863,20 @@ def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weigh
         for i, col_name in enumerate(col_data.unexpanded_output_col_names):
             if i == 0:
                 y = vector_dict[col_name]
-            elif use_hu_cloud_partition and col_name in col_data.unexpanded_cloud_output_col_names:
-                if col_name != col_data.unexpanded_cloud_output_col_names[0]:
-                    # Already dealt with these two cols when first one encountered
-                    continue
-                else:
-                    # Substitute the two dcloud/dt columns with the total cloud, will partition into
-                    # ice and water later during postprocessing
-                    d_cloud_liquid = vector_dict[col_name]
-                    d_cloud_ice    = vector_dict[col_data.unexpanded_cloud_output_col_names[1]]
-                    if col_data.sub_weights_old_liquid is None:
-                        expanded_idx = i * num_atm_levels # Know cloud outputs before any scalars
-                        col_data.sub_weights_old_liquid = submission_weights_old[:, expanded_idx : expanded_idx + num_atm_levels]
-                        expanded_idx += num_atm_levels
-                        col_data.sub_weights_old_ice    = submission_weights_old[:, expanded_idx : expanded_idx + num_atm_levels]
-                        # Using min of two weights so we don't generate v large output numbers
-                        col_data.sub_weights_old_merged = np.minimum(col_data.sub_weights_old_liquid, col_data.sub_weights_old_ice)
-                    d_cloud_liquid_raw = d_cloud_liquid.astype(np.float64) / col_data.sub_weights_old_liquid
-                    d_cloud_ice_raw = d_cloud_ice.astype(np.float64) / col_data.sub_weights_old_ice
-                    d_cloud_total_raw = d_cloud_liquid_raw + d_cloud_ice_raw
-                    d_cloud_total_scaled = (d_cloud_total_raw * col_data.sub_weights_old_merged)
-                    if not use_float64:
-                        d_cloud_total_scaled = d_cloud_total_scaled.astype(np.float32)
-                    y_add = d_cloud_total_scaled
             else:
-                y_add = vector_dict[col_name]
+                if use_hu_cloud_partition and col_name in col_data.unexpanded_cloud_output_col_names:
+                    if col_name != col_data.unexpanded_cloud_output_col_names[0]:
+                        # Already dealt with these two cols when first one encountered
+                        continue
+                    else:
+                        # Substitute the two dcloud/dt columns with the total cloud, will partition into
+                        # ice and water later during postprocessing
+                        d_cloud_liquid = vector_dict[col_name]
+                        d_cloud_ice    = vector_dict[col_data.unexpanded_cloud_output_col_names[1]]
+                        d_cloud_total  = d_cloud_liquid + d_cloud_ice
+                        y_add          = d_cloud_total
+                else:
+                    y_add = vector_dict[col_name]
                 y = np.concatenate((y, y_add), axis=1) # Just stacking sideways hence expanded
     else:
         y = None
@@ -917,11 +906,11 @@ def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weigh
         # Scaling outputs by old submission weights, so we get
         # rid of very tiny values that will give very small variances, and will make
         # them suitable hopefully for conversion to float32
-        y = y * submission_weights_old
+        y = y * weights_data.submission_old
 
         # Also by current submission weights (though those are only 0 or 1 now) so we
         # have target values that match what is required for submission
-        y = y * submission_weights_current
+        y = y * weights_data.submission_current
 
         my_weighted = y.mean(axis=0)
         scaling_data.my_sample_weighted.append(my_weighted)
@@ -964,14 +953,20 @@ def normalise_data(x, y, scaling_data):
 
     return x, y
 
+class WeightsData():
+    # Loose struct for submission weights
+    pass
+
 def load_submission_weights(col_data):
     # First row is all we need from sample submission, to get col weightings. 
     # sample_id column labels are identical to test.csv (checked first rows at least)
     print('Loading submission weights...')
     sample_submission_df = pl.read_csv(submission_template_path, n_rows=1)
 
+    weights_data = WeightsData()
+    
     # Single row of weights for outputs
-    submission_weights_current = sample_submission_df[col_data.expanded_names_output].to_numpy().astype(np.float64)
+    weights_data.submission_current = sample_submission_df[col_data.expanded_names_output].to_numpy().astype(np.float64)
 
     # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/513193
     # Pre-18 June submission weights were good for getting values into sensible range for
@@ -982,21 +977,38 @@ def load_submission_weights(col_data):
     fd = io.StringIO(old_sample_submission_top_row)
 
     old_submission_df = pl.read_csv(fd)
-    submission_weights_old = old_submission_df[col_data.expanded_names_output].to_numpy().astype(np.float64)
+    weights_data.submission_old = old_submission_df[col_data.expanded_names_output].to_numpy().astype(np.float64)
 
     # "EDIT 2: As @churkinnikita points out, ptend_q0002 12-14 are no longer zeroed out"
     ptend_q0002_base_idx = col_data.output_expanded_first_idx_by_name["ptend_q0002"]
-    submission_weights_old[0, ptend_q0002_base_idx + 12 : ptend_q0002_base_idx + 15] = \
-                                              submission_weights_old[0, ptend_q0002_base_idx + 15]
+    weights_data.submission_old[0, ptend_q0002_base_idx + 12 : ptend_q0002_base_idx + 15] = \
+                                              weights_data.submission_old[0, ptend_q0002_base_idx + 15]
     
     # As the new submission weights will zero out unwanted columns anyway, but we'll need to
     # divide by the old weights, turn zeroes to ones to avoid div by zero later
-    submission_weights_old[submission_weights_old == 0.0] = 1.0
+    weights_data.submission_old[weights_data.submission_old == 0.0] = 1.0
 
-    return submission_weights_current, submission_weights_old
+    if use_hu_cloud_partition:
+        # Will be predicting d(total cloud)/dt not ice and water individually
+        first_cloud_output_idx = col_data.expanded_names_output.index('ptend_q0002_0')
+        sub_weights_old_liquid = weights_data.submission_old[:, first_cloud_output_idx : first_cloud_output_idx + num_atm_levels]
+        expanded_idx = first_cloud_output_idx + num_atm_levels
+        sub_weights_old_ice    = weights_data.submission_old[:, expanded_idx : expanded_idx + num_atm_levels]
+        first_noncloud_output_idx = expanded_idx + num_atm_levels
+        # Using min of two weights so we don't generate v large output numbers
+        sub_weights_old_merged = np.minimum(sub_weights_old_liquid, sub_weights_old_ice)
+        weights_data.submission_old = np.concatenate((weights_data.submission_old[:, : first_cloud_output_idx],
+                                                      sub_weights_old_merged,
+                                                      weights_data.submission_old[:, first_noncloud_output_idx :]),
+                                                     axis=1)
+        weights_data.submission_current_both_clouds = weights_data.submission_current
+        weights_data.submission_current = np.delete(weights_data.submission_current, 
+                                                    np.s_[first_cloud_output_idx:first_cloud_output_idx + num_atm_levels],
+                                                    1)
+    return weights_data
 
 
-def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weights_current, submission_weights_old):
+def preprocess_training_data(train_hf, num_train_rows, col_data, weights_data):
     # Preprocess entire dataset, gathering statistics for subsequent normalisation along the way
 
     print("No previous scalings so starting afresh")
@@ -1023,7 +1035,7 @@ def preprocess_training_data(train_hf, num_train_rows, col_data, submission_weig
         # Doing unconditionally as need scaling data across all samples, rebuild everything or nothing
         print(f"Building {prenorm_cache_path}...")
         pl_slice_df = train_hf.get_slice(true_file_index, true_file_index + cache_batch_size)
-        cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True, col_data, scaling_data, submission_weights_current, submission_weights_old)
+        cache_np_x, cache_np_y = preprocess_data(pl_slice_df, True, col_data, scaling_data, weights_data)
         if show_timings: print(f'HoloDataset slice build at row {true_file_index} took {time.time() - start_time} s')
         start_time = time.time()
         with open(prenorm_cache_path, 'wb') as fd:
@@ -1461,7 +1473,7 @@ def form_row_range_from_block_range(block_indices, num_train_rows, num_blocks, n
 
 
 
-def unscale_outputs(y, scaling_data, submission_weights_old):
+def unscale_outputs(y, scaling_data, weights_data):
     """Undo normalisation to return to true values (but with submission
     weights still multiplied in)"""
 
@@ -1471,7 +1483,7 @@ def unscale_outputs(y, scaling_data, submission_weights_old):
     # Should now be safe to divide by old submission weights to get correct magnitudes
     # (New submission weights still present but 0 or 1, and in any case want those
     # to be part of final target values for submission)
-    y = y / submission_weights_old
+    y = y / weights_data.submission_old
 
     # undo y scaling
     y = (y * scaling_data.sy) # Experimenting again with no mean offset: + my
@@ -1526,13 +1538,13 @@ class AnalysisData():
 
 
 def analyse_batch(analysis_data, inputs_np, outputs_pred_np, outputs_true_np, trick_x_np, col_data, 
-                  scaling_data, submission_weights_old):
+                  scaling_data, weights_data):
     """Analyse batch of true versus predicted outputs"""
 
     # Return to original output scalings (but with submission weights
     # multiplied in) to match competition metric
-    outputs_pred_np = unscale_outputs(outputs_pred_np, scaling_data, submission_weights_old)
-    outputs_true_np = unscale_outputs(outputs_true_np, scaling_data, submission_weights_old)
+    outputs_pred_np = unscale_outputs(outputs_pred_np, scaling_data, weights_data)
+    outputs_true_np = unscale_outputs(outputs_true_np, scaling_data, weights_data)
     # Post-model tweaks for tricky columns
     outputs_pred_np = postprocess_predictions(inputs_np, outputs_pred_np, trick_x_np, scaling_data, col_data)
 
@@ -1541,7 +1553,7 @@ def analyse_batch(analysis_data, inputs_np, outputs_pred_np, outputs_true_np, tr
     true_variance_sqd_scaled = scaling_data.stdev_y ** 2 # undo sqrt in stdev
     # Those variances were after scaling with old weightings, undo to compare
     # with values scaled for test output
-    true_variance_sqd_raw = true_variance_sqd_scaled / submission_weights_old ** 2
+    true_variance_sqd_raw = true_variance_sqd_scaled / weights_data.submission_old ** 2
 
     error_residues = outputs_true_np - outputs_pred_np
     error_variance_sqd = np.square(error_residues)
@@ -1598,7 +1610,7 @@ def calc_output_r2_ranking(col_data, analysis_data):
     return bad_r2_names
 
 
-def train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_weights_old,
+def train_cnn_model(model_params, exec_data, col_data, scaling_data, weights_data,
                     param_permutations, train_loader, val_loader, cnn_dataset, device):
     warnings.filterwarnings('ignore', category=FutureWarning)
 
@@ -1664,7 +1676,7 @@ def train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_
                     outputs_true_np = outputs_true.cpu().numpy()
                     _, _, trick_x = cnn_dataset.get_np_block_slice(-1, cnn_batch_size)
                     analyse_batch(analysis_data, inputs.cpu().numpy(), outputs_pred_np, outputs_true_np,
-                                   trick_x, col_data, scaling_data, submission_weights_old)
+                                   trick_x, col_data, scaling_data, weights_data.submission_old)
 
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Validation batch {batch_idx + 1}')
@@ -1727,7 +1739,7 @@ def train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_
     return bad_r2_output_names
 
 
-def train_catboost_model(exec_data, col_data, scaling_data, submission_weights_old, dataset, train_block_idx,
+def train_catboost_model(exec_data, col_data, scaling_data, weights_data, dataset, train_block_idx,
                          val_block_idx,
                          iterations=400, depth=8, learning_rate=0.25,
                          border_count=32, l2_leaf_reg=5):
@@ -1795,7 +1807,7 @@ def train_catboost_model(exec_data, col_data, scaling_data, submission_weights_o
         predicted_y = overall_model.predict(val_x)
         r2_score = sklearn.metrics.r2_score(val_y, predicted_y)
         print(f"Catboost validation batch {batch_idx+1} of {len(val_block_idx)} normalised r2={r2_score}")
-        analyse_batch(analysis_data, val_x, predicted_y, val_y, trick_x, col_data, scaling_data, submission_weights_old)
+        analyse_batch(analysis_data, val_x, predicted_y, val_y, trick_x, col_data, scaling_data, weights_data.submission_old)
 
         if os.path.exists(stopfile_path):
             print("Stop file detected, deleting it and stopping now")
@@ -1853,7 +1865,7 @@ class ExecData():
         self.best_feature_knockout_idx = 0
         self.feature_knockout_idx = 0
 
-def training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_weights_old, param_permutations, device):
+def training_loop(train_hf, num_train_rows, col_data, scaling_data, weights_data, param_permutations, device):
     exec_data = ExecData()
     if model_type == "cnn":
         exec_data.overall_best_val_metric = float('inf')
@@ -1931,10 +1943,10 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_w
             fd.write(f'{exec_data.model_save_path}\n')
 
         if model_type == "cnn":
-            bad_r2_output_names = train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_weights_old,
+            bad_r2_output_names = train_cnn_model(model_params, exec_data, col_data, scaling_data, weights_data.submission_old,
                                                   param_permutations, train_loader, val_loader, cnn_dataset, device)
         else:
-            bad_r2_output_names = train_catboost_model(exec_data, col_data, scaling_data, submission_weights_old, catboost_dataset, train_block_idx,
+            bad_r2_output_names = train_catboost_model(exec_data, col_data, scaling_data, weights_data.submission_old, catboost_dataset, train_block_idx,
                                                        val_block_idx, **model_params)
 
         if do_feature_knockout:
@@ -1945,7 +1957,7 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_w
 
 
 def save_outputs_as_features(src_hf, short_name, max_rows,
-                             col_data, scaling_data, exec_data, device, submission_weights_current, submission_weights_old):
+                             col_data, scaling_data, exec_data, device, weights_data):
     """Go through whole training and test datasets and save predicted outputs from one
     model, to later use as synthetic input features for another type of model,
     effectively running the two models in series"""
@@ -1956,11 +1968,11 @@ def save_outputs_as_features(src_hf, short_name, max_rows,
         num_batch_rows = min(len(src_hf) - base_row_idx, test_batch_size)
         subset_df = src_hf.get_slice(base_row_idx, base_row_idx + num_batch_rows)
         y_predictions = form_predictions(col_data, scaling_data, exec_data, device, 
-                                         submission_weights_current, submission_weights_old, subset_df, None)
+                                         weights_data, subset_df, None)
 
         # Ape steps used for training data
-        y_predictions *= submission_weights_old
-        y_predictions *= submission_weights_current
+        y_predictions *= weights_data.submission_old
+        y_predictions *= weights_data.submission_current
 
         # Using scalings extracted from training provided outputs rather than learning new
         # scaling for these features
@@ -2002,7 +2014,7 @@ def get_output_features_for_test_slice(first_row_idx, last_row_idx):
 
 
 def test_submission(test_hf, col_data, scaling_data, exec_data, device,
-                      submission_weights_current, submission_weights_old):
+                      weights_data):
 
     submission_df = None
 
@@ -2033,7 +2045,7 @@ def test_submission(test_hf, col_data, scaling_data, exec_data, device,
         if do_train:
             x_output_features = get_output_features_for_test_slice(base_row_idx, base_row_idx + num_rows)
             y_predictions = form_predictions(col_data, scaling_data, exec_data, device,
-                                              submission_weights_current, submission_weights_old, 
+                                              weights_data, 
                                               subset_df, x_output_features)
         else:
             # Use weighted combination of previous CNN and catboost submissions
@@ -2061,9 +2073,9 @@ def test_submission(test_hf, col_data, scaling_data, exec_data, device,
     submission_df.write_csv("submission.csv")
 
 
-def form_predictions(col_data, scaling_data, exec_data, device, submission_weights_current, 
-                     submission_weights_old, subset_df, x_outputs):
-    xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights_current, submission_weights_old)
+def form_predictions(col_data, scaling_data, exec_data, device, weights_data, 
+                     subset_df, x_outputs):
+    xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, weights_data)
     xt, _            = normalise_data(xt_prenorm, None, scaling_data)
     x_trick_features = extract_raw_trick_subset(xt_prenorm, col_data)
     if x_outputs is not None:
@@ -2088,7 +2100,7 @@ def form_predictions(col_data, scaling_data, exec_data, device, submission_weigh
         xt = catboost_process_input_batch(xt, col_data)
         y_predictions = exec_data.overall_best_model.predict(xt)
 
-    y_predictions = unscale_outputs(y_predictions, scaling_data, submission_weights_old)
+    y_predictions = unscale_outputs(y_predictions, scaling_data, weights_data)
     y_predictions = postprocess_predictions(xt, y_predictions, x_trick_features, scaling_data, col_data)
 
     return y_predictions
