@@ -57,6 +57,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 7m ago · Commit 2c2c3bb18 comparison CNN without catboost feature injection, ended after 22 epochs as not improving
+0.71781
+
+submission.csv
 Complete · 3m ago · Commit 71741533 with 3 CNN midlayers and late catboost features, 10M rows, 30 epochs, local R2=0.733
 0.72630
 
