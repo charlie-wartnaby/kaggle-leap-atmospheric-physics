@@ -55,7 +55,7 @@ do_feature_knockout         = False
 clear_batch_cache_at_start  = debug
 scale_using_range_limits    = False
 do_save_outputs_as_features = False
-do_use_outputs_as_features  = not do_save_outputs_as_features
+do_use_outputs_as_features  = False # not do_save_outputs_as_features
 do_merge_outputs_early      = False
 do_merge_outputs_late       = False
 use_hu_cloud_partition      = True
@@ -487,7 +487,16 @@ def form_col_data():
 
     col_data.input_trick_names = ["state_q0002", "state_q0003"]
     col_data.unexpanded_cloud_output_col_names = ["ptend_q0002", "ptend_q0003"]
-    
+
+    col_data.unexpanded_output_col_names_hu = col_data.unexpanded_output_col_names[:]
+    col_data.unexpanded_output_vector_col_names_hu = col_data.unexpanded_output_vector_col_names[:]
+    if use_hu_cloud_partition:
+        first_cloud_output_idx = col_data.unexpanded_output_col_names_hu.index(col_data.unexpanded_cloud_output_col_names[0]) 
+        col_data.unexpanded_output_col_names_hu[first_cloud_output_idx] = "ptend_totcloud"
+        del col_data.unexpanded_output_col_names_hu[first_cloud_output_idx + 1]
+        col_data.unexpanded_output_vector_col_names_hu[first_cloud_output_idx] = "ptend_totcloud"
+        del col_data.unexpanded_output_vector_col_names_hu[first_cloud_output_idx + 1]
+
     # Form set of names to not compute outputs for according to competition
     # description; may add our own poor ones to this set later
     col_data.zero_or_bad_cols_by_name = {}
@@ -568,14 +577,18 @@ def expand_vector_col_info(col_data):
     col_data.expanded_col_list = []
     expand_and_add_cols(col_data.expanded_col_list, col_data.unexpanded_cols_by_name, col_data.unexpanded_input_col_names)
     expand_and_add_cols(col_data.expanded_col_list, col_data.unexpanded_cols_by_name, col_data.unexpanded_output_col_names)
+    col_data.expanded_col_list_hu = []
+    expand_and_add_cols(col_data.expanded_col_list_hu, col_data.unexpanded_cols_by_name, col_data.unexpanded_input_col_names)
+    expand_and_add_cols(col_data.expanded_col_list_hu, col_data.unexpanded_cols_by_name, col_data.unexpanded_output_col_names_hu)
 
     expanded_names = [col.name for col in col_data.expanded_col_list]
     col_data.expanded_cols_by_name = dict(zip(expanded_names, col_data.expanded_col_list))
     col_data.expanded_names_input = [col.name for col in col_data.expanded_col_list if col.is_input]
     col_data.expanded_names_output = [col.name for col in col_data.expanded_col_list if not col.is_input]
+    col_data.expanded_names_output_hu = [col.name for col in col_data.expanded_col_list_hu if not col.is_input]
 
-    col_data.num_all_outputs_as_vectors = len(col_data.unexpanded_output_col_names)
-    col_data.num_pure_vector_outputs = len(col_data.unexpanded_output_vector_col_names)
+    col_data.num_all_outputs_as_vectors_hu = len(col_data.unexpanded_output_col_names_hu)
+    col_data.num_pure_vector_outputs_hu = len(col_data.unexpanded_output_vector_col_names_hu)
     col_data.num_scalar_outputs = len(col_data.unexpanded_output_scalar_col_names)
 
 
@@ -1201,7 +1214,7 @@ class AtmLayerCNN(nn.Module):
         num_input_feature_chans = len(col_data.cnn_input_feature_idx)
         if do_use_outputs_as_features and not do_merge_outputs_early:
             # Will ingest output features only near top of network
-            num_input_feature_chans -= len(col_data.unexpanded_output_col_names)
+            num_input_feature_chans -= len(col_data.unexpanded_output_col_names_hu)
         
         if do_feature_knockout:
             num_input_feature_chans -= 1
@@ -1239,7 +1252,7 @@ class AtmLayerCNN(nn.Module):
             input_size += len(col_data.unexpanded_output_col_names)
 
         self.last_conv_depth = gen_conv_depth
-        output_size = col_data.num_all_outputs_as_vectors * self.last_conv_depth
+        output_size = col_data.num_all_outputs_as_vectors_hu * self.last_conv_depth
         self.conv_layer_2 = nn.Conv1d(input_size, output_size, gen_conv_width,
                                 padding='same', dtype=dtype)
         self.layernorm_2 = self.norm_layer(output_size, num_atm_levels, dtype=dtype)
@@ -1249,8 +1262,8 @@ class AtmLayerCNN(nn.Module):
         # Output layer - no dropout, no activation function
         # Data is structured such that all vector columns come first, then scalars
         input_size = output_size
-        self.conv_vector_harvest = nn.Conv1d(col_data.num_pure_vector_outputs * gen_conv_depth,
-                                         col_data.num_pure_vector_outputs, 1, padding='same', dtype=dtype)
+        self.conv_vector_harvest = nn.Conv1d(col_data.num_pure_vector_outputs_hu * gen_conv_depth,
+                                             col_data.num_pure_vector_outputs_hu, 1, padding='same', dtype=dtype)
         self.vector_flatten = nn.Flatten()
         self.pre_scalar_pool = nn.AvgPool1d(num_atm_levels)
         self.scalar_flatten = nn.Flatten()
@@ -1261,7 +1274,7 @@ class AtmLayerCNN(nn.Module):
         # range of some outputs, initialising close to straight-through linear
         # though
         # https://pytorch.org/tutorials/beginner/examples_nn/polynomial_module.html
-        self.vector_poly_coeffs = self.create_coeff_param_list((col_data.num_pure_vector_outputs,1))
+        self.vector_poly_coeffs = self.create_coeff_param_list((col_data.num_pure_vector_outputs_hu,1))
         self.scalar_poly_coeffs = self.create_coeff_param_list((col_data.num_scalar_outputs))
 
     def create_coeff_param_list(self, vector_shape):
@@ -1317,7 +1330,7 @@ class AtmLayerCNN(nn.Module):
         x = self.layernorm_2(x)
         x = self.activation_layer_2(x)
         x = self.dropout_layer_2(x)
-        num_conv_outputs_for_vectors = self.col_data.num_pure_vector_outputs * self.last_conv_depth
+        num_conv_outputs_for_vectors = self.col_data.num_pure_vector_outputs_hu * self.last_conv_depth
         vector_subset = x[:, : num_conv_outputs_for_vectors, :]
         scalar_subset = x[:, num_conv_outputs_for_vectors :, :]
         scalars_pooled = self.pre_scalar_pool(scalar_subset)
@@ -1676,7 +1689,7 @@ def train_cnn_model(model_params, exec_data, col_data, scaling_data, weights_dat
                     outputs_true_np = outputs_true.cpu().numpy()
                     _, _, trick_x = cnn_dataset.get_np_block_slice(-1, cnn_batch_size)
                     analyse_batch(analysis_data, inputs.cpu().numpy(), outputs_pred_np, outputs_true_np,
-                                   trick_x, col_data, scaling_data, weights_data.submission_old)
+                                   trick_x, col_data, scaling_data, weights_data)
 
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Validation batch {batch_idx + 1}')
@@ -1943,10 +1956,10 @@ def training_loop(train_hf, num_train_rows, col_data, scaling_data, weights_data
             fd.write(f'{exec_data.model_save_path}\n')
 
         if model_type == "cnn":
-            bad_r2_output_names = train_cnn_model(model_params, exec_data, col_data, scaling_data, weights_data.submission_old,
+            bad_r2_output_names = train_cnn_model(model_params, exec_data, col_data, scaling_data, weights_data,
                                                   param_permutations, train_loader, val_loader, cnn_dataset, device)
         else:
-            bad_r2_output_names = train_catboost_model(exec_data, col_data, scaling_data, weights_data.submission_old, catboost_dataset, train_block_idx,
+            bad_r2_output_names = train_catboost_model(exec_data, col_data, scaling_data, weights_data, catboost_dataset, train_block_idx,
                                                        val_block_idx, **model_params)
 
         if do_feature_knockout:
