@@ -46,13 +46,13 @@ import warnings
 
 
 # Settings
-debug                       = True
+debug                       = False
 do_test                     = True
 is_rerun                    = False
 do_analysis                 = True
 do_train                    = True
 do_feature_knockout         = False
-clear_batch_cache_at_start  = False #debug
+clear_batch_cache_at_start  = debug
 scale_using_range_limits    = False
 do_save_outputs_as_features = False
 do_use_outputs_as_features  = not do_save_outputs_as_features
@@ -77,11 +77,11 @@ if debug:
     max_epochs                    = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows                = 1000000 # excess_number_of_rows
+    max_train_rows                = excess_number_of_rows
     max_test_rows                 = excess_number_of_rows
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size           = 20000
-    cnn_batch_size                = 5000
+    cnn_batch_size                = 2500  # To fit GPU with current model
     patience                      = 5
     train_proportion              = 0.95
     max_epochs                    = 30
@@ -89,7 +89,7 @@ else:
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {"init_1x1" : [False], "num_midlayers" : [2]} # temp saving GPU RAM
+multitrain_params = {} 
 if debug and model_type == "catboost":
     multitrain_params = {'iterations' : [2]} # Otherwise too slow
 
@@ -168,7 +168,7 @@ cache_batch_size = min(cnn_batch_size, catboost_batch_size)
 test_batch_size = cache_batch_size
 # Except sometimes we have saved cached data with coarser batches but want to use
 # smaller batches now
-cache_batch_size = 100
+cache_batch_size = 5000
 
 
 def main():
