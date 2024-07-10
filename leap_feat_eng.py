@@ -1209,43 +1209,43 @@ class AtmLayerCNN(nn.Module):
             # Should I be doing AvgPool to squeeze down to lower resolution?
             # Assuming conv layer with kernel wider than old resolution has same effect for now            
             atm_levels = num_atm_levels
-            layer_divider = 3 # 60 -> 20 or 18 because of edges (?)
+            layer_divider = 3 # 60 -> 20
             encoder_output_size = num_input_feature_chans * gen_conv_depth
             self.encoder_conv_0 = nn.Conv1d(encoder_input_size, encoder_output_size, gen_conv_width,
-                                            stride=layer_divider, dtype=dtype)
-            atm_levels = atm_levels // layer_divider - 2
+                                            stride=layer_divider, padding=2, dtype=dtype)
+            atm_levels = atm_levels // layer_divider
             self.encoder_norm_0 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
             self.encoder_activation_0 = self.activation_layer(dtype=dtype)
             self.encoder_dropout_0 = nn.Dropout(p=dropout_p)
             
-            layer_divider = 3 # 18 -> 6 or 4 because of edges (?)
+            layer_divider = 4 # 20 -> 5
             encoder_input_size = encoder_output_size
             encoder_output_size = num_input_feature_chans * gen_conv_depth
             self.encoder_conv_1 = nn.Conv1d(encoder_input_size, encoder_output_size, gen_conv_width,
-                                            stride=layer_divider, dtype=dtype)
-            atm_levels = atm_levels // layer_divider - 2
+                                            stride=layer_divider, padding=2, dtype=dtype)
+            atm_levels = atm_levels // layer_divider
             self.encoder_norm_1 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
             self.encoder_activation_1 = self.activation_layer(dtype=dtype)
             self.encoder_dropout_1 = nn.Dropout(p=dropout_p)
 
-            conv_width = 3
-            layer_multiplier = 1
+            conv_width = 4
+            layer_multiplier = 4 # 5 -> 20
             decoder_input_size = encoder_output_size
             decoder_output_size = num_input_feature_chans * gen_conv_depth
             self.decoder_deconv_2 = nn.ConvTranspose1d(decoder_input_size, decoder_output_size, conv_width,
-                                            stride=layer_multiplier, dtype=dtype)
-            atm_levels = atm_levels * layer_multiplier + (conv_width // 2) * 2
+                                            stride=layer_multiplier, padding=0, dtype=dtype)
+            atm_levels = atm_levels * layer_multiplier
             self.decoder_norm_2 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
             self.decoder_activation_2 = self.activation_layer(dtype=dtype)
             self.decoder_dropout_2 = nn.Dropout(p=dropout_p)
 
-            conv_width = 5
-            layer_multiplier = 2 # 20 -> 60
+            conv_width = 3
+            layer_multiplier = 3 # 20 -> 60
             decoder_input_size = encoder_output_size
             decoder_output_size = num_input_feature_chans * gen_conv_depth
-            self.decoder_deconv_3 = nn.ConvTranspose1d(decoder_input_size, decoder_output_size, gen_conv_width,
-                                            stride=layer_multiplier, dtype=dtype)
-            atm_levels = atm_levels * layer_multiplier + (conv_width // 2) * 2
+            self.decoder_deconv_3 = nn.ConvTranspose1d(decoder_input_size, decoder_output_size, conv_width,
+                                            stride=layer_multiplier, padding=0, dtype=dtype)
+            atm_levels = atm_levels * layer_multiplier
             self.decoder_norm_3 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
             self.decoder_activation_3 = self.activation_layer(dtype=dtype)
             self.decoder_dropout_3 = nn.Dropout(p=dropout_p)
