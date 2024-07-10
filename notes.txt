@@ -60,6 +60,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 3m ago · Commit f9266af6 another 6 epochs on 2024_07_07_71741533_full_cnn_3_midlayers_late_catboost now with Hu ice/water cloud partitioning, but looks worse local R2=0.719
+0.70814
+
+submission.csv
 Complete · 7m ago · Commit 2c2c3bb18 comparison CNN without catboost feature injection, ended after 22 epochs as not improving
 0.71781
 

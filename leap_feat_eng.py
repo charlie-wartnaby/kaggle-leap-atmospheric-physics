@@ -58,7 +58,8 @@ do_save_outputs_as_features = False
 do_use_outputs_as_features  = not do_save_outputs_as_features
 do_merge_outputs_early      = False
 do_merge_outputs_late       = True
-use_hu_cloud_partition      = True
+use_encoder_decoder         = True
+use_hu_cloud_partition      = False # Worse by experiment
 use_float64                 = False
 model_type                  = "cnn" if not do_save_outputs_as_features else "catboost"
 emit_scaling_stats          = False
@@ -1142,7 +1143,7 @@ def write_scaling_stats_to_file(scaling_data, col_data):
 class AtmLayerCNN(nn.Module):
     def __init__(self, col_data, gen_conv_width=7, gen_conv_depth=15, init_1x1=True,
                  norm_type="layer", activation_type="silu", poly_degree=0,
-                 num_midlayers=3):
+                 num_midlayers=3, encoder_decoder=True):
         super().__init__()
         
         if use_float64:
@@ -1156,6 +1157,7 @@ class AtmLayerCNN(nn.Module):
         self.activation_type = activation_type
         self.poly_degree = poly_degree
         self.num_midlayers = num_midlayers
+        self.encoder_decoder = encoder_decoder
 
         self.midlayer_conv = nn.ModuleList()
         self.midlayer_norm = nn.ModuleList()
@@ -1188,6 +1190,9 @@ class AtmLayerCNN(nn.Module):
             # No initial unit width layer
             output_size = input_size
 
+        # If have an encoder-decoder, will begin from here later
+        encoder_input_size = output_size
+
         for i in range(self.num_midlayers):
             input_size = output_size
             output_size = num_input_feature_chans * gen_conv_depth
@@ -1196,6 +1201,52 @@ class AtmLayerCNN(nn.Module):
             self.midlayer_norm.append(self.norm_layer(output_size, num_atm_levels, dtype=dtype))
             self.midlayer_activation.append(self.activation_layer(dtype=dtype))
             self.midlayer_dropout.append(nn.Dropout(p=dropout_p))
+
+        if self.encoder_decoder:
+            # Do U-Net style compression and decompression in parallel (main conv layers
+            # act as skip connections to maintain detail)
+
+            # Should I be doing AvgPool to squeeze down to lower resolution?
+            # Assuming conv layer with kernel wider than old resolution has same effect for now            
+            atm_levels = num_atm_levels
+            layer_divider = 3 # 60 -> 20
+            encoder_output_size = num_input_feature_chans * gen_conv_depth
+            self.encoder_conv_0 = nn.Conv1d(encoder_input_size, encoder_output_size, gen_conv_width,
+                                            stride=layer_divider, padding='same', dtype=dtype)
+            atm_levels /= layer_divider
+            self.encoder_norm_0 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
+            self.encoder_activation_0.append(self.activation_layer(dtype=dtype))
+            self.encoder_dropout_0.append(nn.Dropout(p=dropout_p))
+            
+            layer_divider = 4 # 20 -> 5
+            encoder_input_size = encoder_output_size
+            encoder_output_size = num_input_feature_chans * gen_conv_depth
+            self.encoder_conv_1 = nn.Conv1d(encoder_input_size, encoder_output_size, gen_conv_width,
+                                            stride=layer_divider, padding='same', dtype=dtype)
+            atm_levels /= layer_divider
+            self.encoder_norm_1 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
+            self.encoder_activation_1.append(self.activation_layer(dtype=dtype))
+            self.encoder_dropout_1.append(nn.Dropout(p=dropout_p))
+
+            layer_multiplier = 4 # 5 -> 20
+            decoder_input_size = encoder_output_size
+            decoder_output_size = num_input_feature_chans * gen_conv_depth
+            self.decoder_deconv_2 = nn.ConvTranspose1d(encoder_input_size, encoder_output_size, gen_conv_width,
+                                            stride=layer_multiplier, padding='same', dtype=dtype)
+            atm_levels *= layer_multiplier
+            self.decoder_norm_2 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
+            self.decoder_activation_2.append(self.activation_layer(dtype=dtype))
+            self.decoder_dropout_2.append(nn.Dropout(p=dropout_p))
+
+            layer_multiplier = 3 # 20 -> 60
+            decoder_input_size = encoder_output_size
+            decoder_output_size = num_input_feature_chans * gen_conv_depth
+            self.decoder_deconv_3 = nn.ConvTranspose1d(encoder_input_size, encoder_output_size, gen_conv_width,
+                                            stride=layer_multiplier, padding='same', dtype=dtype)
+            atm_levels *= layer_multiplier
+            self.decoder_norm_3 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
+            self.decoder_activation_3.append(self.activation_layer(dtype=dtype))
+            self.decoder_dropout_3.append(nn.Dropout(p=dropout_p))
 
         input_size = output_size
         if do_use_outputs_as_features and do_merge_outputs_late:
