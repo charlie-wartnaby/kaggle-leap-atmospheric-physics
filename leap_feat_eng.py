@@ -46,16 +46,16 @@ import warnings
 
 
 # Settings
-debug                       = False
-do_test                     = True
-is_rerun                    = True
+debug                       = True
+do_test                     = False
+is_rerun                    = False
 do_analysis                 = True
 do_train                    = True
 do_feature_knockout         = False
-clear_batch_cache_at_start  = debug
+clear_batch_cache_at_start  = False #debug
 scale_using_range_limits    = False
 do_save_outputs_as_features = False
-do_use_outputs_as_features  = not do_save_outputs_as_features
+do_use_outputs_as_features  = False #not do_save_outputs_as_features
 do_merge_outputs_early      = False
 do_merge_outputs_late       = True
 use_encoder_decoder         = True
@@ -1209,44 +1209,46 @@ class AtmLayerCNN(nn.Module):
             # Should I be doing AvgPool to squeeze down to lower resolution?
             # Assuming conv layer with kernel wider than old resolution has same effect for now            
             atm_levels = num_atm_levels
-            layer_divider = 3 # 60 -> 20
+            layer_divider = 3 # 60 -> 20 or 18 because of edges (?)
             encoder_output_size = num_input_feature_chans * gen_conv_depth
             self.encoder_conv_0 = nn.Conv1d(encoder_input_size, encoder_output_size, gen_conv_width,
-                                            stride=layer_divider, padding='same', dtype=dtype)
-            atm_levels /= layer_divider
+                                            stride=layer_divider, dtype=dtype)
+            atm_levels = atm_levels // layer_divider - 2
             self.encoder_norm_0 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
-            self.encoder_activation_0.append(self.activation_layer(dtype=dtype))
-            self.encoder_dropout_0.append(nn.Dropout(p=dropout_p))
+            self.encoder_activation_0 = self.activation_layer(dtype=dtype)
+            self.encoder_dropout_0 = nn.Dropout(p=dropout_p)
             
-            layer_divider = 4 # 20 -> 5
+            layer_divider = 3 # 18 -> 6 or 4 because of edges (?)
             encoder_input_size = encoder_output_size
             encoder_output_size = num_input_feature_chans * gen_conv_depth
             self.encoder_conv_1 = nn.Conv1d(encoder_input_size, encoder_output_size, gen_conv_width,
-                                            stride=layer_divider, padding='same', dtype=dtype)
-            atm_levels /= layer_divider
+                                            stride=layer_divider, dtype=dtype)
+            atm_levels = atm_levels // layer_divider - 2
             self.encoder_norm_1 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
-            self.encoder_activation_1.append(self.activation_layer(dtype=dtype))
-            self.encoder_dropout_1.append(nn.Dropout(p=dropout_p))
+            self.encoder_activation_1 = self.activation_layer(dtype=dtype)
+            self.encoder_dropout_1 = nn.Dropout(p=dropout_p)
 
-            layer_multiplier = 4 # 5 -> 20
+            conv_width = 3
+            layer_multiplier = 1
             decoder_input_size = encoder_output_size
             decoder_output_size = num_input_feature_chans * gen_conv_depth
-            self.decoder_deconv_2 = nn.ConvTranspose1d(encoder_input_size, encoder_output_size, gen_conv_width,
-                                            stride=layer_multiplier, padding='same', dtype=dtype)
-            atm_levels *= layer_multiplier
+            self.decoder_deconv_2 = nn.ConvTranspose1d(decoder_input_size, decoder_output_size, conv_width,
+                                            stride=layer_multiplier, dtype=dtype)
+            atm_levels = atm_levels * layer_multiplier + (conv_width // 2) * 2
             self.decoder_norm_2 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
-            self.decoder_activation_2.append(self.activation_layer(dtype=dtype))
-            self.decoder_dropout_2.append(nn.Dropout(p=dropout_p))
+            self.decoder_activation_2 = self.activation_layer(dtype=dtype)
+            self.decoder_dropout_2 = nn.Dropout(p=dropout_p)
 
-            layer_multiplier = 3 # 20 -> 60
+            conv_width = 5
+            layer_multiplier = 2 # 20 -> 60
             decoder_input_size = encoder_output_size
             decoder_output_size = num_input_feature_chans * gen_conv_depth
-            self.decoder_deconv_3 = nn.ConvTranspose1d(encoder_input_size, encoder_output_size, gen_conv_width,
-                                            stride=layer_multiplier, padding='same', dtype=dtype)
-            atm_levels *= layer_multiplier
+            self.decoder_deconv_3 = nn.ConvTranspose1d(decoder_input_size, decoder_output_size, gen_conv_width,
+                                            stride=layer_multiplier, dtype=dtype)
+            atm_levels = atm_levels * layer_multiplier + (conv_width // 2) * 2
             self.decoder_norm_3 = self.norm_layer(encoder_output_size, atm_levels, dtype=dtype)
-            self.decoder_activation_3.append(self.activation_layer(dtype=dtype))
-            self.decoder_dropout_3.append(nn.Dropout(p=dropout_p))
+            self.decoder_activation_3 = self.activation_layer(dtype=dtype)
+            self.decoder_dropout_3 = nn.Dropout(p=dropout_p)
 
         input_size = output_size
         if do_use_outputs_as_features and do_merge_outputs_late:
@@ -1319,12 +1321,33 @@ class AtmLayerCNN(nn.Module):
             x = self.activation_layer_1x1(x)
             x = self.dropout_layer_1x1(x)
 
+        if self.encoder_decoder:
+            ed = self.encoder_conv_0(x)
+            ed = self.encoder_norm_0(ed)
+            ed = self.encoder_activation_0(ed)
+            ed = self.encoder_dropout_0(ed)
+            ed = self.encoder_conv_1(ed)
+            ed = self.encoder_norm_1(ed)
+            ed = self.encoder_activation_1(ed)
+            ed = self.encoder_dropout_1(ed)
+            ed = self.decoder_deconv_2(ed)
+            ed = self.decoder_norm_2(ed)
+            ed = self.decoder_activation_2(ed)
+            ed = self.decoder_dropout_2(ed)
+            ed = self.decoder_deconv_3(ed)
+            ed = self.decoder_norm_3(ed)
+            ed = self.decoder_activation_3(ed)
+            ed = self.decoder_dropout_3(ed)
+
         for i in range(self.num_midlayers):
             x = self.midlayer_conv[i](x)
             x = self.midlayer_norm[i](x)
             x = self.midlayer_activation[i](x)
             x = self.midlayer_dropout[i](x)
 
+        if self.encoder_decoder:
+            x = x + ed
+        
         if do_use_outputs_as_features and do_merge_outputs_late:
             # Bring in catboost-predicted outputs as additional input late in the game
             x = torch.cat((x, input_x[:, -len(self.col_data.unexpanded_output_col_names) : , :]), dim=1)
