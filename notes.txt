@@ -1,9 +1,6 @@
 Ideas to progress
 -----------------
 
-o Try Hu 2024 approach predict total cloud, then partition as water or ice according to temperature
-  https://arxiv.org/abs/2407.00124
-o Try U-Net type structure with mid layers compressing information from all atm layers?
 o Bug if test only currently does validation loops
 o Logarithmic scaling so that reasonable values near 1, extremes not so extreme?
 o Went badly deleting hopefully redundant features at b32db7d49, so what is so crucial?

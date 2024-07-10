@@ -48,7 +48,7 @@ import warnings
 # Settings
 debug                       = False
 do_test                     = False
-is_rerun                    = False
+is_rerun                    = True
 do_analysis                 = True
 do_train                    = True
 do_feature_knockout         = False
@@ -82,7 +82,7 @@ else:
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size           = 20000
     cnn_batch_size                = 5000
-    patience                      = 3
+    patience                      = 5
     train_proportion              = 0.95
     max_epochs                    = 30
 
@@ -1333,7 +1333,7 @@ class AtmLayerCNN(nn.Module):
             ed = self.decoder_deconv_2(ed)
             ed = self.decoder_norm_2(ed)
             ed = self.decoder_activation_2(ed)
-            ed = self.decoder_dropout_2(ed) + skip
+            ed = self.decoder_dropout_2(ed) # + skip (Makes touch worse see results/2024_07_10_1dc605a0_1m_cnn_encoder_skip_connection/comparisons.ods)
             ed = self.decoder_deconv_3(ed)
             ed = self.decoder_norm_3(ed)
             ed = self.decoder_activation_3(ed)
