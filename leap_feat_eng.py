@@ -46,18 +46,18 @@ import warnings
 
 
 # Settings
-debug                       = False
-do_test                     = False
-is_rerun                    = True
+debug                       = True
+do_test                     = True
+is_rerun                    = False
 do_analysis                 = True
 do_train                    = True
 do_feature_knockout         = False
 clear_batch_cache_at_start  = False #debug
 scale_using_range_limits    = False
 do_save_outputs_as_features = False
-do_use_outputs_as_features  = False #not do_save_outputs_as_features
+do_use_outputs_as_features  = not do_save_outputs_as_features
 do_merge_outputs_early      = False
-do_merge_outputs_late       = False
+do_merge_outputs_late       = True
 use_encoder_decoder         = True
 use_hu_cloud_partition      = False # Worse by experiment
 use_float64                 = False
@@ -68,9 +68,9 @@ subset_base_row             = 0
 
 if debug:
     max_train_rows                = 1000
-    max_test_rows                 = 100
-    max_output_feature_train_rows = excess_number_of_rows
-    cnn_batch_size                = 100
+    max_test_rows                 = 500
+    max_output_feature_train_rows = 2000
+    cnn_batch_size                = 20
     catboost_batch_size           = 100
     patience                      = 4
     train_proportion              = 0.8
@@ -166,6 +166,9 @@ catboost_analysis_data_path = 'catboost_analysis_data.pkl'
 # large numpy operations when loading cache batches
 cache_batch_size = min(cnn_batch_size, catboost_batch_size)
 test_batch_size = cache_batch_size
+# Except sometimes we have saved cached data with coarser batches but want to use
+# smaller batches now
+cache_batch_size = 100
 
 
 def main():
@@ -1430,7 +1433,9 @@ class HoloDataset(Dataset):
                 index >= self.cache_base_idx and index < self.cache_base_idx + self.cache_rows):
             # We don't already have this in RAM
             start_time = time.time()
-            self.cache_base_idx = index
+            num_blocks_from_start = index // self.cache_rows
+            self.cache_base_idx = num_blocks_from_start * self.cache_rows
+            self.last_base_idx_requested = index # Dodgy hack so CNN-requested block later used for trick_x
             true_file_idx = self.cache_base_idx + subset_base_row
             cache_filename = f'{true_file_idx}.pkl'
             cache_path = os.path.join(batch_cache_dir, cache_filename)
@@ -1468,7 +1473,12 @@ class HoloDataset(Dataset):
                torch.from_numpy(y_np).to(self.device)
     
     def get_np_block_slice(self, block_base_idx, end_idx):
-        row_idx = block_base_idx if block_base_idx >= 0 else self.cache_base_idx
+        if block_base_idx < 0:
+            # Bit of a hack to retrieve trick data correctly corresponding to recent
+            # CNN data fetched
+            block_base_idx = self.last_base_idx_requested
+            end_idx += block_base_idx  # Caller couldn't give us absolute indices so relative offset here too
+        row_idx = block_base_idx
         complete_x = None
         complete_y = None
         complete_tricks = None
@@ -2033,7 +2043,7 @@ def save_outputs_as_features(src_hf, short_name, max_rows,
     base_row_idx = 0
     num_file_rows = min(max_rows, len(src_hf))
     while base_row_idx < num_file_rows:
-        num_batch_rows = min(len(src_hf) - base_row_idx, test_batch_size)
+        num_batch_rows = min(len(src_hf) - base_row_idx, cache_batch_size)
         subset_df = src_hf.get_slice(base_row_idx, base_row_idx + num_batch_rows)
         y_predictions = form_predictions(col_data, scaling_data, exec_data, device, 
                                          submission_weights_current, submission_weights_old, subset_df, None)
@@ -2066,10 +2076,18 @@ def get_output_features_for_test_slice(first_row_idx, last_row_idx):
     row_idx = first_row_idx
     x_features = None
     while row_idx < last_row_idx:
-        filename = f"test_{row_idx}.pkl"
+        num_disk_batches = row_idx // cache_batch_size
+        disk_base_idx = num_disk_batches * cache_batch_size
+        filename = f"test_{disk_base_idx}.pkl"
         path = os.path.join(output_features_dir, filename)
         with open(path, "rb") as fd:
             x_chunk = pickle.load(fd)
+        offset_in_chunk = row_idx - disk_base_idx
+        if offset_in_chunk > 0:
+            x_chunk = x_chunk[offset_in_chunk : , : , : ]
+        max_rows_in_chunk = last_row_idx - row_idx
+        if x_chunk.shape[0] > max_rows_in_chunk:
+            x_chunk = x_chunk[ : max_rows_in_chunk, :, :]
         if x_features is None:
             x_features = x_chunk
         else:
