@@ -57,6 +57,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 2m ago · Commit f71cba286 full dataset CNN with encoder/decoder and late catboost features, just 5 epochs so far but checking submission still OK after tweaks; local R2=0.7295
+0.70761
+
+submission.csv
 Complete · 3m ago · Commit f9266af6 another 6 epochs on 2024_07_07_71741533_full_cnn_3_midlayers_late_catboost now with Hu ice/water cloud partitioning, but looks worse local R2=0.719
 0.70814
 
