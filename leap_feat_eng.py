@@ -83,7 +83,7 @@ else:
     catboost_batch_size           = 20000
     cnn_batch_size                = 2500  # To fit GPU with current model
     patience                      = 5
-    train_proportion              = 0.95
+    train_proportion              = 0.999
     max_epochs                    = 30
 
 
