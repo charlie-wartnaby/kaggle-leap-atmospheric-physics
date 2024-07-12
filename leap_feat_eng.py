@@ -1848,6 +1848,7 @@ def train_catboost_model(exec_data, col_data, scaling_data, submission_weights_o
         block_base_row_idx = block_idx * catboost_batch_size
         train_x, train_y, trick_x = dataset.get_np_block_slice(block_base_row_idx, block_base_row_idx + catboost_batch_size)
         train_x = catboost_process_input_batch(train_x, col_data)
+        # Avoid error if some column is all zeroes for this batch:
         small_random_col = random_generator.random(catboost_batch_size).reshape((catboost_batch_size,1))
         small_random_col *= 1e-20
         train_y=np.where(train_y[:,]==0.0, small_random_col, train_y)
