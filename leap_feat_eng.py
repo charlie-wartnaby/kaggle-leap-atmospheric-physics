@@ -63,6 +63,7 @@ use_hu_cloud_partition      = False # Worse by experiment
 use_float64                 = False
 model_type                  = "cnn" if not do_save_outputs_as_features else "catboost"
 emit_scaling_stats          = False
+save_regardless_improvement = True
 excess_number_of_rows       = 1000000000 # i.e. do all
 subset_base_row             = 0
 
@@ -1776,20 +1777,23 @@ def train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_
             analysis_data.df.head(max_analysis_output_rows).write_csv(analysis_df_path)
             bad_r2_output_names = calc_output_r2_ranking(col_data, analysis_data)
 
-        if avg_val_loss < exec_data.overall_best_val_metric:
+        if avg_val_loss < exec_data.overall_best_val_metric or save_regardless_improvement:
+            # This covers multitrain experiments with multiple models
+            # When using basically entire training set, validation loss may get meaningless but
+            # still want to use most trained model for test run
             exec_data.overall_best_val_metric = avg_val_loss
             exec_data.overall_best_model = model
-            exec_data.overall_best_model_state = model.state_dict() # TODO is this static anyway?
+            exec_data.overall_best_model_state = model.state_dict().copy() # Copy current state not reference
             exec_data.overall_best_model_name = exec_data.model_save_path
             exec_data.best_feature_knockout_idx = exec_data.feature_knockout_idx
-            print(f"{exec_data.model_save_path} best so far")
+            print(f"{exec_data.model_save_path} best of all so far")
 
-        # Update best model if current epoch's validation loss is lower
-        if avg_val_loss < best_val_loss:
+        # Update best model if current epoch's validation loss is lower (just for current model type if multi)
+        if avg_val_loss < best_val_loss or save_regardless_improvement:
             best_val_loss = avg_val_loss
-            best_model_state = model.state_dict()  # Save the best model state
+            exec_data.best_model_state = model.state_dict()  # Save the best model state
             patience_count = 0
-            print("Validation loss decreased, saving new best model and resetting patience counter.")
+            print(f"Validation loss improved or don't care so saving {exec_data.model_save_path}")
             torch.save(model.state_dict(), exec_data.model_save_path)
         else:
             patience_count += 1
