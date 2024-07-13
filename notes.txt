@@ -57,6 +57,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 6m ago · Commit 76b5c4fa continuing with 99.9% of dataset regardless of local validation score, now at 29 epochs, submitting in case getting overtrained
+0.73373
+
+submission.csv
 Complete · 6m ago · Commit b84dea856 continued with full CNN, encoder/decoder, late catboost features, now 19 epochs, local R2=0.746
 0.72865
 
