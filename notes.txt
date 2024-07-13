@@ -57,6 +57,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 4m ago · Commit 801f442b continuing now to 34 epochs, checking if overtraining
+0.72729
+
+submission.csv
 Complete · 6m ago · Commit 76b5c4fa continuing with 99.9% of dataset regardless of local validation score, now at 29 epochs, submitting in case getting overtrained
 0.73373
 

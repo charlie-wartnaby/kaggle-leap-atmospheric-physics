@@ -48,7 +48,7 @@ import warnings
 # Settings
 debug                       = False
 do_test                     = True
-is_rerun                    = True
+is_rerun                    = False
 do_analysis                 = True
 do_train                    = True
 do_feature_knockout         = False
@@ -56,7 +56,7 @@ clear_batch_cache_at_start  = debug
 scale_using_range_limits    = False
 do_save_outputs_as_features = False
 do_use_outputs_as_features  = not do_save_outputs_as_features
-do_merge_outputs_early      = False
+do_merge_outputs_early      = True
 do_merge_outputs_late       = True
 use_encoder_decoder         = True
 use_hu_cloud_partition      = False # Worse by experiment
@@ -84,7 +84,7 @@ else:
     catboost_batch_size           = 20000
     cnn_batch_size                = 2500  # To fit GPU with current model
     patience                      = 5
-    train_proportion              = 0.999
+    train_proportion              = 0.95
     max_epochs                    = 30
 
 
