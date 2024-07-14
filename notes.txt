@@ -57,6 +57,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 2m ago · Commit bc4cf1c9 catboost early _and_ late in CNN, first 6 epochs, local R2=0.734
+0.71247
+
+submission.csv
 Complete · 4m ago · Commit 801f442b continuing now to 34 epochs, checking if overtraining
 0.72729
 

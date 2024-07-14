@@ -48,7 +48,7 @@ import warnings
 # Settings
 debug                       = False
 do_test                     = True
-is_rerun                    = False
+is_rerun                    = True
 do_analysis                 = True
 do_train                    = True
 do_feature_knockout         = False
@@ -84,8 +84,8 @@ else:
     catboost_batch_size           = 20000
     cnn_batch_size                = 2500  # To fit GPU with current model
     patience                      = 5
-    train_proportion              = 0.95
-    max_epochs                    = 30
+    train_proportion              = 0.999
+    max_epochs                    = 14
 
 
 # For model parameters to form permutations of in hyperparameter search
