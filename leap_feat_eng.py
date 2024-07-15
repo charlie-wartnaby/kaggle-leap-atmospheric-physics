@@ -85,7 +85,7 @@ else:
     cnn_batch_size                = 2500  # To fit GPU with current model
     patience                      = 5
     train_proportion              = 0.999
-    max_epochs                    = 1
+    max_epochs                    = 14
 
 
 # For model parameters to form permutations of in hyperparameter search
@@ -1740,9 +1740,7 @@ def train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Epoch {tot_epochs + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / batch_report_interval:.4f}')
                     total_loss = 0  # Reset the loss for the next n steps
-                    # Hack to finish early as failed to stop training just before deadline
-                    break
-
+        
         # Validation step
         analysis_data = AnalysisData()
 

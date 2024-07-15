@@ -56,6 +56,10 @@ Found layer (not batch) normalisation and SiLU best in experiment 26May2024 thou
 Submission Results
 ------------------
 
+submission.csv -- hmm hacked in a different way to begin training but then abort, oddly poor score though
+Complete · 3m ago · Commit 0b3b5dd now at 21 epochs, probably undertrained but out of time before submission deadline
+0.72396
+
 submission.csv -- hacked to omit training but something bad happened, maybe missing the one bad R2 col
 Complete · 2m ago · Commit 3ccae87 now at 21 epochs, probably undertrained but out of time before submission deadline
 0.68357
