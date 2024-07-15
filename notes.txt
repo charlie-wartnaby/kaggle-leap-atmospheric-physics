@@ -57,6 +57,10 @@ Submission Results
 ------------------
 
 submission.csv
+Complete · 3h ago · Commit dea52e41 with catboost early and late, now at 18 epochs, will continue; local R2=0.7665 but validating on prev training data
+0.72856
+
+submission.csv
 Complete · 2m ago · Continued now with 99.9% of dataset, reached 10 epochs
 0.72387
 

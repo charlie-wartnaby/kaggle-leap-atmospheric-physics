@@ -50,7 +50,7 @@ debug                       = False
 do_test                     = True
 is_rerun                    = True
 do_analysis                 = True
-do_train                    = True
+do_train                    = False
 do_feature_knockout         = False
 clear_batch_cache_at_start  = debug
 scale_using_range_limits    = False
@@ -216,6 +216,16 @@ def main():
     else:
         exec_data = ExecData()
         bad_r2_output_names = []
+        if do_test and model_type == "cnn":
+            # Hack because I forgot to stop training on very last epoch before final submission
+            model = AtmLayerCNN(col_data).to(device)
+            exec_data.model_save_path = "model.pt"
+            if try_reload_model and os.path.exists(exec_data.model_save_path):
+                print('Attempting to reload model from disk...')
+                model.load_state_dict(torch.load(exec_data.model_save_path))
+            exec_data.overall_best_model = model
+            exec_data.overall_best_model_state = model.state_dict().copy() # Copy current state not reference
+            test_hf = prepare_prediction(col_data, bad_r2_output_names)
 
     if do_train and (do_save_outputs_as_features or do_test):
         test_hf = prepare_prediction(col_data, bad_r2_output_names)
