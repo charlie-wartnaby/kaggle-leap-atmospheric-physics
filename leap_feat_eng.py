@@ -50,7 +50,7 @@ debug                       = False
 do_test                     = True
 is_rerun                    = True
 do_analysis                 = True
-do_train                    = False
+do_train                    = True
 do_feature_knockout         = False
 clear_batch_cache_at_start  = debug
 scale_using_range_limits    = False
@@ -85,7 +85,7 @@ else:
     cnn_batch_size                = 2500  # To fit GPU with current model
     patience                      = 5
     train_proportion              = 0.999
-    max_epochs                    = 14
+    max_epochs                    = 1
 
 
 # For model parameters to form permutations of in hyperparameter search
@@ -216,16 +216,6 @@ def main():
     else:
         exec_data = ExecData()
         bad_r2_output_names = []
-        if do_test and model_type == "cnn":
-            # Hack because I forgot to stop training on very last epoch before final submission
-            model = AtmLayerCNN(col_data).to(device)
-            exec_data.model_save_path = "model.pt"
-            if try_reload_model and os.path.exists(exec_data.model_save_path):
-                print('Attempting to reload model from disk...')
-                model.load_state_dict(torch.load(exec_data.model_save_path))
-            exec_data.overall_best_model = model
-            exec_data.overall_best_model_state = model.state_dict().copy() # Copy current state not reference
-            test_hf = prepare_prediction(col_data, bad_r2_output_names)
 
     if do_train and (do_save_outputs_as_features or do_test):
         test_hf = prepare_prediction(col_data, bad_r2_output_names)
@@ -1750,7 +1740,9 @@ def train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_
                 if (batch_idx + 1) % batch_report_interval == 0:
                     print(f'Epoch {tot_epochs + 1}, Step {batch_idx + 1}, Training Loss: {total_loss / batch_report_interval:.4f}')
                     total_loss = 0  # Reset the loss for the next n steps
-        
+                    # Hack to finish early as failed to stop training just before deadline
+                    break
+
         # Validation step
         analysis_data = AnalysisData()
 
