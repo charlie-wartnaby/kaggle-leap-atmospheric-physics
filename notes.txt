@@ -65,6 +65,10 @@ Complete · 2m ago · Commit 3ccae87 now at 21 epochs, probably undertrained but
 0.68357
 
 submission.csv
+Complete · 11h ago · Commit dea52e410 now 20 epochs, time for only 1 more after this before submission deadline
+0.72674 (private) 0.73045 (public) -- 2nd best overall score autoselected for final submission
+
+submission.csv
 Complete · 3h ago · Commit dea52e41 with catboost early and late, now at 18 epochs, will continue; local R2=0.7665 but validating on prev training data
 0.72856
 
@@ -82,7 +86,7 @@ Complete · 4m ago · Commit 801f442b continuing now to 34 epochs, checking if o
 
 submission.csv
 Complete · 6m ago · Commit 76b5c4fa continuing with 99.9% of dataset regardless of local validation score, now at 29 epochs, submitting in case getting overtrained
-0.73373
+0.72998 (private) 0.73373 (public) -- best overall score autoselected for final submission
 
 submission.csv
 Complete · 6m ago · Commit b84dea856 continued with full CNN, encoder/decoder, late catboost features, now 19 epochs, local R2=0.746
