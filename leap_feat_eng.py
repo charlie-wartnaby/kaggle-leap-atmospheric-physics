@@ -42,6 +42,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from   torch.utils.data import Dataset, DataLoader
+import torchinfo  # conda install of torchsummary didn't work, deprecated
 import warnings
 
 
@@ -56,7 +57,7 @@ clear_batch_cache_at_start  = debug
 scale_using_range_limits    = False
 do_save_outputs_as_features = False
 do_use_outputs_as_features  = not do_save_outputs_as_features
-do_merge_outputs_early      = True
+do_merge_outputs_early      = False
 do_merge_outputs_late       = True
 use_encoder_decoder         = True
 use_hu_cloud_partition      = False # Worse by experiment
@@ -1708,6 +1709,8 @@ def train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_
     if try_reload_model and os.path.exists(exec_data.model_save_path):
         print('Attempting to reload model from disk...')
         model.load_state_dict(torch.load(exec_data.model_save_path))
+    print("Model structure summary:")
+    torchinfo.summary(model)
 
     best_val_loss = float('inf')  # Set initial best as infinity
     criterion = nn.MSELoss()  # Using MSE for regression
