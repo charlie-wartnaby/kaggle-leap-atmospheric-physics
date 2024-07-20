@@ -50,10 +50,10 @@ import warnings
 debug                       = False
 do_test                     = False
 is_rerun                    = False
-do_analysis                 = True
-do_train                    = True
+do_analysis                 = False
+do_train                    = False
 do_feature_knockout         = False
-clear_batch_cache_at_start  = debug
+clear_batch_cache_at_start  = True
 scale_using_range_limits    = False
 do_save_outputs_as_features = False
 do_use_outputs_as_features  = False #not do_save_outputs_as_features
@@ -63,7 +63,7 @@ use_encoder_decoder         = True
 use_hu_cloud_partition      = False # Worse by experiment
 use_float64                 = False
 model_type                  = "cnn" if not do_save_outputs_as_features else "catboost"
-emit_scaling_stats          = False
+emit_scaling_stats          = True
 save_regardless_improvement = True
 excess_number_of_rows       = 1000000000 # i.e. do all
 subset_base_row             = 0
@@ -79,7 +79,7 @@ if debug:
     max_epochs                    = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows                = 1000000 # excess_number_of_rows
+    max_train_rows                = excess_number_of_rows
     max_test_rows                 = excess_number_of_rows
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size           = 20000
