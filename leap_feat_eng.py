@@ -50,20 +50,20 @@ import warnings
 debug                       = False
 do_test                     = False
 is_rerun                    = False
-do_analysis                 = False
-do_train                    = False
+do_analysis                 = True
+do_train                    = True
 do_feature_knockout         = False
-clear_batch_cache_at_start  = True
+clear_batch_cache_at_start  = False
 scale_using_range_limits    = False
 do_save_outputs_as_features = False
 do_use_outputs_as_features  = False #not do_save_outputs_as_features
 do_merge_outputs_early      = False
-do_merge_outputs_late       = True
+do_merge_outputs_late       = False
 use_encoder_decoder         = True
 use_hu_cloud_partition      = False # Worse by experiment
 use_float64                 = False
 model_type                  = "cnn" if not do_save_outputs_as_features else "catboost"
-emit_scaling_stats          = True
+emit_scaling_stats          = False
 save_regardless_improvement = True
 excess_number_of_rows       = 1000000000 # i.e. do all
 subset_base_row             = 0
@@ -79,11 +79,11 @@ if debug:
     max_epochs                    = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows                = excess_number_of_rows
+    max_train_rows                = 500000 # excess_number_of_rows
     max_test_rows                 = excess_number_of_rows
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size           = 20000
-    cnn_batch_size                = 5000  # To fit GPU with current model
+    cnn_batch_size                = 2500  # To fit GPU with current model
     patience                      = 5
     train_proportion              = 0.8
     max_epochs                    = 30
@@ -91,8 +91,8 @@ else:
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {"init_1x1"        : [False, True],
-                     "encoder_decoder" : [False, True]} 
+multitrain_params = {"init_1x1"        : [True, False],
+                     "encoder_decoder" : [True, False]} 
 if debug and model_type == "catboost":
     multitrain_params = {'iterations' : [2]} # Otherwise too slow
 
