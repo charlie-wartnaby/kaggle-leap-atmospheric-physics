@@ -3,24 +3,10 @@ Ideas to progress
 
 o Bug if test only currently does validation loops
 o Logarithmic scaling so that reasonable values near 1, extremes not so extreme?
-o Went badly deleting hopefully redundant features at b32db7d49, so what is so crucial?
-o Analyse which columns contributing most to error metric:
-   - ptend_q0001 moistening tendency low indices >=12, then higher ~45
-   - ptend_q0002 cloud liquid/ice mixing ratios and ptend_q0002 ice mixing ratios
-   -- both to do with condensation/evaporation
-   -- mass mixing ratio is m(ice/water) / m(dry air) 
 o Prev expts where knocked out half featurs etc bogus because before new ones added
 o Haven't explored optimiser etc (but did learning rate)
 o Deal properly with columns that are going to be zero anyway
-o Try range instead of stdev scaling again now range calc fixed
-  - if using range scaling need to still compute stdev for R2 metric
 o Tried float64 on 1M samples, very slow and convergence oddly seemed worse
-o Understand physics of each target col better
-o Does humidity have significant effect on heat capacity? And cloud/rain/snow content?
-o Deeper/alternative network structures
-o Would it help to group columns differently depending on technique?
-o Train/val split does appear deterministic (random seeds set)
-o Would catboost work for more iterations with smaller batches (thought not could revisit)
 o When training subset (e.g. for catboost output features) should draw random samples
   from whole training dataset, not one clump
 
