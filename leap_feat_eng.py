@@ -49,22 +49,22 @@ import warnings
 
 # Settings
 debug                       = False
-do_test                     = False
+do_test                     = True
 is_rerun                    = False
 do_analysis                 = True
 do_train                    = True
 do_feature_knockout         = False
 clear_batch_cache_at_start  = debug
 scale_using_range_limits    = False
-do_save_outputs_as_features = False
-do_use_outputs_as_features  = not do_save_outputs_as_features
+do_save_outputs_as_features = False # When running CatBoost to predict outputs
+do_use_outputs_as_features  = False # When CatBoost input features available and wanted
 do_merge_outputs_early      = False
-do_merge_outputs_late       = False #True
+do_merge_outputs_late       = False
 use_encoder_decoder         = True
 use_hu_cloud_partition      = False # Worse by experiment
 use_float64                 = False
 model_type                  = "cnn" if not do_save_outputs_as_features else "catboost"
-emit_scaling_stats          = True
+emit_scaling_stats          = False
 save_regardless_improvement = True # only for final submissions training with full dataset
 excess_number_of_rows       = 1000000000 # i.e. do all
 subset_base_row             = 0
