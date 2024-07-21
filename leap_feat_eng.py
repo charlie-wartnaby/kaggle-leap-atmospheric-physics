@@ -11,12 +11,13 @@
 # The original set of features is augmented using new ones inspired by
 # the physics of air parcels which I hoped would get better results.
 #
-# See README.md for more
+# See README.md for more including link to full report.
 #
 # These example notebooks for PyTorch and catboost got me started, thank you:
 # https://www.kaggle.com/code/airazusta014/pytorch-nn/notebook
 # https://www.kaggle.com/code/lonnieqin/leap-catboost-baseline
 # https://www.kaggle.com/code/gogo827jz/multiregression-catboost-1-model-for-206-targets
+# And thanks to https://www.kaggle.com/jano123 for the 'cloud trick'.
 
 
 # This can be run locally or the whole thing pasted into a single Kaggle notebook cell
@@ -53,18 +54,18 @@ is_rerun                    = False
 do_analysis                 = True
 do_train                    = True
 do_feature_knockout         = False
-clear_batch_cache_at_start  = False
+clear_batch_cache_at_start  = debug
 scale_using_range_limits    = False
 do_save_outputs_as_features = False
-do_use_outputs_as_features  = False #not do_save_outputs_as_features
+do_use_outputs_as_features  = not do_save_outputs_as_features
 do_merge_outputs_early      = False
-do_merge_outputs_late       = False
+do_merge_outputs_late       = False #True
 use_encoder_decoder         = True
 use_hu_cloud_partition      = False # Worse by experiment
 use_float64                 = False
 model_type                  = "cnn" if not do_save_outputs_as_features else "catboost"
-emit_scaling_stats          = False
-save_regardless_improvement = True
+emit_scaling_stats          = True
+save_regardless_improvement = True # only for final submissions training with full dataset
 excess_number_of_rows       = 1000000000 # i.e. do all
 subset_base_row             = 0
 
@@ -79,7 +80,7 @@ if debug:
     max_epochs                    = 1
 else:
     # Use very large numbers for 'all'
-    max_train_rows                = 500000 # excess_number_of_rows
+    max_train_rows                = excess_number_of_rows
     max_test_rows                 = excess_number_of_rows
     max_output_feature_train_rows = excess_number_of_rows
     catboost_batch_size           = 20000
@@ -91,8 +92,7 @@ else:
 
 # For model parameters to form permutations of in hyperparameter search
 # Each entry is 'param_name' : [list of values for that parameter]
-multitrain_params = {"init_1x1"        : [True, False],
-                     "encoder_decoder" : [True, False]} 
+multitrain_params = {} 
 if debug and model_type == "catboost":
     multitrain_params = {'iterations' : [2]} # Otherwise too slow
 
@@ -175,6 +175,8 @@ cache_batch_size = 5000
 
 
 def main():
+    """Main program execution"""
+
     entry_clean_up()
 
     # Read in training data
@@ -187,9 +189,11 @@ def main():
     num_train_rows = num_biggest_batches * max_batch_size # Now exact multiple of batch sizes
     assert(subset_base_row + num_train_rows <= len(train_hf))
 
+    # Produce column metadata (lists of names, descriptions, sizes etc)
     col_data = form_col_data()
     expand_vector_col_info(col_data)
 
+    # Support automated experiments
     if do_feature_knockout:
         param_permutations = range(len(col_data.unexpanded_input_col_names))
         with open(feature_knockout_path, 'w') as fd:
@@ -234,6 +238,7 @@ def main():
 
     exit_clean_up()
 
+
 def prepare_prediction(col_data, bad_r2_output_names):
     print('Loading test HoloFrame...')
     test_hf = HoloFrame(test_path, test_offsets_path)
@@ -244,6 +249,8 @@ def prepare_prediction(col_data, bad_r2_output_names):
 
 
 def expand_multitrain_permutations():
+    """Compute full permutation of parameters provided to iterate over"""
+
     multitrain_keys = list(multitrain_params.keys())
     if len(multitrain_keys) < 1:
         param_permutations = [{}]
@@ -279,6 +286,8 @@ def expand_multitrain_permutations():
 
 
 def entry_clean_up():
+    """Remove any leftovers from last run"""
+
     if os.path.exists(stopfile_path):
         print("Stop file detected on entry, deleting it")
         os.remove(stopfile_path)
@@ -571,6 +580,7 @@ def expand_and_add_cols(col_list, cols_by_name, col_names):
                 col_list.append(col_info)
 
 def expand_vector_col_info(col_data):
+    """Form expanded column lists e.g. ptend_q0002_0, ptend_q0002_1... from vector ptend_q0002"""
     col_data.expanded_col_list = []
     expand_and_add_cols(col_data.expanded_col_list, col_data.unexpanded_cols_by_name, col_data.unexpanded_input_col_names)
     expand_and_add_cols(col_data.expanded_col_list, col_data.unexpanded_cols_by_name, col_data.unexpanded_output_col_names)
@@ -715,6 +725,9 @@ def bmse_calc(T,qv, p): #,P0,PS,hyam,hybm):
 
 
 def add_vector_features(vector_dict):
+    """Apply feature engineering to attempt to get better results, inspired
+    by physics intuition"""
+
     R_air = 287.0 # Mass-based gas constant approx for air in J/kg.K
 
     temperature_np = vector_dict['state_t']
@@ -799,6 +812,9 @@ def add_vector_features(vector_dict):
 re_vector_heading = re.compile('([A-Za-z0-9_]+?)_([0-9]+)')
 
 def vectorise_data(pl_df, col_data, processing_output_features):
+    """"Gather supplied 'exploded' data into a vector for each atmospheric
+    altitude level"""
+
     vector_dict = {}
     col_idx = 0
     while col_idx < len(pl_df.columns):
@@ -858,6 +874,8 @@ def minmax_vector_across_samples(sample_tuple_list, is_min):
 
 
 def preprocess_data(pl_df, has_outputs, col_data, scaling_data, submission_weights_current, submission_weights_old):
+    """Prepare input raw data to be suitable for model ingestion"""
+
     vector_dict = vectorise_data(pl_df, col_data, False)
     add_vector_features(vector_dict)
     # Glue input columns together by rows in batch, then feature, then atm level
@@ -932,6 +950,7 @@ def glue_vector_features_into_matrix(vector_dict, col_names, prepend_output_name
 
 
 def normalise_data(x, y, scaling_data):
+    """Scale data so that standard modelling techniques work on it successfully"""
 
     if x is not None:
         # Original had mx.reshape(1,-1) to go from 1D row vector to 2D array with
@@ -948,6 +967,8 @@ def normalise_data(x, y, scaling_data):
     return x, y
 
 def load_submission_weights(col_data):
+    """Load provided weights which we must multiply output predictions by"""
+
     # First row is all we need from sample submission, to get col weightings. 
     # sample_id column labels are identical to test.csv (checked first rows at least)
     print('Loading submission weights...')
@@ -1128,6 +1149,8 @@ def extract_raw_trick_subset(x_prenorm, col_data):
 
 
 def write_scaling_stats_to_file(scaling_data, col_data):
+    """For understanding scaling of data provided"""
+
     x_df = pl.DataFrame()
     x_df = x_df.with_columns(pl.Series(name="var", values=col_data.unexpanded_input_col_names))
     x_df = x_df.with_columns(pl.from_numpy(np.reshape(scaling_data.xmin, (-1)), ["raw min"]))
@@ -1147,6 +1170,8 @@ def write_scaling_stats_to_file(scaling_data, col_data):
 
 
 class AtmLayerCNN(nn.Module):
+    """Implements the PyTorch neural network model"""
+
     def __init__(self, col_data, gen_conv_width=7, gen_conv_depth=15, init_1x1=True,
                  norm_type="layer", activation_type="silu", poly_degree=0,
                  num_midlayers=3, encoder_decoder=True):
@@ -1316,6 +1341,8 @@ class AtmLayerCNN(nn.Module):
 
 
     def forward(self, input_x):
+        """Run-time execution of model process"""
+
         if do_use_outputs_as_features and not do_merge_outputs_early:
             # Slice off catboost output features for now
             x = input_x[:, : -len(self.col_data.unexpanded_output_col_names), :]
@@ -1411,6 +1438,8 @@ class AtmLayerCNN(nn.Module):
 #
 
 class HoloDataset(Dataset):
+    """PyTorch-compatible dataset class making use of random access to disk cache files"""
+
     def __init__(self, holo_df, cache_rows, exec_data, device, x_col_idx_list):
         """
         Initialize with HoloFrame instance.
@@ -1432,6 +1461,8 @@ class HoloDataset(Dataset):
         return len(self.holo_df)
 
     def ensure_block_loaded(self, index):
+        """Retrieve block of data from disk if required """
+
         if not (self.cache_base_idx >= 0 and 
                 index >= self.cache_base_idx and index < self.cache_base_idx + self.cache_rows):
             # We don't already have this in RAM
@@ -1476,6 +1507,9 @@ class HoloDataset(Dataset):
                torch.from_numpy(y_np).to(self.device)
     
     def get_np_block_slice(self, block_base_idx, end_idx):
+        """"Get chunk of data of required dimensions, if necessary combining or
+        truncating blocks loaded from disk"""
+
         if block_base_idx < 0:
             # Bit of a hack to retrieve trick data correctly corresponding to recent
             # CNN data fetched
@@ -1543,6 +1577,8 @@ def unscale_outputs(y, scaling_data, submission_weights_old):
 
 
 def postprocess_predictions(x, y, trick_x, scaling_data, col_data):
+    """Apply special tricks to prediced data"""
+
     zeroed_cols = []
     for i in range(scaling_data.sy.shape[0]):
         # CW: still using original threshold although now premultiplying outputs by
@@ -1558,27 +1594,16 @@ def postprocess_predictions(x, y, trick_x, scaling_data, col_data):
                 y[:,i] = scaling_data.my_raw[i] # 0 here if restore addition of mean offset later
 
     if use_hu_cloud_partition:
-        # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/516605
-        # https://arxiv.org/pdf/2407.00124
         hu_fit_cloud_types_to_temperature(x, y, scaling_data, col_data)
 
-    # Trick to predict some difficult tiny-value columns discussed here:
-    # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/502484
-    # The gist of it is that the cloud columns at high altitudes often have zero
-    # values, and if they are non-zero then there is a good chance that the next
-    # point in time (1200 s or 20 min later) will be zero. So we can guess the
-    # tendency per second assuming the next point would be zero, giving the -1200 division.
-    # Looking at first 11 rows of training data, the relationships work well for:
-    # ptend_q0002[i] = state_q0002[i] / -1200   i=[12..30]  cloud ice mixing ratio
-    # ptend_q0003[i] = state_q0003[i] / -1200   i=[12..18]  cloud ice mixing ratio
-    # After that it starts to break down, though mixing some proportion of this guess
-    # into the predicted value might still help.
     replace_cloud_tendency_trick("state_q0002", "ptend_q0002", 12, 29, x, y, trick_x, col_data)
 #    replace_cloud_tendency_trick("state_q0003", "ptend_q0003", 12, 17, x, y, trick_x, col_data)
 
     return y
 
 def hu_fit_cloud_types_to_temperature(x, y, scaling_data, col_data):
+    # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/516605
+    # https://arxiv.org/pdf/2407.00124
     temperature_vector_idx = col_data.unexpanded_input_col_names.index("state_t")
     temperatures_scaled = x[:, temperature_vector_idx, :]
     temperatures_sx = scaling_data.sx[0, temperature_vector_idx, 0]
@@ -1604,6 +1629,17 @@ def hu_fit_cloud_types_to_temperature(x, y, scaling_data, col_data):
 
 
 def replace_cloud_tendency_trick(src_name, dest_name, first_idx, last_idx, x, y, trick_x, col_data):
+    # Trick to predict some difficult tiny-value columns discussed here:
+    # https://www.kaggle.com/competitions/leap-atmospheric-physics-ai-climsim/discussion/502484
+    # The gist of it is that the cloud columns at high altitudes often have zero
+    # values, and if they are non-zero then there is a good chance that the next
+    # point in time (1200 s or 20 min later) will be zero. So we can guess the
+    # tendency per second assuming the next point would be zero, giving the -1200 division.
+    # Looking at first 11 rows of training data, the relationships work well for:
+    # ptend_q0002[i] = state_q0002[i] / -1200   i=[12..30]  cloud ice mixing ratio
+    # ptend_q0003[i] = state_q0003[i] / -1200   i=[12..18]  cloud ice mixing ratio
+    # After that it starts to break down, though mixing some proportion of this guess
+    # into the predicted value might still help.
     src_full_set_idx = col_data.input_trick_names.index(src_name)
     raw_src_f64 = trick_x[:, src_full_set_idx, first_idx : last_idx].reshape((x.shape[0], 1, -1))
     y_base_idx = col_data.output_expanded_first_idx_by_name[dest_name]
@@ -1693,6 +1729,8 @@ def calc_output_r2_ranking(col_data, analysis_data):
 
 def train_cnn_model(model_params, exec_data, col_data, scaling_data, submission_weights_old,
                     param_permutations, train_loader, val_loader, cnn_dataset, device):
+    """Run training process for PyTorch model"""
+
     warnings.filterwarnings('ignore', category=FutureWarning)
 
     if is_rerun and os.path.exists(epoch_counter_path):
@@ -1829,6 +1867,7 @@ def train_catboost_model(exec_data, col_data, scaling_data, submission_weights_o
                          val_block_idx,
                          iterations=400, depth=8, learning_rate=0.25,
                          border_count=32, l2_leaf_reg=5):
+    """Run training process for CatBoost model"""
 
     cat_params = {
                     'iterations': iterations, 
@@ -1925,6 +1964,8 @@ def train_catboost_model(exec_data, col_data, scaling_data, submission_weights_o
 
 
 def catboost_process_input_batch(x_np, col_data):
+    """Catboost cannot work on vectorised data for CNN, so flatten it and remove
+    resulting duplicates of what were scalar features anyway"""
 
     num_rows = x_np.shape[0]
     x_proc = x_np.reshape((num_rows,-1)) # Leaving layer duplicates of scalars
@@ -1953,6 +1994,8 @@ class ExecData():
         self.feature_knockout_idx = 0
 
 def training_loop(train_hf, num_train_rows, col_data, scaling_data, submission_weights_old, param_permutations, device):
+    """Generic training loop process, iterating over parameter permutations if necessary"""
+
     exec_data = ExecData()
     if model_type == "cnn":
         exec_data.overall_best_val_metric = float('inf')
@@ -2081,7 +2124,9 @@ def save_outputs_as_features(src_hf, short_name, max_rows,
         base_row_idx += num_batch_rows
 
 def get_output_features_for_test_slice(first_row_idx, last_row_idx):
-    
+    """Read precomputed predicted values generated by one modelling technique to
+    use as input features for other modelling technique"""
+
     row_idx = first_row_idx
     x_features = None
     while row_idx < last_row_idx:
@@ -2110,6 +2155,7 @@ def get_output_features_for_test_slice(first_row_idx, last_row_idx):
 
 def test_submission(test_hf, col_data, scaling_data, exec_data, device,
                       submission_weights_current, submission_weights_old):
+    """Form final predictions and create CSV file ready for submission"""
 
     submission_df = None
 
@@ -2170,6 +2216,8 @@ def test_submission(test_hf, col_data, scaling_data, exec_data, device,
 
 def form_predictions(col_data, scaling_data, exec_data, device, submission_weights_current, 
                      submission_weights_old, subset_df, x_outputs):
+    """Predict target outputs for a subset of test data"""
+
     xt_prenorm, _    = preprocess_data(subset_df, False, col_data, scaling_data, submission_weights_current, submission_weights_old)
     xt, _            = normalise_data(xt_prenorm, None, scaling_data)
     x_trick_features = extract_raw_trick_subset(xt_prenorm, col_data)
@@ -2203,6 +2251,9 @@ def form_predictions(col_data, scaling_data, exec_data, device, submission_weigh
 
 def form_weighted_submission(submission_subset_cnn_df, submission_subset_catboost_df, 
                              prev_analysis_data_cnn, prev_analysis_data_catboost, scaling_data):
+    """Combine corresponding subsets from two submission files in the hope of getting
+    better overall result (spoiler: it did not work out better) """
+
     col_idx = 0
     while col_idx < len(submission_subset_cnn_df.columns):
         col_name = submission_subset_cnn_df.columns[col_idx]
@@ -2237,7 +2288,6 @@ def exit_clean_up():
     if clear_batch_cache_at_end:
         print('Deleting batch cache files...')
         shutil.rmtree(batch_cache_dir)
-
 
 if __name__ == "__main__":
     # Note: this is true when executed in Kaggle notebook cell too
